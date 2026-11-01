@@ -25,7 +25,7 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v3.0.0](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v3.0.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;9 patches total
+> **[v1.0.0](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.0.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;9 patches total
 <details open>
 <summary>📦 TickTick&nbsp;&nbsp;•&nbsp;&nbsp;4 patches</summary>
 <br>
