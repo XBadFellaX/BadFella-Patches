@@ -25,6 +25,7 @@ SPAN_EDITS = (
     (0x0146C90B, b"\x34\x0b\x00\x89\x06\x01", RETURN_UNDEFINED, "paywall gate base"),
     (0x01771119, b"\x34\x04\x00\x04\x03\x89", RETURN_UNDEFINED, "paywall gate store a"),
     (0x01771201, b"\x34\x05\x00\x34\x06\x01", RETURN_UNDEFINED, "paywall gate store b"),
+    (0x13C1879, b"\x01\xb2\x03\x00", b"\x41\xfc\x00\x00", "dark mode operand"),
 )
 
 
@@ -69,7 +70,8 @@ def verify(args):
     assert re.search(r'expo.modules.updates.ENABLED[^\n]*\n[^\n]*=false', manifest), "Expo OTA enabled"
     assert re.search(r'expo.modules.updates.EXPO_UPDATE_URL[^\n]*\n[^\n]*=""', manifest), "OTA URL remains"
     print("PASS: twelve HBC98 tier operands, prompt guard, billing headline, home Pro star, "
-          "Pro Activated profile label and three paywall auto-open gates; valid footer; "
+          "Pro Activated profile label, three paywall auto-open gates and the dark mode "
+          "device-theme operand; valid footer; "
           "all DEX, other assets and native payloads unchanged; OTA disabled")
 
 
