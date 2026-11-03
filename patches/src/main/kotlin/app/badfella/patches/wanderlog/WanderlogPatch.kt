@@ -14,7 +14,7 @@ import org.w3c.dom.Element
 @Suppress("unused")
 val wanderlogProPatch = resourcePatch(
     name = "Wanderlog Pro features",
-    description = "Enables local Pro feature checks, removes subscription prompts and auto-opening paywalls, hides the home Pro star, labels the profile button Pro Activated and brands the billing screen. Keeps the patched bundle in place by disabling Expo OTA updates. Does not grant server-run AI, downloads, flight tracking or a subscription.",
+    description = "Enables local Pro feature checks, removes subscription prompts and auto-opening paywalls, hides the home Pro star, labels the profile button Pro Activated and brands the billing screen. Makes the app theme follow the device dark-mode setting, because the app's own dark mode entry is Pro-only and the preference is set by Wanderlog's servers on subscription. Keeps the patched bundle in place by disabling Expo OTA updates. Does not grant server-run AI, downloads, flight tracking, Google Maps export or a subscription.",
 ) {
     compatibleWith(Compatibility(
         name = "Wanderlog", packageName = "com.wanderlog.android", apkFileType = ApkFileType.APKM,
@@ -97,8 +97,17 @@ val wanderlogProPatch = resourcePatch(
             }
             returnUndefined().copyInto(bytes, offset)
         }
+        // Dark mode: DarkModeContextProvider reads sessionStoreData.darkModePreference, a
+        // server-set value that only subscribers get, then falls back to
+        // makeDefaultDarkModePreference(scheme) -> useSystemSettings. Swap the GetByIdLong
+        // string-id operand 242177 ('darkModePreference') to 64577 ('useSystemSettings') so
+        // the lookup always misses and the theme follows the device setting instead.
+        val darkModeOperand = 0x13c1879
+        check(bytes.copyOfRange(darkModeOperand, darkModeOperand + 4).contentEquals(
+            byteArrayOf(0x01, 0xb2.toByte(), 0x03, 0x00))) { "Wanderlog dark mode operand changed" }
+        byteArrayOf(0x41, 0xfc.toByte(), 0x00, 0x00).copyInto(bytes, darkModeOperand)
         digest("SHA-1", bytes.copyOf(footer)).copyInto(bytes, footer)
-        check(sha256(bytes) == "9cf2e5738b4ad690ce0cf92351c6b9a478700196a0a2bfdced64a8a9b5c1d36c") { "Wanderlog output checksum failed" }
+        check(sha256(bytes) == "e1b0945e2acfd73f9c9749691a39325cbc3c2d27a0080d194c6c9b9344f8e3b2") { "Wanderlog output checksum failed" }
         document("AndroidManifest.xml").use { doc ->
             val nodes = doc.getElementsByTagName("meta-data")
             val metadata = (0 until nodes.length).mapNotNull { nodes.item(it) as? Element }
