@@ -97,17 +97,21 @@ val wanderlogProPatch = resourcePatch(
             }
             returnUndefined().copyInto(bytes, offset)
         }
-        // Dark mode: DarkModeContextProvider reads sessionStoreData.darkModePreference, a
-        // server-set value that only subscribers get, then falls back to
-        // makeDefaultDarkModePreference(scheme) -> useSystemSettings. Swap the GetByIdLong
-        // string-id operand 242177 ('darkModePreference') to 64577 ('useSystemSettings') so
-        // the lookup always misses and the theme follows the device setting instead.
-        val darkModeOperand = 0x13c1879
-        check(bytes.copyOfRange(darkModeOperand, darkModeOperand + 4).contentEquals(
-            byteArrayOf(0x01, 0xb2.toByte(), 0x03, 0x00))) { "Wanderlog dark mode operand changed" }
-        byteArrayOf(0x41, 0xfc.toByte(), 0x00, 0x00).copyInto(bytes, darkModeOperand)
+        // Dark mode: the provider's value is gated on isTrialOrProUser(), which stays false
+        // for free accounts, and makeDefaultDarkModePreference(false) yields 'lightMode'.
+        // Run the preference evaluation regardless of that gate (JmpFalse target 0x10f ->
+        // fall through) and treat 'lightMode' as the system setting (JStrictEqual target
+        // 0x10f -> next instruction), so the theme follows the device.
+        val themeGate = 0x13c18c3
+        check(bytes.copyOfRange(themeGate, themeGate + 3).contentEquals(
+            byteArrayOf(0xb2.toByte(), 0x51, 0x0a))) { "Wanderlog theme gate changed" }
+        bytes[themeGate + 1] = 0x03
+        val lightModeBranch = 0x13c18ea
+        check(bytes.copyOfRange(lightModeBranch, lightModeBranch + 4).contentEquals(
+            byteArrayOf(0xd3.toByte(), 0x2a, 0x08, 0x09))) { "Wanderlog theme branch changed" }
+        bytes[lightModeBranch + 1] = 0x04
         digest("SHA-1", bytes.copyOf(footer)).copyInto(bytes, footer)
-        check(sha256(bytes) == "e1b0945e2acfd73f9c9749691a39325cbc3c2d27a0080d194c6c9b9344f8e3b2") { "Wanderlog output checksum failed" }
+        check(sha256(bytes) == "4e7835054b644097d8d6a2f41361b71ceee94206670c88b193a82a60404ea32c") { "Wanderlog output checksum failed" }
         document("AndroidManifest.xml").use { doc ->
             val nodes = doc.getElementsByTagName("meta-data")
             val metadata = (0 until nodes.length).mapNotNull { nodes.item(it) as? Element }
