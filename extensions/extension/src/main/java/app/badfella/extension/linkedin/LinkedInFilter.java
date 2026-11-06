@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -19,6 +20,9 @@ public final class LinkedInFilter {
     private static final String[] HIDEABLE_TABS = {
             "RELATIONSHIPS", "POST", "NOTIFICATIONS", "JOBS", "VIDEO", "NEWS",
     };
+
+    /** Bound for reshared/attachment/carousel wrapping so a malformed graph cannot recurse. */
+    private static final int MAX_UPDATE_DEPTH = 3;
 
     // ---- Feed -------------------------------------------------------------------------------
 
@@ -56,53 +60,90 @@ public final class LinkedInFilter {
 
     /**
      * Sponsored or promoted content. Sponsored tracking metadata is authoritative; lead-gen form
-     * content and the feed's "Promoted"/"Sponsored" actor label cover ads that arrive without it.
+     * content, boosted headers, call-to-action cards and the feed's Promoted/Sponsored labels cover
+     * ads that arrive without it. Ads can also wrap an inner update, so nested updates are checked
+     * with a bounded depth.
      */
     private static boolean isSponsored(Object update) {
-        if (update == null) return false;
+        return isSponsored(update, 0);
+    }
+
+    private static boolean isSponsored(Object update, int depth) {
+        if (update == null || depth > MAX_UPDATE_DEPTH) return false;
         Object tracking = field(field(update, "metadata"), "trackingData");
         if (field(tracking, "sponsoredTracking") != null) return true;
+        if (isTrue(tracking, "hasSponsoredTracking")) return true;
         if (field(update, "leadGenFormContent") != null) return true;
         if (isTrue(update, "hasLeadGenFormContent")) return true;
+        if (isTrue(update, "hasBoostHeader") || field(update, "boostHeader") != null) return true;
+        if (hasCallToAction(update)) return true;
         if (hasPromotedLabel(update)) return true;
-        return hasSponsoredCarouselItem(update);
+        if (hasSponsoredCarouselItem(update, depth)) return true;
+        if (isSponsored(field(update, "resharedUpdate"), depth + 1)) return true;
+        return isSponsored(field(field(update, "attachment"), "update"), depth + 1);
+    }
+
+    private static boolean hasCallToAction(Object update) {
+        if (hasComponent(update, "hasCallToActionComponentValue")) return true;
+        return field(field(update, "content"), "callToActionComponentValue") != null
+                || field(field(field(update, "attachment"), "content"),
+                        "callToActionComponentValue") != null;
     }
 
     private static boolean hasPromotedLabel(Object update) {
-        if (hasPromotedActor(update)) return true;
-        Object items = field(carouselOf(update), "items");
-        if (!(items instanceof List)) return false;
-        for (Object item : (List) items) {
-            if (hasPromotedActor(field(item, "update"))) return true;
-        }
-        return false;
+        return hasPromotedActor(field(update, "actor"))
+                || hasPromotedActor(field(field(update, "content"), "actorComponentValue"))
+                || hasPromotedTextIn(field(update, "header"))
+                || hasPromotedTextIn(field(update, "detailHeader"))
+                || hasPromotedTextIn(field(update, "contextualHeader"));
     }
 
-    private static boolean hasPromotedActor(Object update) {
-        Object actor = field(update, "actor");
-        if (actor == null) actor = field(field(update, "content"), "actorComponentValue");
+    private static boolean hasPromotedActor(Object actor) {
+        if (actor == null) return false;
         return isPromotedText(field(actor, "subDescription"))
-                || isPromotedText(field(actor, "subDescriptionButton"));
+                || isPromotedText(field(actor, "subDescriptionButton"))
+                || isPromotedText(field(actor, "supplementaryActorInfo"))
+                || isPromotedText(field(actor, "description"));
     }
 
+    /** {@code HeaderComponent.text} and the {@code ContextualHeaderComponent} text variants. */
+    private static boolean hasPromotedTextIn(Object header) {
+        if (header == null) return false;
+        return isPromotedText(field(header, "text"))
+                || isPromotedText(field(header, "title"))
+                || isPromotedText(field(header, "subtitle"))
+                || isPromotedText(field(header, "contextualTitle"))
+                || isPromotedText(field(header, "titleSupplementaryInfo"))
+                || isPromotedText(field(header, "contextualTitleSupplementaryInfo"));
+    }
+
+    /**
+     * TextViewModel carries both {@code text} and {@code accessibilityText}; ButtonComponent
+     * carries a plain string. Labels can be joined with separators or non-breaking spaces, so
+     * match the words rather than the whole value.
+     */
     private static boolean isPromotedText(Object value) {
         if (value == null) return false;
-        String text = value instanceof CharSequence ? value.toString() : asString(field(value, "text"));
-        if (text == null) return false;
-        text = text.trim();
-        return "Promoted".equalsIgnoreCase(text) || "Sponsored".equalsIgnoreCase(text);
+        if (value instanceof CharSequence) return mentionsPromoted(value.toString());
+        return mentionsPromoted(asString(field(value, "text")))
+                || mentionsPromoted(asString(field(value, "accessibilityText")));
     }
 
-    private static boolean hasSponsoredCarouselItem(Object update) {
+    private static boolean mentionsPromoted(String text) {
+        if (text == null) return false;
+        String lower = text.toLowerCase(Locale.ROOT);
+        return lower.contains("promoted") || lower.contains("sponsored");
+    }
+
+    private static boolean hasSponsoredCarouselItem(Object update, int depth) {
         Object items = field(carouselOf(update), "items");
         if (!(items instanceof List)) return false;
         for (Object item : (List) items) {
             if (item == null) continue;
-            if (field(field(item, "trackingData"), "sponsoredTracking") != null) return true;
-            Object nested = field(item, "update");
-            if (field(field(field(nested, "metadata"), "trackingData"), "sponsoredTracking") != null) {
-                return true;
-            }
+            Object itemTracking = field(item, "trackingData");
+            if (field(itemTracking, "sponsoredTracking") != null) return true;
+            if (isTrue(itemTracking, "hasSponsoredTracking")) return true;
+            if (isSponsored(field(item, "update"), depth + 1)) return true;
         }
         return false;
     }

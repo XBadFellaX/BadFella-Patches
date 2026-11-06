@@ -1,3 +1,9 @@
+## 1.2.0-dev.5 (2026-11-06)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** remove boosted and label-only promoted posts from the feed, including labels in accessibility text, supplementary actor info, headers and call-to-action cards
+
 ## 1.2.0-dev.4 (2026-11-06)
 
 ### 🐛 Bug Fixes

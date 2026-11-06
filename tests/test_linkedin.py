@@ -100,9 +100,13 @@ class LinkedInSourceTests(unittest.TestCase):
         source = FILTER.read_text(encoding="utf-8")
         for anchor in ["leadGenFormContent", "sponsoredTracking", "subDescription",
                        "subDescriptionButton", "carouselContent", "hasVideoCarouselItemComponentValue",
-                       "hasEntityComponentValue", "hasFollowPromptComponentValue"]:
+                       "hasEntityComponentValue", "hasFollowPromptComponentValue", "accessibilityText",
+                       "supplementaryActorInfo", "hasSponsoredTracking", "hasBoostHeader",
+                       "boostHeader", "resharedUpdate", "callToActionComponentValue",
+                       "detailHeader", "contextualHeader"]:
             self.assertIn(anchor, source)
-        self.assertIn("\"Promoted\".equalsIgnoreCase(text)", source)
+        self.assertIn('lower.contains("promoted")', source)
+        self.assertIn('lower.contains("sponsored")', source)
         self.assertIn("name.contains(\"VIDEO\")", source)
 
     def test_runtime_filter_does_not_treat_general_lego_token_as_sponsored(self):
@@ -129,8 +133,12 @@ import java.util.List;
 public final class LinkedInFilterBehaviorCheck {
     enum Type { UNKNOWN, MIXED_UPDATES, DISCOVER_VIDEO, VIDEO, SMALL_THEMED_VIDEOS }
 
-    static final class Tracking { Object sponsoredTracking; }
+    static final class Tracking {
+        Object sponsoredTracking;
+        boolean hasSponsoredTracking;
+    }
     static final class Metadata { Tracking trackingData; String legoTrackingToken; }
+    static final class CallToAction { String legoTrackingToken; }
     static final class Content {
         boolean hasLinkedInVideoComponentValue;
         boolean hasLargeSingleVideoComponentValue;
@@ -141,6 +149,9 @@ public final class LinkedInFilterBehaviorCheck {
         boolean hasEntityComponentValue;
         boolean hasFeedDiscoveryEntityComponentValue;
         boolean hasFeedDiscoveryGridComponentValue;
+        boolean hasCallToActionComponentValue;
+        CallToAction callToActionComponentValue;
+        Actor actorComponentValue;
     }
     static final class Item { Tracking trackingData; Update update; Content content; }
     static final class Carousel {
@@ -148,10 +159,32 @@ public final class LinkedInFilterBehaviorCheck {
         List<Item> items = new ArrayList<>();
         Carousel(Type type) { this.type = type; }
     }
-    static final class Attachment { Content content; Carousel carouselContent; }
-    static final class Text { String text; Text(String text) { this.text = text; } }
+    static final class Attachment { Content content; Carousel carouselContent; Update update; }
+    static final class Text {
+        String text;
+        String accessibilityText;
+        Text(String text) { this.text = text; }
+        Text(String text, String accessibilityText) {
+            this.text = text;
+            this.accessibilityText = accessibilityText;
+        }
+    }
     static final class Button { String text; Button(String text) { this.text = text; } }
-    static final class Actor { Text subDescription; Button subDescriptionButton; }
+    static final class Actor {
+        Text subDescription;
+        Button subDescriptionButton;
+        Text supplementaryActorInfo;
+        Text description;
+    }
+    static final class Header { Text text; }
+    static final class ContextualHeader {
+        Text title;
+        Text subtitle;
+        Text contextualTitle;
+        Text titleSupplementaryInfo;
+        Text contextualTitleSupplementaryInfo;
+    }
+    static final class Boost { String boostStatus; }
     static final class LeadGenFormContent { Carousel carouselContent; Content content; }
     static final class Update {
         Metadata metadata = new Metadata();
@@ -161,6 +194,12 @@ public final class LinkedInFilterBehaviorCheck {
         Carousel carouselContent;
         LeadGenFormContent leadGenFormContent;
         boolean hasLeadGenFormContent;
+        boolean hasBoostHeader;
+        Boost boostHeader;
+        Update resharedUpdate;
+        Header header;
+        Header detailHeader;
+        ContextualHeader contextualHeader;
     }
 
     static void check(String name, boolean condition) {
@@ -195,6 +234,94 @@ public final class LinkedInFilterBehaviorCheck {
         labelledButton.actor = new Actor();
         labelledButton.actor.subDescriptionButton = new Button("Sponsored");
         check("Sponsored actor button is sponsored", LinkedInFilter.isSponsoredPost(labelledButton));
+
+        Update accessibleOnly = new Update();
+        accessibleOnly.actor = new Actor();
+        accessibleOnly.actor.subDescription = new Text(null, "Promoted");
+        check("Promoted accessibilityText is sponsored", LinkedInFilter.isSponsoredPost(accessibleOnly));
+
+        Update separated = new Update();
+        separated.actor = new Actor();
+        separated.actor.subDescription = new Text("\\u00A02,725,195 followers \\u2022 Promoted\\u00A0");
+        check("label joined with separators is sponsored", LinkedInFilter.isSponsoredPost(separated));
+
+        Update supplementary = new Update();
+        supplementary.actor = new Actor();
+        supplementary.actor.subDescription = new Text("2,725,195 followers");
+        supplementary.actor.supplementaryActorInfo = new Text("Promoted");
+        check("supplementaryActorInfo label is sponsored", LinkedInFilter.isSponsoredPost(supplementary));
+
+        Update described = new Update();
+        described.actor = new Actor();
+        described.actor.description = new Text("Promoted");
+        check("actor description label is sponsored", LinkedInFilter.isSponsoredPost(described));
+
+        Update headerLabel = new Update();
+        headerLabel.header = new Header();
+        headerLabel.header.text = new Text("Promoted");
+        check("header label is sponsored", LinkedInFilter.isSponsoredPost(headerLabel));
+
+        Update detailHeaderLabel = new Update();
+        detailHeaderLabel.detailHeader = new Header();
+        detailHeaderLabel.detailHeader.text = new Text("Sponsored");
+        check("detail header label is sponsored", LinkedInFilter.isSponsoredPost(detailHeaderLabel));
+
+        Update contextualLabel = new Update();
+        contextualLabel.contextualHeader = new ContextualHeader();
+        contextualLabel.contextualHeader.subtitle = new Text("Promoted");
+        check("contextual header label is sponsored", LinkedInFilter.isSponsoredPost(contextualLabel));
+
+        Update contentActor = new Update();
+        contentActor.content.actorComponentValue = new Actor();
+        contentActor.content.actorComponentValue.subDescription = new Text("Promoted");
+        check("content actor label is sponsored", LinkedInFilter.isSponsoredPost(contentActor));
+
+        Update tracked = new Update();
+        tracked.metadata.trackingData = new Tracking();
+        tracked.metadata.trackingData.hasSponsoredTracking = true;
+        check("hasSponsoredTracking is sponsored", LinkedInFilter.isSponsoredPost(tracked));
+
+        Update boosted = new Update();
+        boosted.hasBoostHeader = true;
+        check("boost header flag is sponsored", LinkedInFilter.isSponsoredPost(boosted));
+
+        Update boostedComponent = new Update();
+        boostedComponent.boostHeader = new Boost();
+        check("boost header component is sponsored", LinkedInFilter.isSponsoredPost(boostedComponent));
+
+        Update reshared = new Update();
+        reshared.resharedUpdate = new Update();
+        reshared.resharedUpdate.actor = new Actor();
+        reshared.resharedUpdate.actor.subDescription = new Text("Sponsored");
+        check("reshared promoted update is sponsored", LinkedInFilter.isSponsoredPost(reshared));
+
+        Update attachmentCta = new Update();
+        attachmentCta.attachment = new Attachment();
+        attachmentCta.attachment.content = new Content();
+        attachmentCta.attachment.content.callToActionComponentValue = new CallToAction();
+        check("attachment call-to-action card is sponsored", LinkedInFilter.isSponsoredPost(attachmentCta));
+
+        Update contentCta = new Update();
+        contentCta.content.callToActionComponentValue = new CallToAction();
+        check("content call-to-action card is sponsored", LinkedInFilter.isSponsoredPost(contentCta));
+
+        Update atlassian = new Update();
+        atlassian.actor = new Actor();
+        atlassian.actor.subDescription = new Text("2,725,195 followers");
+        atlassian.actor.supplementaryActorInfo = new Text("Promoted");
+        atlassian.content.callToActionComponentValue = new CallToAction();
+        check("reported Atlassian promoted ad is sponsored", LinkedInFilter.isSponsoredPost(atlassian));
+
+        Update organic = new Update();
+        organic.actor = new Actor();
+        organic.actor.subDescription = new Text("2,725,195 followers");
+        organic.header = new Header();
+        organic.header.text = new Text("Atlassian");
+        organic.content.hasEntityComponentValue = true;
+        organic.metadata.legoTrackingToken = "lego-token-present-on-organic-updates";
+        check("organic update is kept", !LinkedInFilter.isSponsoredPost(organic));
+        check("organic update is not a job", !LinkedInFilter.isPromotedJob(organic));
+        check("organic update is not suggested", !LinkedInFilter.isSuggestedCarousel(organic));
 
         Update organicVideo = new Update();
         organicVideo.content.hasLinkedInVideoComponentValue = true;
@@ -233,6 +360,16 @@ public final class LinkedInFilterBehaviorCheck {
         sponsoredCarousel.carouselContent.items.add(sponsoredItem);
         check("carousel with sponsored item is sponsored", LinkedInFilter.isSponsoredPost(sponsoredCarousel));
         check("carousel with sponsored item is suggested", LinkedInFilter.isSuggestedCarousel(sponsoredCarousel));
+
+        Update labelledCarouselItem = new Update();
+        labelledCarouselItem.carouselContent = new Carousel(Type.MIXED_UPDATES);
+        Item labelledItem = new Item();
+        labelledItem.update = new Update();
+        labelledItem.update.actor = new Actor();
+        labelledItem.update.actor.supplementaryActorInfo = new Text("Promoted");
+        labelledCarouselItem.carouselContent.items.add(labelledItem);
+        check("carousel item with promoted label is sponsored",
+                LinkedInFilter.isSponsoredPost(labelledCarouselItem));
 
         Update organicEntityCarousel = new Update();
         organicEntityCarousel.carouselContent = new Carousel(Type.MIXED_UPDATES);
