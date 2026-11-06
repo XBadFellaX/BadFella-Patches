@@ -1,3 +1,9 @@
+## 1.2.0-dev.3 (2026-11-06)
+
+### ✨ New Features
+
+* **linkedin:** add LinkedIn 4.1.1271 sponsored-post, promoted-job, suggested-carousel and feed-video removal, plus a customizable bottom navigation bar
+
 ## 1.1.0 (2026-11-06)
 
 ### ✨ New Features
