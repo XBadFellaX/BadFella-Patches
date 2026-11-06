@@ -1,3 +1,9 @@
+## 1.2.0-dev.8 (2026-11-06)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** filter the server-driven UI feed at `SduiPagedList.addAll(Collection)` before Compose receives the page, so sponsored, promoted and suggested components no longer enter the modern home feed; also match Promoted/Sponsored accessibility labels and Videos for you carousels
+
 ## 1.2.0-dev.7 (2026-11-06)
 
 ### 🐛 Bug Fixes

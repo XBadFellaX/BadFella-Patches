@@ -24,6 +24,7 @@ PRESENTER = "Lcom/linkedin/android/feed/framework/presentercreator/update/FeedUp
 STREAMING_LIST = ("Lcom/linkedin/android/infra/paging/"
                   "BaseStreamingPagedResource$DataManagerBackedStreamingPagedList;")
 TEMPLATE_PAGED_LIST = "Lcom/linkedin/android/infra/paging/CollectionTemplatePagedList;"
+SDUI_PAGED_LIST = "Lcom/linkedin/android/infra/sdui/viewmodel/SduiPagedList;"
 BOTTOM_BAR = "Lcom/linkedin/android/home/bottomnav/SlimBottomBar;"
 EXPECTED_PATCHES = {
     "Hide sponsored posts",
@@ -77,12 +78,13 @@ with tempfile.TemporaryDirectory() as workspace:
             file.write_bytes(data)
             for descriptor in class_descriptors(data):
                 classes[descriptor] += 1
-                if descriptor in (FILTER, PRESENTER, STREAMING_LIST, TEMPLATE_PAGED_LIST, BOTTOM_BAR):
+                if descriptor in (FILTER, PRESENTER, STREAMING_LIST, TEMPLATE_PAGED_LIST, SDUI_PAGED_LIST, BOTTOM_BAR):
                     targets.setdefault(descriptor, name)
 
     assert classes[FILTER] == 1, "LinkedIn runtime filter is missing or duplicated"
     assert (classes[PRESENTER] == 1 and classes[STREAMING_LIST] == 1
-            and classes[TEMPLATE_PAGED_LIST] == 1 and classes[BOTTOM_BAR] == 1)
+            and classes[TEMPLATE_PAGED_LIST] == 1 and classes[SDUI_PAGED_LIST] == 1
+            and classes[BOTTOM_BAR] == 1)
     assert all(count == 1 for count in classes.values()), "Duplicate DEX classes"
 
     def disassemble(name):
@@ -113,6 +115,14 @@ with tempfile.TemporaryDirectory() as workspace:
                    "enableHideSuggestedCarousels", "enableHideFeedVideos"):
         assert f"{FILTER}.{enable}:" in superclass, \
             f"Superclass selection not enabled: {enable}"
+
+    sdui = disassemble(targets[SDUI_PAGED_LIST])
+    assert f"{FILTER}.filterSduiCollection:" in sdui, \
+        "SDUI paged-list filter not injected"
+    for enable in ("enableHideSponsoredPosts", "enableHidePromotedJobs",
+                   "enableHideSuggestedCarousels", "enableHideFeedVideos"):
+        assert f"{FILTER}.{enable}:" in sdui, \
+            f"SDUI selection not enabled: {enable}"
 
     nav = disassemble(targets[BOTTOM_BAR])
     if args.tabs_mask:

@@ -62,6 +62,21 @@ internal object LinkedInTemplatePagedListFingerprint : Fingerprint(
 )
 
 /**
+ * The SDUI component list funnel modern feed pages pass through before Compose LazyList rendering.
+ *
+ * SduiPagedList.addAll(Collection<SduiComponentViewData>) is the entrypoint for both initial
+ * cached/network load and subsequent pagination batches. Filtering the collection before it is
+ * added to the working batch prevents any promoted or sponsored SDUI component from entering the
+ * list or allocating Compose state.
+ */
+internal object LinkedInSduiPagedListFingerprint : Fingerprint(
+    definingClass = "Lcom/linkedin/android/infra/sdui/viewmodel/SduiPagedList;",
+    name = "addAll",
+    returnType = "Z",
+    parameters = listOf("Ljava/util/Collection;"),
+)
+
+/**
  * The dedupe funnel a parsed page's element list passes through after the template hook.
  *
  * This is the LinkedIn equivalent of Hush's `FeedUnitCollectionManager.addNewEdgeToCollection`

@@ -118,8 +118,10 @@ class LinkedInSourceTests(unittest.TestCase):
             self.assertIn(f'"{enable}"', feed)
         self.assertIn("LinkedInStreamingTemplateFingerprint,", feed)
         self.assertIn("LinkedInTemplatePagedListFingerprint,", feed)
+        self.assertIn("LinkedInSduiPagedListFingerprint.method", feed)
         self.assertIn("LinkedInStreamingListFingerprint.method", feed)
         self.assertIn("filterCollectionTemplate(Ljava/lang/Object;)V", feed)
+        self.assertIn("filterSduiCollection(Ljava/util/Collection;)Ljava/util/Collection;", feed)
         self.assertIn("move-object/from16 p1, v0", feed)
 
     def test_runtime_filter_uses_structural_ad_and_video_anchors(self):
@@ -131,7 +133,7 @@ class LinkedInSourceTests(unittest.TestCase):
                        "boostHeader", "resharedUpdate", "callToActionComponentValue",
                        "detailHeader", "contextualHeader", "contextualDescription",
                        "entityUrn", "preDashEntityUrn", "rawUrnString", "adUrn",
-                       "aggregatedContent"]:
+                       "aggregatedContent", "serverComponentName", "semanticKey", "filterSduiCollection"]:
             self.assertIn(anchor, source)
         for token in ["sponsoredcontent", "sponsoredcreative", "sponsoredupdate",
                       "adcreative", "adupdate", "promotedupdate"]:
@@ -256,6 +258,28 @@ public final class LinkedInFilterBehaviorCheck {
         Header detailHeader;
         ContextualHeader contextualHeader;
         ContextualDescription contextualDescription;
+    }
+
+    static final class SduiA11y { SduiText label; }
+    static final class SduiText { String text; }
+    static final class SduiProps {
+        String serverComponentName;
+        String semanticKey;
+        String key;
+        String typeId;
+        SduiA11y accessibility;
+    }
+    static final class SduiComponent {
+        SduiProps properties;
+        SduiComponent childScreen;
+        List<SduiComponent> columnItems;
+        public SduiProps getProperties() { return properties; }
+    }
+    static final class ShareCarouselComponent {
+        SduiProps properties;
+    }
+    static final class VideoSingleComponent {
+        SduiProps properties;
     }
 
     static void check(String name, boolean condition) {
@@ -592,6 +616,46 @@ public final class LinkedInFilterBehaviorCheck {
         LinkedInFilter.filterCollectionTemplate(null);
         LinkedInFilter.filterCollectionTemplate(new Object());
         check("page filter ignores a missing template or element list", true);
+
+        // SDUI component filtering checks
+        SduiComponent sduiOrganic = new SduiComponent();
+        sduiOrganic.properties = new SduiProps();
+        sduiOrganic.properties.serverComponentName = "organic_feed_update";
+        check("organic SDUI component is kept", !LinkedInFilter.shouldDropSduiComponent(sduiOrganic));
+
+        SduiComponent sduiAd = new SduiComponent();
+        sduiAd.properties = new SduiProps();
+        sduiAd.properties.serverComponentName = "sponsored_feed_update";
+        check("sponsored SDUI component by name is dropped", LinkedInFilter.shouldDropSduiComponent(sduiAd));
+
+        SduiComponent sduiPromotedA11y = new SduiComponent();
+        sduiPromotedA11y.properties = new SduiProps();
+        sduiPromotedA11y.properties.accessibility = new SduiA11y();
+        sduiPromotedA11y.properties.accessibility.label = new SduiText();
+        sduiPromotedA11y.properties.accessibility.label.text = "Promoted";
+        check("SDUI component with Promoted accessibility text is dropped",
+                LinkedInFilter.shouldDropSduiComponent(sduiPromotedA11y));
+
+        ShareCarouselComponent sduiCarousel = new ShareCarouselComponent();
+        check("SDUI carousel component is dropped", LinkedInFilter.shouldDropSduiComponent(sduiCarousel));
+
+        VideoSingleComponent sduiVideo = new VideoSingleComponent();
+        check("SDUI video component is dropped", LinkedInFilter.shouldDropSduiComponent(sduiVideo));
+
+        SduiComponent sduiRoot = new SduiComponent();
+        sduiRoot.childScreen = sduiAd;
+        check("SDUI root container with sponsored child is dropped",
+                LinkedInFilter.shouldDropSduiComponent(sduiRoot));
+
+        ArrayList sduiList = new ArrayList();
+        sduiList.add(sduiOrganic);
+        sduiList.add(sduiAd);
+        sduiList.add(sduiPromotedA11y);
+        sduiList.add(sduiCarousel);
+        sduiList.add(sduiVideo);
+        LinkedInFilter.filterSduiCollection(sduiList);
+        check("filterSduiCollection retains only organic items", sduiList.size() == 1
+                && sduiList.contains(sduiOrganic));
 
         System.out.println("PASS: LinkedIn filter behavior checks");
     }

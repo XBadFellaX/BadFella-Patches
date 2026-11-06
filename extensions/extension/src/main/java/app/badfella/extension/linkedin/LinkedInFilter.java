@@ -1,6 +1,7 @@
 package app.badfella.extension.linkedin;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -107,6 +108,208 @@ public final class LinkedInFilter {
         } catch (Throwable unsupported) {
             setField(template, "elements", retained);
         }
+    }
+
+    // ---- SDUI component collection --------------------------------------------------------
+
+    /**
+     * Filters an SDUI component collection before SduiPagedList accepts it.
+     * Trims the collection in place where supported and returns the retained collection.
+     */
+    public static Collection filterSduiCollection(Collection collection) {
+        if (collection == null || collection.isEmpty() || !anySelectionEnabled()) {
+            return collection;
+        }
+        ArrayList retained = new ArrayList(collection.size());
+        boolean matched = false;
+        for (Object item : collection) {
+            if (shouldDropSduiComponent(item)) {
+                matched = true;
+            } else {
+                retained.add(item);
+            }
+        }
+        if (!matched) return collection;
+        try {
+            collection.clear();
+            collection.addAll(retained);
+            return collection;
+        } catch (Throwable ignored) {
+            return retained;
+        }
+    }
+
+    public static boolean shouldDropSduiComponent(Object component) {
+        if (component == null || !anySelectionEnabled()) return false;
+        return shouldDropSduiComponent(component, 0);
+    }
+
+    private static boolean shouldDropSduiComponent(Object component, int depth) {
+        if (component == null || depth > MAX_UPDATE_DEPTH) return false;
+
+        String className = component.getClass().getName();
+
+        // 1. Specific SDUI component types
+        if (hideSuggestedCarousels && className.contains("ShareCarousel")) {
+            return true;
+        }
+        if (hideFeedVideos && (className.contains("VideoSingle") || className.contains("VideoViewer"))) {
+            return true;
+        }
+
+        // 2. ComponentProperties inspection
+        Object props = call(component, "getProperties");
+        if (props == null) props = field(component, "properties");
+        if (props != null && isSponsoredSduiProperties(props)) {
+            return true;
+        }
+
+        // 3. Accessibility & text harvesting
+        if (isSponsoredSduiText(component, props)) {
+            return true;
+        }
+
+        // 4. Nested container children (RootLayoutFrameworkViewData, ColumnItemsViewData, etc.)
+        Object child = field(component, "childScreen");
+        if (child != null && shouldDropSduiComponent(child, depth + 1)) {
+            return true;
+        }
+        Object columnItems = field(component, "columnItems");
+        if (columnItems instanceof List) {
+            for (Object sub : (List) columnItems) {
+                if (shouldDropSduiComponent(sub, depth + 1)) return true;
+            }
+        }
+        Object components = field(component, "components");
+        if (components instanceof List) {
+            for (Object sub : (List) components) {
+                if (shouldDropSduiComponent(sub, depth + 1)) return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean isSponsoredSduiProperties(Object props) {
+        if (props == null) return false;
+
+        String serverComponentName = asString(field(props, "serverComponentName"));
+        if (serverComponentName != null) {
+            String lower = serverComponentName.toLowerCase(Locale.US);
+            if (hideSponsoredPosts && (lower.contains("sponsored") || lower.contains("promoted")
+                    || lower.contains("leadgen") || lower.contains("adupdate") || lower.contains("adcreative"))) {
+                return true;
+            }
+            if (hidePromotedJobs && lower.contains("job") && (lower.contains("promoted") || lower.contains("sponsored"))) {
+                return true;
+            }
+            if (hideSuggestedCarousels && (lower.contains("sharecarousel") || lower.contains("discover_video")
+                    || lower.contains("suggested") || lower.contains("carousel"))) {
+                return true;
+            }
+            if (hideFeedVideos && lower.contains("video")) {
+                return true;
+            }
+        }
+
+        String semanticKey = asString(field(props, "semanticKey"));
+        if (semanticKey != null) {
+            String lower = semanticKey.toLowerCase(Locale.US);
+            if (hideSponsoredPosts && (lower.contains("sponsored") || lower.contains("promoted")
+                    || lower.contains("leadgen") || lower.contains(":ad:") || lower.contains("ad_"))) {
+                return true;
+            }
+            if (hidePromotedJobs && lower.contains("job") && (lower.contains("promoted") || lower.contains("sponsored"))) {
+                return true;
+            }
+            if (hideSuggestedCarousels && (lower.contains("carousel") || lower.contains("discover_video")
+                    || lower.contains("videos_for_you"))) {
+                return true;
+            }
+        }
+
+        String key = asString(field(props, "key"));
+        if (key != null) {
+            String lower = key.toLowerCase(Locale.US);
+            if (hideSponsoredPosts && (lower.contains("sponsored") || lower.contains("promoted")
+                    || lower.contains("leadgen") || lower.contains("adcreative"))) {
+                return true;
+            }
+            if (hidePromotedJobs && lower.contains("job") && (lower.contains("promoted") || lower.contains("sponsored"))) {
+                return true;
+            }
+            if (hideSuggestedCarousels && (lower.contains("carousel") || lower.contains("discover_video"))) {
+                return true;
+            }
+        }
+
+        String typeId = asString(field(props, "typeId"));
+        if (typeId != null) {
+            String lower = typeId.toLowerCase(Locale.US);
+            if (hideSponsoredPosts && (lower.contains("sponsored") || lower.contains("promoted"))) {
+                return true;
+            }
+            if (hideFeedVideos && lower.contains("video")) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean isSponsoredSduiText(Object component, Object props) {
+        if (props != null) {
+            Object a11y = field(props, "accessibility");
+            if (a11y != null) {
+                Object label = field(a11y, "label");
+                if (label != null) {
+                    String str = extractLocalizedText(label);
+                    if (str != null && isSponsoredString(str)) return true;
+                }
+            }
+        }
+
+        try {
+            Method m = Class.forName("com.linkedin.sdui.viewdata.accessibility.SduiComponentTextHarvester")
+                    .getMethod("a11yLabelText", Class.forName("com.linkedin.sdui.viewdata.SduiComponentViewData"));
+            Object res = m.invoke(null, component);
+            if (res instanceof String) {
+                if (isSponsoredString((String) res)) return true;
+            }
+        } catch (Throwable ignored) {
+        }
+
+        return false;
+    }
+
+    private static String extractLocalizedText(Object textModel) {
+        if (textModel == null) return null;
+        Object stateFlow = field(textModel, "localizedTextData");
+        if (stateFlow != null) {
+            Object localizedData = call(stateFlow, "getValue");
+            if (localizedData != null) {
+                Object str = field(localizedData, "localizedString");
+                if (str instanceof String) return (String) str;
+            }
+        }
+        Object text = field(textModel, "text");
+        if (text instanceof String) return (String) text;
+        return null;
+    }
+
+    private static boolean isSponsoredString(String text) {
+        if (text == null || text.isEmpty()) return false;
+        String lower = text.toLowerCase(Locale.US);
+        if (hideSponsoredPosts && (lower.contains("promoted") || lower.contains("sponsored"))) {
+            return true;
+        }
+        if (hidePromotedJobs && lower.contains("promoted") && lower.contains("job")) {
+            return true;
+        }
+        if (hideSuggestedCarousels && lower.contains("videos for you")) {
+            return true;
+        }
+        return false;
     }
 
     private static boolean anySelectionEnabled() {
@@ -460,6 +663,36 @@ public final class LinkedInFilter {
     }
 
     // ---- Reflection -------------------------------------------------------------------------
+
+    private static Object call(Object owner, String name) {
+        if (owner == null) return null;
+        try {
+            Method m = findMethod(owner.getClass(), name);
+            return m.invoke(owner);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Method findMethod(Class<?> type, String name, Class<?>... parameterTypes) throws NoSuchMethodException {
+        for (Class<?> current = type; current != null; current = current.getSuperclass()) {
+            try {
+                Method m = current.getDeclaredMethod(name, parameterTypes);
+                m.setAccessible(true);
+                return m;
+            } catch (NoSuchMethodException ignored) {
+            }
+        }
+        for (Class<?> iface : type.getInterfaces()) {
+            try {
+                Method m = iface.getDeclaredMethod(name, parameterTypes);
+                m.setAccessible(true);
+                return m;
+            } catch (NoSuchMethodException ignored) {
+            }
+        }
+        throw new NoSuchMethodException(name);
+    }
 
     private static Object field(Object owner, String name) {
         if (owner == null) return null;

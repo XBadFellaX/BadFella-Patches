@@ -1,6 +1,7 @@
 package app.badfella.patches.linkedin
 
 import app.badfella.patches.linkedin.LINKEDIN
+import app.badfella.patches.linkedin.LinkedInSduiPagedListFingerprint
 import app.badfella.patches.linkedin.LinkedInStreamingListFingerprint
 import app.badfella.patches.linkedin.LinkedInStreamingTemplateFingerprint
 import app.badfella.patches.linkedin.LinkedInTemplatePagedListFingerprint
@@ -105,6 +106,34 @@ private fun BytecodePatchContext.filterIngestedWhen(selection: String) {
     """)
 }
 
+/**
+ * Filters the SDUI component collection before SduiPagedList accepts it.
+ *
+ * SduiPagedList.addAll(Collection) receives the parsed SDUI components for each feed page.
+ * Replacing the parameter collection with the filtered result strips sponsored components,
+ * promoted jobs, and suggested carousels before Compose LazyList state or duplicate detection
+ * is allocated.
+ */
+private fun BytecodePatchContext.filterSduiCollectionWhen(enable: String) {
+    val method: MutableMethod = LinkedInSduiPagedListFingerprint.method
+    val implementation = checkNotNull(method.implementation) {
+        "LinkedIn SDUI paged list addAll has no body; this build needs review"
+    }
+    val parameterWords = 1 + method.parameterTypes.sumOf {
+        if (it.toString() == "J" || it.toString() == "D") 2 else 1
+    }
+    check(implementation.registerCount - parameterWords >= 1) {
+        "LinkedIn SDUI paged list addAll has no free local; this build needs review"
+    }
+    method.addInstructions(0, """
+        invoke-static {}, $FILTER->$enable()V
+        move-object/from16 v0, p1
+        invoke-static { v0 }, $FILTER->filterSduiCollection(Ljava/util/Collection;)Ljava/util/Collection;
+        move-result-object v0
+        move-object/from16 p1, v0
+    """)
+}
+
 @Suppress("unused")
 val linkedInHideSponsoredPostsPatch = bytecodePatch(
     name = "Hide sponsored posts",
@@ -119,6 +148,7 @@ val linkedInHideSponsoredPostsPatch = bytecodePatch(
     category("Ads")
     extendWith("extensions/extension.mpe")
     execute {
+        filterSduiCollectionWhen("enableHideSponsoredPosts")
         filterCollectionTemplateWhen("enableHideSponsoredPosts")
         dropUpdateWhen("isSponsoredPost")
         filterIngestedWhen("filterSponsoredPosts")
@@ -136,6 +166,7 @@ val linkedInHidePromotedJobsPatch = bytecodePatch(
     category("Ads")
     extendWith("extensions/extension.mpe")
     execute {
+        filterSduiCollectionWhen("enableHidePromotedJobs")
         filterCollectionTemplateWhen("enableHidePromotedJobs")
         dropUpdateWhen("isPromotedJob")
         filterIngestedWhen("filterPromotedJobs")
@@ -154,6 +185,7 @@ val linkedInHideSuggestedCarouselsPatch = bytecodePatch(
     category("Feed")
     extendWith("extensions/extension.mpe")
     execute {
+        filterSduiCollectionWhen("enableHideSuggestedCarousels")
         filterCollectionTemplateWhen("enableHideSuggestedCarousels")
         dropUpdateWhen("isSuggestedCarousel")
         filterIngestedWhen("filterSuggestedCarousels")
@@ -171,6 +203,7 @@ val linkedInHideFeedVideosPatch = bytecodePatch(
     category("Feed")
     extendWith("extensions/extension.mpe")
     execute {
+        filterSduiCollectionWhen("enableHideFeedVideos")
         filterCollectionTemplateWhen("enableHideFeedVideos")
         dropUpdateWhen("isVideoPost")
         filterIngestedWhen("filterVideos")
