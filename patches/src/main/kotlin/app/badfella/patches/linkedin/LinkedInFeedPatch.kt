@@ -2,6 +2,8 @@ package app.badfella.patches.linkedin
 
 import app.badfella.patches.linkedin.LINKEDIN
 import app.badfella.patches.linkedin.LinkedInStreamingListFingerprint
+import app.badfella.patches.linkedin.LinkedInStreamingTemplateFingerprint
+import app.badfella.patches.linkedin.LinkedInTemplatePagedListFingerprint
 import app.badfella.patches.linkedin.LinkedInUpdatePresenterFingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
@@ -45,6 +47,38 @@ private fun BytecodePatchContext.dropUpdateWhen(predicate: String) {
 }
 
 /**
+ * Filters the parsed page's element list before the paged list reads it.
+ *
+ * `addAll(CollectionTemplate)` reads `template.elements` at instruction 0, so replacing or
+ * trimming that list here means the worker that adds the page, its metadata store and every
+ * presenter mapped from it only ever see the retained updates. Each selection enables its own
+ * predicate and then runs the shared funnel, so enabling several selections cannot duplicate a
+ * label or filter with another selection's rules.
+ */
+private fun BytecodePatchContext.filterCollectionTemplateWhen(enable: String) {
+    for (fingerprint in listOf(
+        LinkedInStreamingTemplateFingerprint,
+        LinkedInTemplatePagedListFingerprint,
+    )) {
+        val method: MutableMethod = fingerprint.method
+        val implementation = checkNotNull(method.implementation) {
+            "LinkedIn collection-template addAll has no body; this build needs review"
+        }
+        val parameterWords = 1 + method.parameterTypes.sumOf {
+            if (it.toString() == "J" || it.toString() == "D") 2 else 1
+        }
+        check(implementation.registerCount - parameterWords >= 1) {
+            "LinkedIn collection-template addAll has no free local; this build needs review"
+        }
+        method.addInstructions(0, """
+            move-object/from16 v0, p1
+            invoke-static {}, $FILTER->$enable()V
+            invoke-static { v0 }, $FILTER->filterCollectionTemplate(Ljava/lang/Object;)V
+        """)
+    }
+}
+
+/**
  * Strips matching models from an incoming page before the paged list accepts them.
  *
  * `addAll(Collection)` is the dedupe funnel that `CollectionTemplatePagedList.addAll` reaches with
@@ -75,8 +109,8 @@ private fun BytecodePatchContext.filterIngestedWhen(selection: String) {
 val linkedInHideSponsoredPostsPatch = bytecodePatch(
     name = "Hide sponsored posts",
     description = "Removes sponsored and promoted posts from the home feed instead of leaving an empty card. " +
-        "Drops matching updates before the paged list accepts them and also checks the presenter entry, so " +
-        "an ad that arrives through a different transformer cannot leave a gap. Matches sponsored tracking, " +
+        "Filters each parsed page before the feed's paged list reads it, so an ad never takes a list slot, " +
+        "and keeps the presenter entry as a second guard for other screens. Matches sponsored tracking, " +
         "sponsored URNs, boosted posts, call-to-action and lead-gen cards, and the feed's Promoted or " +
         "Sponsored labels, including labels in accessibility text, supplementary actor info and headers. " +
         "Promoted jobs keep their own selection.",
@@ -85,6 +119,7 @@ val linkedInHideSponsoredPostsPatch = bytecodePatch(
     category("Ads")
     extendWith("extensions/extension.mpe")
     execute {
+        filterCollectionTemplateWhen("enableHideSponsoredPosts")
         dropUpdateWhen("isSponsoredPost")
         filterIngestedWhen("filterSponsoredPosts")
     }
@@ -94,12 +129,14 @@ val linkedInHideSponsoredPostsPatch = bytecodePatch(
 val linkedInHidePromotedJobsPatch = bytecodePatch(
     name = "Hide promoted jobs",
     description = "Removes sponsored and promoted job cards and job recommendations from the feed. " +
-        "Organic job posts from people you follow are kept.",
+        "Filters each parsed page before the feed's paged list reads it. Organic job posts from people " +
+        "you follow are kept.",
 ) {
     compatibleWith(LINKEDIN)
     category("Ads")
     extendWith("extensions/extension.mpe")
     execute {
+        filterCollectionTemplateWhen("enableHidePromotedJobs")
         dropUpdateWhen("isPromotedJob")
         filterIngestedWhen("filterPromotedJobs")
     }
@@ -109,13 +146,15 @@ val linkedInHidePromotedJobsPatch = bytecodePatch(
 val linkedInHideSuggestedCarouselsPatch = bytecodePatch(
     name = "Hide suggested and follow carousels",
     description = "Removes recommended-follow prompts and sponsored discovery, entity and carousel rows " +
-        "from the feed, including video carousels such as Videos for you. Organic posts by people and " +
-        "pages you follow are kept.",
+        "from the feed, including discovery, mixed-update, creative-card and announcement carousels such " +
+        "as Videos for you. Filters each parsed page before the feed's paged list reads it. Organic posts " +
+        "by people and pages you follow are kept.",
 ) {
     compatibleWith(LINKEDIN)
     category("Feed")
     extendWith("extensions/extension.mpe")
     execute {
+        filterCollectionTemplateWhen("enableHideSuggestedCarousels")
         dropUpdateWhen("isSuggestedCarousel")
         filterIngestedWhen("filterSuggestedCarousels")
     }
@@ -125,13 +164,14 @@ val linkedInHideSuggestedCarouselsPatch = bytecodePatch(
 val linkedInHideFeedVideosPatch = bytecodePatch(
     name = "Hide feed videos",
     description = "Removes video posts from the home feed, including native, large single and external video " +
-        "updates, and video carousels such as Videos for you. Videos opened from a profile or a link are " +
-        "not part of the feed pipeline.",
+        "updates, and video carousels such as Videos for you. Filters each parsed page before the feed's " +
+        "paged list reads it. Videos opened from a profile or a link are not part of the feed pipeline.",
 ) {
     compatibleWith(LINKEDIN)
     category("Feed")
     extendWith("extensions/extension.mpe")
     execute {
+        filterCollectionTemplateWhen("enableHideFeedVideos")
         dropUpdateWhen("isVideoPost")
         filterIngestedWhen("filterVideos")
     }

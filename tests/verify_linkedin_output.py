@@ -23,6 +23,7 @@ FILTER = "Lapp/badfella/extension/linkedin/LinkedInFilter;"
 PRESENTER = "Lcom/linkedin/android/feed/framework/presentercreator/update/FeedUpdateTransformer;"
 STREAMING_LIST = ("Lcom/linkedin/android/infra/paging/"
                   "BaseStreamingPagedResource$DataManagerBackedStreamingPagedList;")
+TEMPLATE_PAGED_LIST = "Lcom/linkedin/android/infra/paging/CollectionTemplatePagedList;"
 BOTTOM_BAR = "Lcom/linkedin/android/home/bottomnav/SlimBottomBar;"
 EXPECTED_PATCHES = {
     "Hide sponsored posts",
@@ -76,11 +77,12 @@ with tempfile.TemporaryDirectory() as workspace:
             file.write_bytes(data)
             for descriptor in class_descriptors(data):
                 classes[descriptor] += 1
-                if descriptor in (FILTER, PRESENTER, STREAMING_LIST, BOTTOM_BAR):
+                if descriptor in (FILTER, PRESENTER, STREAMING_LIST, TEMPLATE_PAGED_LIST, BOTTOM_BAR):
                     targets.setdefault(descriptor, name)
 
     assert classes[FILTER] == 1, "LinkedIn runtime filter is missing or duplicated"
-    assert classes[PRESENTER] == 1 and classes[STREAMING_LIST] == 1 and classes[BOTTOM_BAR] == 1
+    assert (classes[PRESENTER] == 1 and classes[STREAMING_LIST] == 1
+            and classes[TEMPLATE_PAGED_LIST] == 1 and classes[BOTTOM_BAR] == 1)
     assert all(count == 1 for count in classes.values()), "Duplicate DEX classes"
 
     def disassemble(name):
@@ -97,6 +99,20 @@ with tempfile.TemporaryDirectory() as workspace:
                       "filterSuggestedCarousels", "filterVideos"):
         assert f"{FILTER}.{selection}:" in streaming, \
             f"Collection-boundary filter not injected: {selection}"
+    for enable in ("enableHideSponsoredPosts", "enableHidePromotedJobs",
+                   "enableHideSuggestedCarousels", "enableHideFeedVideos"):
+        assert f"{FILTER}.{enable}:" in streaming, \
+            f"Parsed-page selection not enabled: {enable}"
+    assert f"{FILTER}.filterCollectionTemplate:" in streaming, \
+        "Streaming parsed-page filter not injected"
+
+    superclass = disassemble(targets[TEMPLATE_PAGED_LIST])
+    assert f"{FILTER}.filterCollectionTemplate:" in superclass, \
+        "Superclass parsed-page filter not injected"
+    for enable in ("enableHideSponsoredPosts", "enableHidePromotedJobs",
+                   "enableHideSuggestedCarousels", "enableHideFeedVideos"):
+        assert f"{FILTER}.{enable}:" in superclass, \
+            f"Superclass selection not enabled: {enable}"
 
     nav = disassemble(targets[BOTTOM_BAR])
     if args.tabs_mask:

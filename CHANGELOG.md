@@ -1,3 +1,9 @@
+## 1.2.0-dev.7 (2026-11-06)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** filter each parsed feed page at `addAll(CollectionTemplate)` before the paged list reads its elements, which is the ingestion funnel the home feed actually uses, and check the carousel content type before the sponsored test so organic carousels such as Videos for you no longer pass the suggested-carousel filter
+
 ## 1.2.0-dev.6 (2026-11-06)
 
 ### 🐛 Bug Fixes

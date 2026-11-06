@@ -33,12 +33,40 @@ internal object LinkedInUpdatePresenterFingerprint : Fingerprint(
 )
 
 /**
- * The collection funnel every streaming update page passes through.
+ * The parsed-page entry the streaming feed hands every network page and cache hit to.
  *
- * `CollectionTemplatePagedList.addAll(CollectionTemplate)` ends by calling this
- * `addAll(Collection)` override with the parsed page's element list, so a model removed here never
- * enters the paged list, allocates a presenter or records an impression. This is the LinkedIn
- * equivalent of Hush's `FeedUnitCollectionManager.addNewEdgeToCollection` hook.
+ * The body reads `CollectionTemplate.elements` at instruction 0 and schedules the superclass
+ * `addAll(CollectionTemplate)` on its worker executor, so filtering the template before that read
+ * removes a model before the paged list, the presenter mapping or impression accounting sees it.
+ */
+internal object LinkedInStreamingTemplateFingerprint : Fingerprint(
+    definingClass = "Lcom/linkedin/android/infra/paging/" +
+        "BaseStreamingPagedResource\$DataManagerBackedStreamingPagedList;",
+    name = "addAll",
+    returnType = "V",
+    parameters = listOf("Lcom/linkedin/android/pegasus/gen/collection/CollectionTemplate;"),
+)
+
+/**
+ * The superclass every template-backed paged list reaches with the same parsed page.
+ *
+ * `DataManagerBackedStreamingPagedList` reaches it from its worker lambda, and
+ * `DataManagerBackedPagedResourceBase$CachedPagedList`/`NonCachedPagedList` call it directly, so
+ * this is the funnel that also covers cached and non-streaming update lists.
+ */
+internal object LinkedInTemplatePagedListFingerprint : Fingerprint(
+    definingClass = "Lcom/linkedin/android/infra/paging/CollectionTemplatePagedList;",
+    name = "addAll",
+    returnType = "V",
+    parameters = listOf("Lcom/linkedin/android/pegasus/gen/collection/CollectionTemplate;"),
+)
+
+/**
+ * The dedupe funnel a parsed page's element list passes through after the template hook.
+ *
+ * This is the LinkedIn equivalent of Hush's `FeedUnitCollectionManager.addNewEdgeToCollection`
+ * hook and stays as a second layer for lists that reach `DefaultObservableList.addAll(Collection)`
+ * without a `CollectionTemplate`.
  */
 internal object LinkedInStreamingListFingerprint : Fingerprint(
     definingClass = "Lcom/linkedin/android/infra/paging/" +

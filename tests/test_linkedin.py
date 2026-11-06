@@ -69,10 +69,17 @@ class LinkedInSourceTests(unittest.TestCase):
         for method in ["filterSponsoredPosts", "filterPromotedJobs",
                        "filterSuggestedCarousels", "filterVideos"]:
             self.assertIn(f"public static List {method}(Collection items)", source)
+        for method in ["filterCollectionTemplate", "shouldDropUpdate"]:
+            self.assertIn(f"public static ", source)
+            self.assertIn(f"{method}(", source)
+        for enable in ["enableHideSponsoredPosts", "enableHidePromotedJobs",
+                       "enableHideSuggestedCarousels", "enableHideFeedVideos"]:
+            self.assertIn(f"public static void {enable}()", source)
         self.assertIn("public static List filterTabs(", source)
         self.assertIn("sponsoredTracking", source)
         self.assertIn("hasLinkedInVideoComponentValue", source)
         self.assertIn("RELATIONSHIPS", source)
+        self.assertIn("SUGGESTED_CAROUSEL_TYPES", source)
 
     def test_fingerprints_use_reviewed_anchors(self):
         compat = (ROOT / "patches/src/main/kotlin/app/badfella/patches/linkedin/"
@@ -84,6 +91,10 @@ class LinkedInSourceTests(unittest.TestCase):
                       "FeedUpdateTransformer;", compat)
         self.assertIn('name = "createUpdatePresenter"', compat)
         self.assertIn("BaseStreamingPagedResource\\$DataManagerBackedStreamingPagedList;", compat)
+        self.assertIn("Lcom/linkedin/android/infra/paging/CollectionTemplatePagedList;", compat)
+        self.assertIn('parameters = listOf("Lcom/linkedin/android/pegasus/gen/collection/'
+                      'CollectionTemplate;")', compat)
+        self.assertIn('returnType = "V"', compat)
         self.assertIn('name = "addAll"', compat)
         self.assertIn('parameters = listOf("Ljava/util/Collection;")', compat)
         self.assertIn("Lcom/linkedin/android/home/bottomnav/SlimBottomBar;", compat)
@@ -102,7 +113,13 @@ class LinkedInSourceTests(unittest.TestCase):
         for selection in ["filterSponsoredPosts", "filterPromotedJobs",
                           "filterSuggestedCarousels", "filterVideos"]:
             self.assertIn(f'"{selection}"', feed)
+        for enable in ["enableHideSponsoredPosts", "enableHidePromotedJobs",
+                       "enableHideSuggestedCarousels", "enableHideFeedVideos"]:
+            self.assertIn(f'"{enable}"', feed)
+        self.assertIn("LinkedInStreamingTemplateFingerprint,", feed)
+        self.assertIn("LinkedInTemplatePagedListFingerprint,", feed)
         self.assertIn("LinkedInStreamingListFingerprint.method", feed)
+        self.assertIn("filterCollectionTemplate(Ljava/lang/Object;)V", feed)
         self.assertIn("move-object/from16 p1, v0", feed)
 
     def test_runtime_filter_uses_structural_ad_and_video_anchors(self):
@@ -142,6 +159,8 @@ BEHAVIOR_HARNESS = '''
 import app.badfella.extension.linkedin.LinkedInFilter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public final class LinkedInFilterBehaviorCheck {
@@ -210,6 +229,7 @@ public final class LinkedInFilterBehaviorCheck {
     static final class Boost { String boostStatus; }
     static final class LeadGenFormContent { Carousel carouselContent; Content content; }
     static final class AggregatedContent { List<Update> updates = new ArrayList<>(); }
+    static final class CollectionTemplate { List elements = new ArrayList(); }
     static final class Urn {
         String entityType;
         String rawUrnString;
@@ -418,9 +438,10 @@ public final class LinkedInFilterBehaviorCheck {
         Update mixedCarousel = new Update();
         mixedCarousel.carouselContent = new Carousel(Type.MIXED_UPDATES);
         mixedCarousel.carouselContent.items.add(new Item());
-        check("organic mixed carousel is kept by suggested",
-                !LinkedInFilter.isSuggestedCarousel(mixedCarousel));
-        check("organic mixed carousel is not a video post", !LinkedInFilter.isVideoPost(mixedCarousel));
+        check("mixed-update carousel is suggested", LinkedInFilter.isSuggestedCarousel(mixedCarousel));
+        check("mixed-update carousel is not a sponsored post",
+                !LinkedInFilter.isSponsoredPost(mixedCarousel));
+        check("mixed-update carousel is not a video post", !LinkedInFilter.isVideoPost(mixedCarousel));
 
         Update videoCarouselItems = new Update();
         videoCarouselItems.carouselContent = new Carousel(Type.MIXED_UPDATES);
@@ -453,6 +474,12 @@ public final class LinkedInFilterBehaviorCheck {
         organicEntityCarousel.carouselContent = new Carousel(Type.MIXED_UPDATES);
         organicEntityCarousel.content.hasEntityComponentValue = true;
         check("organic entity carousel is not sponsored", !LinkedInFilter.isSponsoredPost(organicEntityCarousel));
+        check("organic entity carousel is still a suggestion",
+                LinkedInFilter.isSuggestedCarousel(organicEntityCarousel));
+
+        Update entityOnly = new Update();
+        entityOnly.content.hasEntityComponentValue = true;
+        check("entity content alone is not suggested", !LinkedInFilter.isSuggestedCarousel(entityOnly));
 
         Update promotedJob = new Update();
         promotedJob.metadata.trackingData = new Tracking();
@@ -507,10 +534,64 @@ public final class LinkedInFilterBehaviorCheck {
         suggestedItems.add(videoCarousel);
         suggestedItems.add(organicEntityCarousel);
         List suggestedFiltered = LinkedInFilter.filterSuggestedCarousels(suggestedItems);
-        check("suggested collection filter removes prompts and video carousels",
-                suggestedFiltered.size() == 2
-                        && suggestedFiltered.contains(organic)
-                        && suggestedFiltered.contains(organicEntityCarousel));
+        check("suggested collection filter removes prompts and carousels",
+                suggestedFiltered.size() == 1
+                        && suggestedFiltered.contains(organic));
+
+        check("nothing is dropped before a selection is enabled",
+                !LinkedInFilter.shouldDropUpdate(sponsoredTypeUrn)
+                        && !LinkedInFilter.shouldDropUpdate(organicVideo));
+
+        CollectionTemplate page = new CollectionTemplate();
+        page.elements.add(organic);
+        page.elements.add(sponsoredTypeUrn);
+        page.elements.add(promotedJob);
+        LinkedInFilter.filterCollectionTemplate(page);
+        check("page filter leaves an unchanged page alone before a selection is enabled",
+                page.elements.size() == 3 && page.elements.contains(sponsoredTypeUrn));
+
+        LinkedInFilter.enableHideSponsoredPosts();
+        LinkedInFilter.filterCollectionTemplate(page);
+        check("page filter drops the sponsored post", page.elements.size() == 2
+                && page.elements.contains(organic) && page.elements.contains(promotedJob)
+                && !page.elements.contains(sponsoredTypeUrn));
+        check("page filter keeps the template list when nothing more matches",
+                LinkedInFilter.shouldDropUpdate(sponsoredTypeUrn)
+                        && !LinkedInFilter.shouldDropUpdate(organic));
+
+        LinkedInFilter.enableHidePromotedJobs();
+        LinkedInFilter.filterCollectionTemplate(page);
+        check("page filter drops the promoted job", page.elements.size() == 1
+                && page.elements.contains(organic));
+
+        CollectionTemplate videoPage = new CollectionTemplate();
+        videoPage.elements.add(organic);
+        videoPage.elements.add(organicVideo);
+        videoPage.elements.add(videoCarousel);
+        LinkedInFilter.enableHideFeedVideos();
+        LinkedInFilter.filterCollectionTemplate(videoPage);
+        check("page filter drops every video", videoPage.elements.size() == 1
+                && videoPage.elements.contains(organic));
+
+        CollectionTemplate suggestedPage = new CollectionTemplate();
+        suggestedPage.elements.add(organic);
+        suggestedPage.elements.add(followPrompt);
+        suggestedPage.elements.add(videoCarousel);
+        LinkedInFilter.enableHideSuggestedCarousels();
+        LinkedInFilter.filterCollectionTemplate(suggestedPage);
+        check("page filter drops suggested carousels", suggestedPage.elements.size() == 1
+                && suggestedPage.elements.contains(organic));
+
+        CollectionTemplate immutablePage = new CollectionTemplate();
+        immutablePage.elements = Collections.unmodifiableList(
+                new ArrayList(Arrays.asList(organic, sponsoredTypeUrn)));
+        LinkedInFilter.filterCollectionTemplate(immutablePage);
+        check("page filter replaces an immutable element list", immutablePage.elements.size() == 1
+                && immutablePage.elements.contains(organic));
+
+        LinkedInFilter.filterCollectionTemplate(null);
+        LinkedInFilter.filterCollectionTemplate(new Object());
+        check("page filter ignores a missing template or element list", true);
 
         System.out.println("PASS: LinkedIn filter behavior checks");
     }

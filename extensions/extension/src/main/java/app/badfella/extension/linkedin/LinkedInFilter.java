@@ -15,17 +15,25 @@ import java.util.Set;
  * update's metadata and content components directly. Every lookup fails safe: a missing field or
  * class returns "not filtered" instead of throwing into the feed.
  *
- * Feed selections run at two layers. At the collection boundary
- * ({@code DataManagerBackedStreamingPagedList.addAll}) matching models are removed from the parsed
- * page before the paged list accepts them, so no adapter slot, view holder or impression is
- * allocated. The presenter entry remains as a second guard for updates that reach the feed through
- * a transformer that does not use the streaming list.
+ * Feed selections run at the page boundary. The paged lists read
+ * {@code CollectionTemplate.elements} immediately after {@code addAll(CollectionTemplate)} starts,
+ * so {@link #filterCollectionTemplate(Object)} trims that list before any element reaches the
+ * paged list, the metadata store, a presenter mapping or impression accounting. Each selection
+ * enables its own predicate first, so enabling several selections at once keeps their behaviour
+ * separate. The dedupe funnel and the presenter entry stay as second guards for lists and screens
+ * that never pass a {@code CollectionTemplate} through this method.
  */
 @SuppressWarnings({"rawtypes", "unchecked", "unused"})
 public final class LinkedInFilter {
 
     private static final String[] HIDEABLE_TABS = {
             "RELATIONSHIPS", "POST", "NOTIFICATIONS", "JOBS", "VIDEO", "NEWS",
+    };
+
+    /** Carousel content the feed builds as a recommendation or discovery module, not an organic post. */
+    private static final String[] SUGGESTED_CAROUSEL_TYPES = {
+            "DISCOVER_VIDEO", "MIXED_UPDATES", "MIXED_UPDATES_WITH_FOLLOW_ACTION",
+            "CREATIVE_CARDS", "ANNOUNCEMENT",
     };
 
     /** Bound for reshared/attachment/carousel/aggregated wrapping so a malformed graph cannot recurse. */
@@ -41,6 +49,78 @@ public final class LinkedInFilter {
     private static final int SELECT_PROMOTED_JOB = 2;
     private static final int SELECT_SUGGESTED_CAROUSEL = 3;
     private static final int SELECT_VIDEO = 4;
+
+    /**
+     * Selections enabled by the patch application. Only the selections the user asked for are
+     * enabled, so the shared page funnel keeps each patch's behaviour separate.
+     */
+    private static volatile boolean hideSponsoredPosts;
+    private static volatile boolean hidePromotedJobs;
+    private static volatile boolean hideSuggestedCarousels;
+    private static volatile boolean hideFeedVideos;
+
+    public static void enableHideSponsoredPosts() {
+        hideSponsoredPosts = true;
+    }
+
+    public static void enableHidePromotedJobs() {
+        hidePromotedJobs = true;
+    }
+
+    public static void enableHideSuggestedCarousels() {
+        hideSuggestedCarousels = true;
+    }
+
+    public static void enableHideFeedVideos() {
+        hideFeedVideos = true;
+    }
+
+    // ---- Parsed page ----------------------------------------------------------------------
+
+    /**
+     * Trims {@code CollectionTemplate.elements} in place before the paged list reads it.
+     *
+     * The update list is mutated rather than replaced where possible because the template is also
+     * kept as {@code prevResult} and handed to the worker that adds the page; the field is replaced
+     * only when the parser supplied a list that cannot be changed. Nothing is touched when no
+     * selection is enabled or nothing matches.
+     */
+    public static void filterCollectionTemplate(Object template) {
+        if (template == null || !anySelectionEnabled()) return;
+        Object elements = field(template, "elements");
+        if (!(elements instanceof List)) return;
+        List source = (List) elements;
+        if (source.isEmpty()) return;
+        ArrayList retained = new ArrayList(source.size());
+        boolean matched = false;
+        for (Object item : source) {
+            if (shouldDropUpdate(item)) {
+                matched = true;
+            } else {
+                retained.add(item);
+            }
+        }
+        if (!matched) return;
+        try {
+            source.clear();
+            source.addAll(retained);
+        } catch (Throwable unsupported) {
+            setField(template, "elements", retained);
+        }
+    }
+
+    private static boolean anySelectionEnabled() {
+        return hideSponsoredPosts || hidePromotedJobs || hideSuggestedCarousels || hideFeedVideos;
+    }
+
+    /** Whether the update matches any enabled selection. */
+    public static boolean shouldDropUpdate(Object update) {
+        if (update == null) return false;
+        if (hideSponsoredPosts && isSponsoredPost(update)) return true;
+        if (hidePromotedJobs && isPromotedJob(update)) return true;
+        if (hideSuggestedCarousels && isSuggestedCarousel(update)) return true;
+        return hideFeedVideos && isVideoPost(update);
+    }
 
     // ---- Collection boundary ----------------------------------------------------------------
 
@@ -117,16 +197,28 @@ public final class LinkedInFilter {
         return isSponsored(update) && hasComponent(update, "hasJobComponentValue");
     }
 
-    /** Recommended follows and sponsored discovery/entity/carousel rows, including video carousels. */
+    /**
+     * Recommended follows and discovery/entity/carousel rows.
+     *
+     * The carousel content type is checked before the sponsored check: "Videos for you" and the
+     * other discovery carousels are organic modules, so requiring sponsored tracking first let
+     * every non-ad carousel through. Entity content only counts as suggested when it is also
+     * sponsored, because ordinary posts carry an entity component.
+     */
     public static boolean isSuggestedCarousel(Object update) {
         if (update == null) return false;
         if (hasComponent(update, "hasFollowPromptComponentValue")) return true;
         if (isVideoCarousel(update)) return true;
-        if (!isSponsored(update)) return false;
-        if (hasCarouselContent(update)) return true;
-        return hasComponent(update, "hasFeedDiscoveryEntityComponentValue")
-                || hasComponent(update, "hasFeedDiscoveryGridComponentValue")
-                || hasComponent(update, "hasEntityComponentValue");
+        Object carousel = carouselOf(update);
+        if (carousel != null) {
+            if (isSponsored(update)) return true;
+            if (isSuggestedCarouselType(field(carousel, "type"))) return true;
+        }
+        if (hasComponent(update, "hasFeedDiscoveryEntityComponentValue")
+                || hasComponent(update, "hasFeedDiscoveryGridComponentValue")) {
+            return true;
+        }
+        return isSponsored(update) && hasComponent(update, "hasEntityComponentValue");
     }
 
     /** Any feed update whose content or attachment is a video, or whose carousel is a video carousel. */
@@ -279,10 +371,6 @@ public final class LinkedInFilter {
         return false;
     }
 
-    private static boolean hasCarouselContent(Object update) {
-        return carouselOf(update) != null;
-    }
-
     private static Object carouselOf(Object update) {
         Object carousel = field(update, "carouselContent");
         if (carousel == null) carousel = field(field(update, "attachment"), "carouselContent");
@@ -309,6 +397,17 @@ public final class LinkedInFilter {
         if (type == null) return false;
         String name = type instanceof Enum ? ((Enum) type).name() : asString(type);
         return name != null && name.contains("VIDEO");
+    }
+
+    /** Carousel content the feed treats as a recommendation or discovery module. */
+    private static boolean isSuggestedCarouselType(Object type) {
+        if (type == null) return false;
+        String name = type instanceof Enum ? ((Enum) type).name() : asString(type);
+        if (name == null) return false;
+        for (String candidate : SUGGESTED_CAROUSEL_TYPES) {
+            if (candidate.equalsIgnoreCase(name)) return true;
+        }
+        return false;
     }
 
     private static boolean hasComponent(Object update, String flag) {
@@ -376,6 +475,14 @@ public final class LinkedInFilter {
             return findField(type, name).get(null);
         } catch (Throwable ignored) {
             return null;
+        }
+    }
+
+    private static void setField(Object owner, String name, Object value) {
+        if (owner == null) return;
+        try {
+            findField(owner.getClass(), name).set(owner, value);
+        } catch (Throwable ignored) {
         }
     }
 
