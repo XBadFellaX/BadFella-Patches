@@ -15,7 +15,7 @@
 1. Install [Morphe Manager](https://github.com/MorpheApp/morphe-manager/releases/latest) **2.2.0 or later**.
 2. On your phone, tap **Add to Morphe** above and add the source.
 3. Open **TickTick**, **Emby**, **Remote for Android TV**, **Pep Talk** or **Wanderlog** in Manager. Refresh Sources if it is missing; enable **Settings → Expert settings → Expert Mode** if needed for custom app selection.
-4. Select the unmodified **TickTick 8.2.4.0 APKM**, **Emby 3.5.72 APK**, **Remote for Android TV 6.1.0 APKM** or **Pep Talk 2.31.0 XAPK** or **Wanderlog 2.227 APKM**, choose the patches below, then patch and install.
+4. Select the unmodified **TickTick 8.2.4.0 APKM**, **Emby 3.5.72 APK**, **Remote for Android TV 6.1.0 APKM**, **Pep Talk 2.31.0 XAPK** or **Wanderlog 2.227/2.228 APKM**, choose the patches below, then patch and install.
 5. For updates, refresh this source and patch again using the **same Manager signing key** to preserve app data.
 
 Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX/BadFella-Patches/releases/latest) and add it in Manager's **Sources** screen.
@@ -97,7 +97,7 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 
 **🎯 Supported versions:**
 
-| 🧪&nbsp;2.227 |
+| 🧪&nbsp;2.227 / 2.228 |
 | :---: |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
