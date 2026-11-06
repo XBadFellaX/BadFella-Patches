@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.2.0-dev.3",
+  "version": "1.2.0-dev.4",
   "patches": [
     {
       "name": "Customize navigation bar",
@@ -172,7 +172,7 @@
     },
     {
       "name": "Hide feed videos",
-      "description": "Removes video posts from the home feed, including native, large single and external video updates. Videos opened from a profile or a link are not part of the feed pipeline.",
+      "description": "Removes video posts from the home feed, including native, large single and external video updates, and video carousels such as Videos for you. Videos opened from a profile or a link are not part of the feed pipeline.",
       "default": true,
       "category": "Feed",
       "compatiblePackages": [
@@ -236,7 +236,7 @@
     },
     {
       "name": "Hide sponsored posts",
-      "description": "Removes sponsored and promoted posts from the home feed instead of leaving an empty card. Promoted jobs and sponsored carousels stay with their own selections. Sponsored updates that the server does not mark with sponsored metadata are not affected.",
+      "description": "Removes sponsored and promoted posts from the home feed instead of leaving an empty card. Includes lead-gen ads and updates the feed labels Promoted or Sponsored, including when the ad also carries an entity, discovery or carousel card. Promoted jobs keep their own selection.",
       "default": true,
       "category": "Ads",
       "compatiblePackages": [
@@ -268,7 +268,7 @@
     },
     {
       "name": "Hide suggested and follow carousels",
-      "description": "Removes recommended-follow prompts and sponsored discovery, entity and carousel rows from the feed. Organic posts by people and pages you follow are kept.",
+      "description": "Removes recommended-follow prompts and sponsored discovery, entity and carousel rows from the feed, including video carousels such as Videos for you. Organic posts by people and pages you follow are kept.",
       "default": true,
       "category": "Feed",
       "compatiblePackages": [

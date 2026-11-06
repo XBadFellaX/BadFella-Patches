@@ -1,10 +1,16 @@
 """LinkedIn patch registration and source-anchor checks; no APKs or network required."""
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "com.linkedin.android"
+FILTER = (ROOT / "extensions/extension/src/main/java/app/badfella/extension/linkedin/"
+                 "LinkedInFilter.java")
 
 LINKEDIN_PATCHES = {
     "Hide sponsored posts": "Ads",
@@ -88,6 +94,185 @@ class LinkedInSourceTests(unittest.TestCase):
             self.assertIn("Lapp/badfella/extension/linkedin/LinkedInFilter;", source)
         for predicate in ["isSponsoredPost", "isPromotedJob", "isSuggestedCarousel", "isVideoPost"]:
             self.assertIn(f'"{predicate}"', feed)
+
+
+    def test_runtime_filter_uses_structural_ad_and_video_anchors(self):
+        source = FILTER.read_text(encoding="utf-8")
+        for anchor in ["leadGenFormContent", "sponsoredTracking", "subDescription",
+                       "subDescriptionButton", "carouselContent", "hasVideoCarouselItemComponentValue",
+                       "hasEntityComponentValue", "hasFollowPromptComponentValue"]:
+            self.assertIn(anchor, source)
+        self.assertIn("\"Promoted\".equalsIgnoreCase(text)", source)
+        self.assertIn("name.contains(\"VIDEO\")", source)
+
+    def test_runtime_filter_does_not_treat_general_lego_token_as_sponsored(self):
+        source = FILTER.read_text(encoding="utf-8")
+        self.assertNotIn("legoTrackingToken", source)
+
+
+def _jdk_tool(name):
+    suffix = ".exe" if os.name == "nt" else ""
+    home = os.environ.get("JAVA_HOME")
+    if home:
+        candidate = Path(home) / "bin" / f"{name}{suffix}"
+        if candidate.is_file():
+            return str(candidate)
+    return shutil.which(name)
+
+
+BEHAVIOR_HARNESS = '''
+import app.badfella.extension.linkedin.LinkedInFilter;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public final class LinkedInFilterBehaviorCheck {
+    enum Type { UNKNOWN, MIXED_UPDATES, DISCOVER_VIDEO, VIDEO, SMALL_THEMED_VIDEOS }
+
+    static final class Tracking { Object sponsoredTracking; }
+    static final class Metadata { Tracking trackingData; String legoTrackingToken; }
+    static final class Content {
+        boolean hasLinkedInVideoComponentValue;
+        boolean hasLargeSingleVideoComponentValue;
+        boolean hasExternalVideoComponentValue;
+        boolean hasVideoCarouselItemComponentValue;
+        boolean hasJobComponentValue;
+        boolean hasFollowPromptComponentValue;
+        boolean hasEntityComponentValue;
+        boolean hasFeedDiscoveryEntityComponentValue;
+        boolean hasFeedDiscoveryGridComponentValue;
+    }
+    static final class Item { Tracking trackingData; Update update; Content content; }
+    static final class Carousel {
+        Type type;
+        List<Item> items = new ArrayList<>();
+        Carousel(Type type) { this.type = type; }
+    }
+    static final class Attachment { Content content; Carousel carouselContent; }
+    static final class Text { String text; Text(String text) { this.text = text; } }
+    static final class Button { String text; Button(String text) { this.text = text; } }
+    static final class Actor { Text subDescription; Button subDescriptionButton; }
+    static final class LeadGenFormContent { Carousel carouselContent; Content content; }
+    static final class Update {
+        Metadata metadata = new Metadata();
+        Content content = new Content();
+        Attachment attachment;
+        Actor actor;
+        Carousel carouselContent;
+        LeadGenFormContent leadGenFormContent;
+        boolean hasLeadGenFormContent;
+    }
+
+    static void check(String name, boolean condition) {
+        if (!condition) throw new AssertionError(name);
+    }
+
+    public static void main(String[] args) {
+        Update leadGen = new Update();
+        leadGen.leadGenFormContent = new LeadGenFormContent();
+        leadGen.hasLeadGenFormContent = true;
+        leadGen.carouselContent = new Carousel(Type.VIDEO);
+        leadGen.content.hasEntityComponentValue = true;
+        check("lead-gen ad is sponsored", LinkedInFilter.isSponsoredPost(leadGen));
+        check("lead-gen ad is not a job", !LinkedInFilter.isPromotedJob(leadGen));
+
+        Update promotedVideo = new Update();
+        promotedVideo.metadata.trackingData = new Tracking();
+        promotedVideo.metadata.trackingData.sponsoredTracking = new Object();
+        promotedVideo.content.hasLinkedInVideoComponentValue = true;
+        promotedVideo.content.hasEntityComponentValue = true;
+        promotedVideo.carouselContent = new Carousel(Type.VIDEO);
+        check("promoted video with entity and carousel is sponsored",
+                LinkedInFilter.isSponsoredPost(promotedVideo));
+
+        Update labelled = new Update();
+        labelled.actor = new Actor();
+        labelled.actor.subDescription = new Text("Promoted");
+        labelled.content.hasLargeSingleVideoComponentValue = true;
+        check("Promoted actor label is sponsored", LinkedInFilter.isSponsoredPost(labelled));
+
+        Update labelledButton = new Update();
+        labelledButton.actor = new Actor();
+        labelledButton.actor.subDescriptionButton = new Button("Sponsored");
+        check("Sponsored actor button is sponsored", LinkedInFilter.isSponsoredPost(labelledButton));
+
+        Update organicVideo = new Update();
+        organicVideo.content.hasLinkedInVideoComponentValue = true;
+        organicVideo.metadata.legoTrackingToken = "lego-token-present-on-organic-updates";
+        check("organic video is not sponsored", !LinkedInFilter.isSponsoredPost(organicVideo));
+        check("organic video is a video post", LinkedInFilter.isVideoPost(organicVideo));
+
+        Update videoCarousel = new Update();
+        videoCarousel.carouselContent = new Carousel(Type.DISCOVER_VIDEO);
+        videoCarousel.carouselContent.items.add(new Item());
+        check("video carousel is a video post", LinkedInFilter.isVideoPost(videoCarousel));
+        check("video carousel is suggested", LinkedInFilter.isSuggestedCarousel(videoCarousel));
+        check("organic video carousel is not a sponsored post",
+                !LinkedInFilter.isSponsoredPost(videoCarousel));
+
+        Update mixedCarousel = new Update();
+        mixedCarousel.carouselContent = new Carousel(Type.MIXED_UPDATES);
+        mixedCarousel.carouselContent.items.add(new Item());
+        check("organic mixed carousel is kept by suggested",
+                !LinkedInFilter.isSuggestedCarousel(mixedCarousel));
+        check("organic mixed carousel is not a video post", !LinkedInFilter.isVideoPost(mixedCarousel));
+
+        Update videoCarouselItems = new Update();
+        videoCarouselItems.carouselContent = new Carousel(Type.MIXED_UPDATES);
+        Item videoItem = new Item();
+        videoItem.update = new Update();
+        videoItem.update.content.hasVideoCarouselItemComponentValue = true;
+        videoCarouselItems.carouselContent.items.add(videoItem);
+        check("carousel with video item is a video post", LinkedInFilter.isVideoPost(videoCarouselItems));
+
+        Update sponsoredCarousel = new Update();
+        sponsoredCarousel.carouselContent = new Carousel(Type.MIXED_UPDATES);
+        Item sponsoredItem = new Item();
+        sponsoredItem.trackingData = new Tracking();
+        sponsoredItem.trackingData.sponsoredTracking = new Object();
+        sponsoredCarousel.carouselContent.items.add(sponsoredItem);
+        check("carousel with sponsored item is sponsored", LinkedInFilter.isSponsoredPost(sponsoredCarousel));
+        check("carousel with sponsored item is suggested", LinkedInFilter.isSuggestedCarousel(sponsoredCarousel));
+
+        Update organicEntityCarousel = new Update();
+        organicEntityCarousel.carouselContent = new Carousel(Type.MIXED_UPDATES);
+        organicEntityCarousel.content.hasEntityComponentValue = true;
+        check("organic entity carousel is not sponsored", !LinkedInFilter.isSponsoredPost(organicEntityCarousel));
+
+        Update promotedJob = new Update();
+        promotedJob.metadata.trackingData = new Tracking();
+        promotedJob.metadata.trackingData.sponsoredTracking = new Object();
+        promotedJob.content.hasJobComponentValue = true;
+        check("promoted job is a job", LinkedInFilter.isPromotedJob(promotedJob));
+        check("promoted job is not a sponsored post", !LinkedInFilter.isSponsoredPost(promotedJob));
+
+        Update plain = new Update();
+        check("plain update is kept", !LinkedInFilter.isSponsoredPost(plain)
+                && !LinkedInFilter.isPromotedJob(plain)
+                && !LinkedInFilter.isSuggestedCarousel(plain)
+                && !LinkedInFilter.isVideoPost(plain));
+
+        System.out.println("PASS: LinkedIn filter behavior checks");
+    }
+}
+'''
+
+
+class LinkedInFilterBehaviorTests(unittest.TestCase):
+    def test_predicates_cover_reported_ads_and_video_carousels(self):
+        javac, java = _jdk_tool("javac"), _jdk_tool("java")
+        if not javac or not java:
+            self.skipTest("JDK javac/java not available")
+        with tempfile.TemporaryDirectory() as workspace:
+            root = Path(workspace)
+            harness = root / "LinkedInFilterBehaviorCheck.java"
+            harness.write_text(BEHAVIOR_HARNESS, encoding="utf-8")
+            classes = root / "classes"
+            subprocess.run([javac, "-encoding", "UTF-8", "-d", str(classes), str(FILTER), str(harness)],
+                           check=True, capture_output=True, text=True)
+            result = subprocess.run([java, "-cp", str(classes), "LinkedInFilterBehaviorCheck"],
+                                    check=True, capture_output=True, text=True)
+        self.assertIn("PASS: LinkedIn filter behavior checks", result.stdout)
 
 
 if __name__ == "__main__":

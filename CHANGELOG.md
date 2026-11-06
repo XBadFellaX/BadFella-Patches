@@ -1,3 +1,9 @@
+## 1.2.0-dev.4 (2026-11-06)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** remove promoted and lead-gen ads that carry entity, discovery or carousel cards, and remove video carousels such as Videos for you
+
 ## 1.2.0-dev.3 (2026-11-06)
 
 ### ✨ New Features

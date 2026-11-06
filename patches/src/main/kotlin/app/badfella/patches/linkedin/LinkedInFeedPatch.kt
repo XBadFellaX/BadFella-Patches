@@ -16,7 +16,9 @@ private const val FILTER = "Lapp/badfella/extension/linkedin/LinkedInFilter;"
  *
  * `createUpdatePresenter` already returns null when a collapsed update produces no presenters,
  * and the feed pipeline logs and skips that update, so the same null return removes the row
- * instead of leaving a placeholder.
+ * instead of leaving a placeholder. Each selection inserts its own block with a predicate-scoped
+ * label, so enabling several selections at once cannot duplicate a label or jump into the wrong
+ * patch's code.
  */
 private fun BytecodePatchContext.dropUpdateWhen(predicate: String) {
     val method: MutableMethod = LinkedInUpdatePresenterFingerprint.method
@@ -29,22 +31,23 @@ private fun BytecodePatchContext.dropUpdateWhen(predicate: String) {
     check(implementation.registerCount - parameterWords - 1 >= 2) {
         "LinkedIn feed presenter has no free locals; this build needs review"
     }
+    val keep = "keep_$predicate"
     method.addInstructionsWithLabels(0, """
         move-object/from16 v1, p1
         invoke-static { v1 }, $FILTER->$predicate(Ljava/lang/Object;)Z
         move-result v0
-        if-eqz v0, :keep
+        if-eqz v0, :$keep
         const/4 v0, 0x0
         return-object v0
-    """, ExternalLabel("keep", method.getInstruction(0)))
+    """, ExternalLabel(keep, method.getInstruction(0)))
 }
 
 @Suppress("unused")
 val linkedInHideSponsoredPostsPatch = bytecodePatch(
     name = "Hide sponsored posts",
     description = "Removes sponsored and promoted posts from the home feed instead of leaving an empty card. " +
-        "Promoted jobs and sponsored carousels stay with their own selections. Sponsored updates that the " +
-        "server does not mark with sponsored metadata are not affected.",
+        "Includes lead-gen ads and updates the feed labels Promoted or Sponsored, including when the ad " +
+        "also carries an entity, discovery or carousel card. Promoted jobs keep their own selection.",
 ) {
     compatibleWith(LINKEDIN)
     category("Ads")
@@ -68,7 +71,8 @@ val linkedInHidePromotedJobsPatch = bytecodePatch(
 val linkedInHideSuggestedCarouselsPatch = bytecodePatch(
     name = "Hide suggested and follow carousels",
     description = "Removes recommended-follow prompts and sponsored discovery, entity and carousel rows " +
-        "from the feed. Organic posts by people and pages you follow are kept.",
+        "from the feed, including video carousels such as Videos for you. Organic posts by people and " +
+        "pages you follow are kept.",
 ) {
     compatibleWith(LINKEDIN)
     category("Feed")
@@ -80,7 +84,8 @@ val linkedInHideSuggestedCarouselsPatch = bytecodePatch(
 val linkedInHideFeedVideosPatch = bytecodePatch(
     name = "Hide feed videos",
     description = "Removes video posts from the home feed, including native, large single and external video " +
-        "updates. Videos opened from a profile or a link are not part of the feed pipeline.",
+        "updates, and video carousels such as Videos for you. Videos opened from a profile or a link are " +
+        "not part of the feed pipeline.",
 ) {
     compatibleWith(LINKEDIN)
     category("Feed")

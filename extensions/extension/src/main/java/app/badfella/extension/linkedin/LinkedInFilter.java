@@ -22,16 +22,10 @@ public final class LinkedInFilter {
 
     // ---- Feed -------------------------------------------------------------------------------
 
-    /** Sponsored/promoted post that is neither a job card nor a suggested/promotion carousel. */
+    /** Sponsored/promoted post that is not a promoted job (that has its own selection). */
     public static boolean isSponsoredPost(Object update) {
         if (!isSponsored(update)) return false;
-        if (hasComponent(update, "hasJobComponentValue")) return false;
-        if (hasComponent(update, "hasFollowPromptComponentValue")) return false;
-        if (field(update, "carouselContent") != null) return false;
-        if (hasComponent(update, "hasFeedDiscoveryEntityComponentValue")) return false;
-        if (hasComponent(update, "hasFeedDiscoveryGridComponentValue")) return false;
-        if (hasComponent(update, "hasEntityComponentValue")) return false;
-        return true;
+        return !hasComponent(update, "hasJobComponentValue");
     }
 
     /** Sponsored job card and promoted job recommendation. */
@@ -39,28 +33,110 @@ public final class LinkedInFilter {
         return isSponsored(update) && hasComponent(update, "hasJobComponentValue");
     }
 
-    /** Recommended follows and sponsored discovery/pages carousels. */
+    /** Recommended follows and sponsored discovery/entity/carousel rows, including video carousels. */
     public static boolean isSuggestedCarousel(Object update) {
         if (update == null) return false;
         if (hasComponent(update, "hasFollowPromptComponentValue")) return true;
+        if (isVideoCarousel(update)) return true;
         if (!isSponsored(update)) return false;
-        if (field(update, "carouselContent") != null) return true;
+        if (hasCarouselContent(update)) return true;
         return hasComponent(update, "hasFeedDiscoveryEntityComponentValue")
                 || hasComponent(update, "hasFeedDiscoveryGridComponentValue")
                 || hasComponent(update, "hasEntityComponentValue");
     }
 
-    /** Any feed update whose content or attachment is a video component. */
+    /** Any feed update whose content or attachment is a video, or whose carousel is a video carousel. */
     public static boolean isVideoPost(Object update) {
         return hasComponent(update, "hasLinkedInVideoComponentValue")
                 || hasComponent(update, "hasLargeSingleVideoComponentValue")
-                || hasComponent(update, "hasExternalVideoComponentValue");
+                || hasComponent(update, "hasExternalVideoComponentValue")
+                || hasComponent(update, "hasVideoCarouselItemComponentValue")
+                || isVideoCarousel(update);
     }
 
+    /**
+     * Sponsored or promoted content. Sponsored tracking metadata is authoritative; lead-gen form
+     * content and the feed's "Promoted"/"Sponsored" actor label cover ads that arrive without it.
+     */
     private static boolean isSponsored(Object update) {
-        Object metadata = field(update, "metadata");
-        Object tracking = field(metadata, "trackingData");
-        return field(tracking, "sponsoredTracking") != null;
+        if (update == null) return false;
+        Object tracking = field(field(update, "metadata"), "trackingData");
+        if (field(tracking, "sponsoredTracking") != null) return true;
+        if (field(update, "leadGenFormContent") != null) return true;
+        if (isTrue(update, "hasLeadGenFormContent")) return true;
+        if (hasPromotedLabel(update)) return true;
+        return hasSponsoredCarouselItem(update);
+    }
+
+    private static boolean hasPromotedLabel(Object update) {
+        if (hasPromotedActor(update)) return true;
+        Object items = field(carouselOf(update), "items");
+        if (!(items instanceof List)) return false;
+        for (Object item : (List) items) {
+            if (hasPromotedActor(field(item, "update"))) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasPromotedActor(Object update) {
+        Object actor = field(update, "actor");
+        if (actor == null) actor = field(field(update, "content"), "actorComponentValue");
+        return isPromotedText(field(actor, "subDescription"))
+                || isPromotedText(field(actor, "subDescriptionButton"));
+    }
+
+    private static boolean isPromotedText(Object value) {
+        if (value == null) return false;
+        String text = value instanceof CharSequence ? value.toString() : asString(field(value, "text"));
+        if (text == null) return false;
+        text = text.trim();
+        return "Promoted".equalsIgnoreCase(text) || "Sponsored".equalsIgnoreCase(text);
+    }
+
+    private static boolean hasSponsoredCarouselItem(Object update) {
+        Object items = field(carouselOf(update), "items");
+        if (!(items instanceof List)) return false;
+        for (Object item : (List) items) {
+            if (item == null) continue;
+            if (field(field(item, "trackingData"), "sponsoredTracking") != null) return true;
+            Object nested = field(item, "update");
+            if (field(field(field(nested, "metadata"), "trackingData"), "sponsoredTracking") != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasCarouselContent(Object update) {
+        return carouselOf(update) != null;
+    }
+
+    private static Object carouselOf(Object update) {
+        Object carousel = field(update, "carouselContent");
+        if (carousel == null) carousel = field(field(update, "attachment"), "carouselContent");
+        if (carousel == null) carousel = field(field(update, "leadGenFormContent"), "carouselContent");
+        return carousel;
+    }
+
+    private static boolean isVideoCarousel(Object update) {
+        if (update == null) return false;
+        Object carousel = carouselOf(update);
+        if (carousel == null) return false;
+        if (isVideoCarouselType(field(carousel, "type"))) return true;
+        Object items = field(carousel, "items");
+        if (!(items instanceof List)) return false;
+        for (Object item : (List) items) {
+            if (item == null) continue;
+            Object nested = field(item, "update");
+            if (hasComponent(nested, "hasVideoCarouselItemComponentValue")) return true;
+        }
+        return false;
+    }
+
+    private static boolean isVideoCarouselType(Object type) {
+        if (type == null) return false;
+        String name = type instanceof Enum ? ((Enum) type).name() : asString(type);
+        return name != null && name.contains("VIDEO");
     }
 
     private static boolean hasComponent(Object update, String flag) {
@@ -74,6 +150,10 @@ public final class LinkedInFilter {
         if (component == null) return false;
         Object value = field(component, flag);
         return value instanceof Boolean && (Boolean) value;
+    }
+
+    private static String asString(Object value) {
+        return value instanceof String ? (String) value : null;
     }
 
     // ---- Bottom navigation ------------------------------------------------------------------
