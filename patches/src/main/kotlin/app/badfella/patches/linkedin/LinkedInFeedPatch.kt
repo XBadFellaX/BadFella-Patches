@@ -46,8 +46,9 @@ private fun BytecodePatchContext.dropUpdateWhen(predicate: String) {
 val linkedInHideSponsoredPostsPatch = bytecodePatch(
     name = "Hide sponsored posts",
     description = "Removes sponsored and promoted posts from the home feed instead of leaving an empty card. " +
-        "Includes lead-gen ads and updates the feed labels Promoted or Sponsored, including when the ad " +
-        "also carries an entity, discovery or carousel card. Promoted jobs keep their own selection.",
+        "Matches sponsored tracking, boosted posts, call-to-action and lead-gen cards, and the feed's " +
+        "Promoted or Sponsored labels, including labels in accessibility text, supplementary actor info " +
+        "and headers. Promoted jobs keep their own selection.",
 ) {
     compatibleWith(LINKEDIN)
     category("Ads")
