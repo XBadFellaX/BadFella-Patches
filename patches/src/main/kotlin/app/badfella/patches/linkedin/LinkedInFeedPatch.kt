@@ -1,7 +1,9 @@
 package app.badfella.patches.linkedin
 
 import app.badfella.patches.linkedin.LINKEDIN
+import app.badfella.patches.linkedin.LinkedInStreamingListFingerprint
 import app.badfella.patches.linkedin.LinkedInUpdatePresenterFingerprint
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.patch.BytecodePatchContext
@@ -42,18 +44,50 @@ private fun BytecodePatchContext.dropUpdateWhen(predicate: String) {
     """, ExternalLabel(keep, method.getInstruction(0)))
 }
 
+/**
+ * Strips matching models from an incoming page before the paged list accepts them.
+ *
+ * `addAll(Collection)` is the dedupe funnel that `CollectionTemplatePagedList.addAll` reaches with
+ * the parsed element list, so removing an entry here means no adapter slot, presenter or
+ * impression is ever allocated for it. The helper returns a new list only when something matched;
+ * otherwise the original collection is handed back untouched.
+ */
+private fun BytecodePatchContext.filterIngestedWhen(selection: String) {
+    val method: MutableMethod = LinkedInStreamingListFingerprint.method
+    val implementation = checkNotNull(method.implementation) {
+        "LinkedIn streaming list addAll has no body; this build needs review"
+    }
+    val parameterWords = 1 + method.parameterTypes.sumOf {
+        if (it.toString() == "J" || it.toString() == "D") 2 else 1
+    }
+    check(implementation.registerCount - parameterWords >= 1) {
+        "LinkedIn streaming list addAll has no free local; this build needs review"
+    }
+    method.addInstructions(0, """
+        move-object/from16 v0, p1
+        invoke-static { v0 }, $FILTER->$selection(Ljava/util/Collection;)Ljava/util/List;
+        move-result-object v0
+        move-object/from16 p1, v0
+    """)
+}
+
 @Suppress("unused")
 val linkedInHideSponsoredPostsPatch = bytecodePatch(
     name = "Hide sponsored posts",
     description = "Removes sponsored and promoted posts from the home feed instead of leaving an empty card. " +
-        "Matches sponsored tracking, boosted posts, call-to-action and lead-gen cards, and the feed's " +
-        "Promoted or Sponsored labels, including labels in accessibility text, supplementary actor info " +
-        "and headers. Promoted jobs keep their own selection.",
+        "Drops matching updates before the paged list accepts them and also checks the presenter entry, so " +
+        "an ad that arrives through a different transformer cannot leave a gap. Matches sponsored tracking, " +
+        "sponsored URNs, boosted posts, call-to-action and lead-gen cards, and the feed's Promoted or " +
+        "Sponsored labels, including labels in accessibility text, supplementary actor info and headers. " +
+        "Promoted jobs keep their own selection.",
 ) {
     compatibleWith(LINKEDIN)
     category("Ads")
     extendWith("extensions/extension.mpe")
-    execute { dropUpdateWhen("isSponsoredPost") }
+    execute {
+        dropUpdateWhen("isSponsoredPost")
+        filterIngestedWhen("filterSponsoredPosts")
+    }
 }
 
 @Suppress("unused")
@@ -65,7 +99,10 @@ val linkedInHidePromotedJobsPatch = bytecodePatch(
     compatibleWith(LINKEDIN)
     category("Ads")
     extendWith("extensions/extension.mpe")
-    execute { dropUpdateWhen("isPromotedJob") }
+    execute {
+        dropUpdateWhen("isPromotedJob")
+        filterIngestedWhen("filterPromotedJobs")
+    }
 }
 
 @Suppress("unused")
@@ -78,7 +115,10 @@ val linkedInHideSuggestedCarouselsPatch = bytecodePatch(
     compatibleWith(LINKEDIN)
     category("Feed")
     extendWith("extensions/extension.mpe")
-    execute { dropUpdateWhen("isSuggestedCarousel") }
+    execute {
+        dropUpdateWhen("isSuggestedCarousel")
+        filterIngestedWhen("filterSuggestedCarousels")
+    }
 }
 
 @Suppress("unused")
@@ -91,5 +131,8 @@ val linkedInHideFeedVideosPatch = bytecodePatch(
     compatibleWith(LINKEDIN)
     category("Feed")
     extendWith("extensions/extension.mpe")
-    execute { dropUpdateWhen("isVideoPost") }
+    execute {
+        dropUpdateWhen("isVideoPost")
+        filterIngestedWhen("filterVideos")
+    }
 }

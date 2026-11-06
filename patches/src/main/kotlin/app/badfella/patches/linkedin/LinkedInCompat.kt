@@ -32,6 +32,22 @@ internal object LinkedInUpdatePresenterFingerprint : Fingerprint(
     ),
 )
 
+/**
+ * The collection funnel every streaming update page passes through.
+ *
+ * `CollectionTemplatePagedList.addAll(CollectionTemplate)` ends by calling this
+ * `addAll(Collection)` override with the parsed page's element list, so a model removed here never
+ * enters the paged list, allocates a presenter or records an impression. This is the LinkedIn
+ * equivalent of Hush's `FeedUnitCollectionManager.addNewEdgeToCollection` hook.
+ */
+internal object LinkedInStreamingListFingerprint : Fingerprint(
+    definingClass = "Lcom/linkedin/android/infra/paging/" +
+        "BaseStreamingPagedResource\$DataManagerBackedStreamingPagedList;",
+    name = "addAll",
+    returnType = "Z",
+    parameters = listOf("Ljava/util/Collection;"),
+)
+
 /** The slim bottom bar applies its reviewed HomeTabInfo list here. */
 internal object LinkedInBottomBarItemsFingerprint : Fingerprint(
     definingClass = "Lcom/linkedin/android/home/bottomnav/SlimBottomBar;",

@@ -21,6 +21,8 @@ APK = args.apk
 SDK = args.build_tools
 FILTER = "Lapp/badfella/extension/linkedin/LinkedInFilter;"
 PRESENTER = "Lcom/linkedin/android/feed/framework/presentercreator/update/FeedUpdateTransformer;"
+STREAMING_LIST = ("Lcom/linkedin/android/infra/paging/"
+                  "BaseStreamingPagedResource$DataManagerBackedStreamingPagedList;")
 BOTTOM_BAR = "Lcom/linkedin/android/home/bottomnav/SlimBottomBar;"
 EXPECTED_PATCHES = {
     "Hide sponsored posts",
@@ -74,11 +76,11 @@ with tempfile.TemporaryDirectory() as workspace:
             file.write_bytes(data)
             for descriptor in class_descriptors(data):
                 classes[descriptor] += 1
-                if descriptor in (FILTER, PRESENTER, BOTTOM_BAR):
+                if descriptor in (FILTER, PRESENTER, STREAMING_LIST, BOTTOM_BAR):
                     targets.setdefault(descriptor, name)
 
     assert classes[FILTER] == 1, "LinkedIn runtime filter is missing or duplicated"
-    assert classes[PRESENTER] == 1 and classes[BOTTOM_BAR] == 1
+    assert classes[PRESENTER] == 1 and classes[STREAMING_LIST] == 1 and classes[BOTTOM_BAR] == 1
     assert all(count == 1 for count in classes.values()), "Duplicate DEX classes"
 
     def disassemble(name):
@@ -90,6 +92,12 @@ with tempfile.TemporaryDirectory() as workspace:
     for predicate in ("isSponsoredPost", "isPromotedJob", "isSuggestedCarousel", "isVideoPost"):
         assert f"{FILTER}.{predicate}:" in feed, f"Feed predicate not injected: {predicate}"
 
+    streaming = disassemble(targets[STREAMING_LIST])
+    for selection in ("filterSponsoredPosts", "filterPromotedJobs",
+                      "filterSuggestedCarousels", "filterVideos"):
+        assert f"{FILTER}.{selection}:" in streaming, \
+            f"Collection-boundary filter not injected: {selection}"
+
     nav = disassemble(targets[BOTTOM_BAR])
     if args.tabs_mask:
         assert f"{FILTER}.filterTabs:" in nav, "Bottom-bar filter not injected"
@@ -99,5 +107,5 @@ with tempfile.TemporaryDirectory() as workspace:
         assert f"{FILTER}.filterTabs:" not in nav, "Bottom-bar filter injected without a selection"
 
 subprocess.run([str(SDK / "zipalign.exe"), "-c", "4", str(APK)], check=True)
-print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, feed predicates and bottom-bar filter, "
-      f"{len(classes)} unique classes, ZIP alignment")
+print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, presenter and collection filters, "
+      f"bottom-bar filter, {len(classes)} unique classes, ZIP alignment")

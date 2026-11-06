@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.2.0-dev.5",
+  "version": "1.2.0-dev.6",
   "patches": [
     {
       "name": "Customize navigation bar",
@@ -236,7 +236,7 @@
     },
     {
       "name": "Hide sponsored posts",
-      "description": "Removes sponsored and promoted posts from the home feed instead of leaving an empty card. Matches sponsored tracking, boosted posts, call-to-action and lead-gen cards, and the feed's Promoted or Sponsored labels, including labels in accessibility text, supplementary actor info and headers. Promoted jobs keep their own selection.",
+      "description": "Removes sponsored and promoted posts from the home feed instead of leaving an empty card. Drops matching updates before the paged list accepts them and also checks the presenter entry, so an ad that arrives through a different transformer cannot leave a gap. Matches sponsored tracking, sponsored URNs, boosted posts, call-to-action and lead-gen cards, and the feed's Promoted or Sponsored labels, including labels in accessibility text, supplementary actor info and headers. Promoted jobs keep their own selection.",
       "default": true,
       "category": "Ads",
       "compatiblePackages": [

@@ -63,11 +63,13 @@ class LinkedInCatalogTests(unittest.TestCase):
 
 class LinkedInSourceTests(unittest.TestCase):
     def test_runtime_filter_covers_every_injected_predicate(self):
-        source = (ROOT / "extensions/extension/src/main/java/app/badfella/extension/linkedin/"
-                         "LinkedInFilter.java").read_text(encoding="utf-8")
-        for method in ["isSponsoredPost", "isPromotedJob", "isSuggestedCarousel", "isVideoPost", "filterTabs"]:
-            self.assertIn(f"public static boolean {method}(" if method != "filterTabs"
-                          else "public static List filterTabs(", source)
+        source = FILTER.read_text(encoding="utf-8")
+        for method in ["isSponsoredPost", "isPromotedJob", "isSuggestedCarousel", "isVideoPost"]:
+            self.assertIn(f"public static boolean {method}(", source)
+        for method in ["filterSponsoredPosts", "filterPromotedJobs",
+                       "filterSuggestedCarousels", "filterVideos"]:
+            self.assertIn(f"public static List {method}(Collection items)", source)
+        self.assertIn("public static List filterTabs(", source)
         self.assertIn("sponsoredTracking", source)
         self.assertIn("hasLinkedInVideoComponentValue", source)
         self.assertIn("RELATIONSHIPS", source)
@@ -81,6 +83,9 @@ class LinkedInSourceTests(unittest.TestCase):
         self.assertIn("Lcom/linkedin/android/feed/framework/presentercreator/update/"
                       "FeedUpdateTransformer;", compat)
         self.assertIn('name = "createUpdatePresenter"', compat)
+        self.assertIn("BaseStreamingPagedResource\\$DataManagerBackedStreamingPagedList;", compat)
+        self.assertIn('name = "addAll"', compat)
+        self.assertIn('parameters = listOf("Ljava/util/Collection;")', compat)
         self.assertIn("Lcom/linkedin/android/home/bottomnav/SlimBottomBar;", compat)
         self.assertIn('name = "setItems"', compat)
 
@@ -94,7 +99,11 @@ class LinkedInSourceTests(unittest.TestCase):
             self.assertIn("Lapp/badfella/extension/linkedin/LinkedInFilter;", source)
         for predicate in ["isSponsoredPost", "isPromotedJob", "isSuggestedCarousel", "isVideoPost"]:
             self.assertIn(f'"{predicate}"', feed)
-
+        for selection in ["filterSponsoredPosts", "filterPromotedJobs",
+                          "filterSuggestedCarousels", "filterVideos"]:
+            self.assertIn(f'"{selection}"', feed)
+        self.assertIn("LinkedInStreamingListFingerprint.method", feed)
+        self.assertIn("move-object/from16 p1, v0", feed)
 
     def test_runtime_filter_uses_structural_ad_and_video_anchors(self):
         source = FILTER.read_text(encoding="utf-8")
@@ -103,8 +112,13 @@ class LinkedInSourceTests(unittest.TestCase):
                        "hasEntityComponentValue", "hasFollowPromptComponentValue", "accessibilityText",
                        "supplementaryActorInfo", "hasSponsoredTracking", "hasBoostHeader",
                        "boostHeader", "resharedUpdate", "callToActionComponentValue",
-                       "detailHeader", "contextualHeader"]:
+                       "detailHeader", "contextualHeader", "contextualDescription",
+                       "entityUrn", "preDashEntityUrn", "rawUrnString", "adUrn",
+                       "aggregatedContent"]:
             self.assertIn(anchor, source)
+        for token in ["sponsoredcontent", "sponsoredcreative", "sponsoredupdate",
+                      "adcreative", "adupdate", "promotedupdate"]:
+            self.assertIn(f'"{token}"', source)
         self.assertIn('lower.contains("promoted")', source)
         self.assertIn('lower.contains("sponsored")', source)
         self.assertIn("name.contains(\"VIDEO\")", source)
@@ -133,9 +147,17 @@ import java.util.List;
 public final class LinkedInFilterBehaviorCheck {
     enum Type { UNKNOWN, MIXED_UPDATES, DISCOVER_VIDEO, VIDEO, SMALL_THEMED_VIDEOS }
 
+    static final class Sponsored {
+        String adUrn;
+        String adServingUrn;
+        String sponsoredCampaignUrn;
+        String adTrackingCode;
+        String leadTrackingCode;
+    }
     static final class Tracking {
-        Object sponsoredTracking;
+        Sponsored sponsoredTracking;
         boolean hasSponsoredTracking;
+        String adUrn;
     }
     static final class Metadata { Tracking trackingData; String legoTrackingToken; }
     static final class CallToAction { String legoTrackingToken; }
@@ -159,7 +181,7 @@ public final class LinkedInFilterBehaviorCheck {
         List<Item> items = new ArrayList<>();
         Carousel(Type type) { this.type = type; }
     }
-    static final class Attachment { Content content; Carousel carouselContent; Update update; }
+    static final class Attachment { Content content; Carousel carouselContent; Update update; Urn entityUrn; }
     static final class Text {
         String text;
         String accessibilityText;
@@ -184,8 +206,18 @@ public final class LinkedInFilterBehaviorCheck {
         Text titleSupplementaryInfo;
         Text contextualTitleSupplementaryInfo;
     }
+    static final class ContextualDescription { Text text; }
     static final class Boost { String boostStatus; }
     static final class LeadGenFormContent { Carousel carouselContent; Content content; }
+    static final class AggregatedContent { List<Update> updates = new ArrayList<>(); }
+    static final class Urn {
+        String entityType;
+        String rawUrnString;
+        Urn(String entityType, String rawUrnString) {
+            this.entityType = entityType;
+            this.rawUrnString = rawUrnString;
+        }
+    }
     static final class Update {
         Metadata metadata = new Metadata();
         Content content = new Content();
@@ -193,6 +225,9 @@ public final class LinkedInFilterBehaviorCheck {
         Actor actor;
         Carousel carouselContent;
         LeadGenFormContent leadGenFormContent;
+        AggregatedContent aggregatedContent;
+        Urn entityUrn;
+        Urn preDashEntityUrn;
         boolean hasLeadGenFormContent;
         boolean hasBoostHeader;
         Boost boostHeader;
@@ -200,10 +235,24 @@ public final class LinkedInFilterBehaviorCheck {
         Header header;
         Header detailHeader;
         ContextualHeader contextualHeader;
+        ContextualDescription contextualDescription;
     }
 
     static void check(String name, boolean condition) {
         if (!condition) throw new AssertionError(name);
+    }
+
+    static Update organic() {
+        Update organic = new Update();
+        organic.actor = new Actor();
+        organic.actor.subDescription = new Text("2,725,195 followers");
+        organic.header = new Header();
+        organic.header.text = new Text("Atlassian");
+        organic.content.hasEntityComponentValue = true;
+        organic.metadata.legoTrackingToken = "lego-token-present-on-organic-updates";
+        organic.entityUrn = new Urn("update", "urn:li:update:(urn:li:activity:1,MAIN_FEED)");
+        organic.preDashEntityUrn = new Urn("activity", "urn:li:activity:1");
+        return organic;
     }
 
     public static void main(String[] args) {
@@ -217,7 +266,7 @@ public final class LinkedInFilterBehaviorCheck {
 
         Update promotedVideo = new Update();
         promotedVideo.metadata.trackingData = new Tracking();
-        promotedVideo.metadata.trackingData.sponsoredTracking = new Object();
+        promotedVideo.metadata.trackingData.sponsoredTracking = new Sponsored();
         promotedVideo.content.hasLinkedInVideoComponentValue = true;
         promotedVideo.content.hasEntityComponentValue = true;
         promotedVideo.carouselContent = new Carousel(Type.VIDEO);
@@ -271,6 +320,12 @@ public final class LinkedInFilterBehaviorCheck {
         contextualLabel.contextualHeader.subtitle = new Text("Promoted");
         check("contextual header label is sponsored", LinkedInFilter.isSponsoredPost(contextualLabel));
 
+        Update contextualDescriptionLabel = new Update();
+        contextualDescriptionLabel.contextualDescription = new ContextualDescription();
+        contextualDescriptionLabel.contextualDescription.text = new Text("Sponsored");
+        check("contextual description label is sponsored",
+                LinkedInFilter.isSponsoredPost(contextualDescriptionLabel));
+
         Update contentActor = new Update();
         contentActor.content.actorComponentValue = new Actor();
         contentActor.content.actorComponentValue.subDescription = new Text("Promoted");
@@ -280,6 +335,26 @@ public final class LinkedInFilterBehaviorCheck {
         tracked.metadata.trackingData = new Tracking();
         tracked.metadata.trackingData.hasSponsoredTracking = true;
         check("hasSponsoredTracking is sponsored", LinkedInFilter.isSponsoredPost(tracked));
+
+        Update adUrnLeaf = new Update();
+        adUrnLeaf.metadata.trackingData = new Tracking();
+        adUrnLeaf.metadata.trackingData.sponsoredTracking = new Sponsored();
+        adUrnLeaf.metadata.trackingData.sponsoredTracking.adUrn = "urn:li:adCreative:1";
+        check("SponsoredMetadata adUrn is sponsored", LinkedInFilter.isSponsoredPost(adUrnLeaf));
+
+        Update directAdUrn = new Update();
+        directAdUrn.metadata.trackingData = new Tracking();
+        directAdUrn.metadata.trackingData.adUrn = "urn:li:adCreative:2";
+        check("trackingData adUrn is sponsored", LinkedInFilter.isSponsoredPost(directAdUrn));
+
+        Update sponsoredTypeUrn = new Update();
+        sponsoredTypeUrn.entityUrn = new Urn("sponsoredContent", "urn:li:sponsoredContent:1");
+        check("sponsored entity type URN is sponsored", LinkedInFilter.isSponsoredPost(sponsoredTypeUrn));
+
+        Update sponsoredRawUrn = new Update();
+        sponsoredRawUrn.preDashEntityUrn =
+                new Urn("update", "urn:li:sponsoredUpdate:(urn:li:activity:1)");
+        check("sponsored raw URN is sponsored", LinkedInFilter.isSponsoredPost(sponsoredRawUrn));
 
         Update boosted = new Update();
         boosted.hasBoostHeader = true;
@@ -294,6 +369,14 @@ public final class LinkedInFilterBehaviorCheck {
         reshared.resharedUpdate.actor = new Actor();
         reshared.resharedUpdate.actor.subDescription = new Text("Sponsored");
         check("reshared promoted update is sponsored", LinkedInFilter.isSponsoredPost(reshared));
+
+        Update aggregated = new Update();
+        aggregated.aggregatedContent = new AggregatedContent();
+        Update aggregatedAd = new Update();
+        aggregatedAd.actor = new Actor();
+        aggregatedAd.actor.subDescription = new Text("Promoted");
+        aggregated.aggregatedContent.updates.add(aggregatedAd);
+        check("aggregated promoted update is sponsored", LinkedInFilter.isSponsoredPost(aggregated));
 
         Update attachmentCta = new Update();
         attachmentCta.attachment = new Attachment();
@@ -312,16 +395,11 @@ public final class LinkedInFilterBehaviorCheck {
         atlassian.content.callToActionComponentValue = new CallToAction();
         check("reported Atlassian promoted ad is sponsored", LinkedInFilter.isSponsoredPost(atlassian));
 
-        Update organic = new Update();
-        organic.actor = new Actor();
-        organic.actor.subDescription = new Text("2,725,195 followers");
-        organic.header = new Header();
-        organic.header.text = new Text("Atlassian");
-        organic.content.hasEntityComponentValue = true;
-        organic.metadata.legoTrackingToken = "lego-token-present-on-organic-updates";
+        Update organic = organic();
         check("organic update is kept", !LinkedInFilter.isSponsoredPost(organic));
         check("organic update is not a job", !LinkedInFilter.isPromotedJob(organic));
         check("organic update is not suggested", !LinkedInFilter.isSuggestedCarousel(organic));
+        check("organic update is not a video", !LinkedInFilter.isVideoPost(organic));
 
         Update organicVideo = new Update();
         organicVideo.content.hasLinkedInVideoComponentValue = true;
@@ -356,7 +434,7 @@ public final class LinkedInFilterBehaviorCheck {
         sponsoredCarousel.carouselContent = new Carousel(Type.MIXED_UPDATES);
         Item sponsoredItem = new Item();
         sponsoredItem.trackingData = new Tracking();
-        sponsoredItem.trackingData.sponsoredTracking = new Object();
+        sponsoredItem.trackingData.sponsoredTracking = new Sponsored();
         sponsoredCarousel.carouselContent.items.add(sponsoredItem);
         check("carousel with sponsored item is sponsored", LinkedInFilter.isSponsoredPost(sponsoredCarousel));
         check("carousel with sponsored item is suggested", LinkedInFilter.isSuggestedCarousel(sponsoredCarousel));
@@ -378,16 +456,61 @@ public final class LinkedInFilterBehaviorCheck {
 
         Update promotedJob = new Update();
         promotedJob.metadata.trackingData = new Tracking();
-        promotedJob.metadata.trackingData.sponsoredTracking = new Object();
+        promotedJob.metadata.trackingData.sponsoredTracking = new Sponsored();
         promotedJob.content.hasJobComponentValue = true;
         check("promoted job is a job", LinkedInFilter.isPromotedJob(promotedJob));
         check("promoted job is not a sponsored post", !LinkedInFilter.isSponsoredPost(promotedJob));
+
+        Update followPrompt = new Update();
+        followPrompt.content.hasFollowPromptComponentValue = true;
+        check("follow prompt is suggested", LinkedInFilter.isSuggestedCarousel(followPrompt));
 
         Update plain = new Update();
         check("plain update is kept", !LinkedInFilter.isSponsoredPost(plain)
                 && !LinkedInFilter.isPromotedJob(plain)
                 && !LinkedInFilter.isSuggestedCarousel(plain)
                 && !LinkedInFilter.isVideoPost(plain));
+
+        ArrayList organicOnly = new ArrayList();
+        organicOnly.add(organic);
+        check("sponsored collection filter keeps an unchanged list",
+                LinkedInFilter.filterSponsoredPosts(organicOnly) == organicOnly);
+        check("video collection filter keeps an unchanged list",
+                LinkedInFilter.filterVideos(organicOnly) == organicOnly);
+
+        ArrayList sponsoredItems = new ArrayList();
+        sponsoredItems.add(organic);
+        sponsoredItems.add(sponsoredTypeUrn);
+        sponsoredItems.add(promotedJob);
+        List sponsoredFiltered = LinkedInFilter.filterSponsoredPosts(sponsoredItems);
+        check("sponsored collection filter removes the ad", sponsoredFiltered.size() == 2
+                && sponsoredFiltered.contains(organic) && sponsoredFiltered.contains(promotedJob)
+                && !sponsoredFiltered.contains(sponsoredTypeUrn));
+        check("sponsored collection filter keeps the source list intact", sponsoredItems.size() == 3);
+
+        List jobsFiltered = LinkedInFilter.filterPromotedJobs(sponsoredItems);
+        check("job collection filter removes only the promoted job", jobsFiltered.size() == 2
+                && jobsFiltered.contains(organic) && jobsFiltered.contains(sponsoredTypeUrn)
+                && !jobsFiltered.contains(promotedJob));
+
+        ArrayList videoItems = new ArrayList();
+        videoItems.add(organic);
+        videoItems.add(organicVideo);
+        videoItems.add(videoCarousel);
+        List videosFiltered = LinkedInFilter.filterVideos(videoItems);
+        check("video collection filter removes every video", videosFiltered.size() == 1
+                && videosFiltered.contains(organic));
+
+        ArrayList suggestedItems = new ArrayList();
+        suggestedItems.add(organic);
+        suggestedItems.add(followPrompt);
+        suggestedItems.add(videoCarousel);
+        suggestedItems.add(organicEntityCarousel);
+        List suggestedFiltered = LinkedInFilter.filterSuggestedCarousels(suggestedItems);
+        check("suggested collection filter removes prompts and video carousels",
+                suggestedFiltered.size() == 2
+                        && suggestedFiltered.contains(organic)
+                        && suggestedFiltered.contains(organicEntityCarousel));
 
         System.out.println("PASS: LinkedIn filter behavior checks");
     }

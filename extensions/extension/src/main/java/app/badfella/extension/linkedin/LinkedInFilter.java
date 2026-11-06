@@ -2,6 +2,7 @@ package app.badfella.extension.linkedin;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -13,6 +14,12 @@ import java.util.Set;
  * The APK's Pegasus models and tab definitions keep their field names, so the filters read the
  * update's metadata and content components directly. Every lookup fails safe: a missing field or
  * class returns "not filtered" instead of throwing into the feed.
+ *
+ * Feed selections run at two layers. At the collection boundary
+ * ({@code DataManagerBackedStreamingPagedList.addAll}) matching models are removed from the parsed
+ * page before the paged list accepts them, so no adapter slot, view holder or impression is
+ * allocated. The presenter entry remains as a second guard for updates that reach the feed through
+ * a transformer that does not use the streaming list.
  */
 @SuppressWarnings({"rawtypes", "unchecked", "unused"})
 public final class LinkedInFilter {
@@ -21,8 +28,81 @@ public final class LinkedInFilter {
             "RELATIONSHIPS", "POST", "NOTIFICATIONS", "JOBS", "VIDEO", "NEWS",
     };
 
-    /** Bound for reshared/attachment/carousel wrapping so a malformed graph cannot recurse. */
+    /** Bound for reshared/attachment/carousel/aggregated wrapping so a malformed graph cannot recurse. */
     private static final int MAX_UPDATE_DEPTH = 3;
+
+    /** URN entity types and prefixes that identify ad serving rather than an organic update. */
+    private static final String[] SPONSORED_URN_TOKENS = {
+            "sponsoredcontent", "sponsoredcreative", "sponsoredupdate",
+            "adcreative", "adupdate", "promotedupdate",
+    };
+
+    private static final int SELECT_SPONSORED_POST = 1;
+    private static final int SELECT_PROMOTED_JOB = 2;
+    private static final int SELECT_SUGGESTED_CAROUSEL = 3;
+    private static final int SELECT_VIDEO = 4;
+
+    // ---- Collection boundary ----------------------------------------------------------------
+
+    /** Removes sponsored/promoted posts from a parsed page before the paged list accepts it. */
+    public static List filterSponsoredPosts(Collection items) {
+        return filterItems(items, SELECT_SPONSORED_POST);
+    }
+
+    /** Removes promoted job cards from a parsed page before the paged list accepts it. */
+    public static List filterPromotedJobs(Collection items) {
+        return filterItems(items, SELECT_PROMOTED_JOB);
+    }
+
+    /** Removes suggested, discovery and follow-carousel rows from a parsed page. */
+    public static List filterSuggestedCarousels(Collection items) {
+        return filterItems(items, SELECT_SUGGESTED_CAROUSEL);
+    }
+
+    /** Removes video updates from a parsed page. */
+    public static List filterVideos(Collection items) {
+        return filterItems(items, SELECT_VIDEO);
+    }
+
+    /**
+     * Returns the original collection when nothing matches, otherwise a new list without the
+     * matching models. The original is never mutated because pages can share their element list.
+     */
+    private static List filterItems(Collection items, int selection) {
+        if (items == null || items.isEmpty()) {
+            return items instanceof List ? (List) items : new ArrayList();
+        }
+        boolean matched = false;
+        for (Object item : items) {
+            if (matches(item, selection)) {
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            return items instanceof List ? (List) items : new ArrayList(items);
+        }
+        ArrayList retained = new ArrayList(items.size());
+        for (Object item : items) {
+            if (!matches(item, selection)) retained.add(item);
+        }
+        return retained;
+    }
+
+    private static boolean matches(Object item, int selection) {
+        switch (selection) {
+            case SELECT_SPONSORED_POST:
+                return isSponsoredPost(item);
+            case SELECT_PROMOTED_JOB:
+                return isPromotedJob(item);
+            case SELECT_SUGGESTED_CAROUSEL:
+                return isSuggestedCarousel(item);
+            case SELECT_VIDEO:
+                return isVideoPost(item);
+            default:
+                return false;
+        }
+    }
 
     // ---- Feed -------------------------------------------------------------------------------
 
@@ -59,10 +139,10 @@ public final class LinkedInFilter {
     }
 
     /**
-     * Sponsored or promoted content. Sponsored tracking metadata is authoritative; lead-gen form
-     * content, boosted headers, call-to-action cards and the feed's Promoted/Sponsored labels cover
-     * ads that arrive without it. Ads can also wrap an inner update, so nested updates are checked
-     * with a bounded depth.
+     * Sponsored or promoted content. Sponsored tracking metadata and sponsored URNs are
+     * authoritative; lead-gen form content, boosted headers, call-to-action cards and the feed's
+     * Promoted/Sponsored labels cover ads that arrive without either. Ads can wrap an inner update
+     * or an aggregated list, so nested updates are checked with a bounded depth.
      */
     private static boolean isSponsored(Object update) {
         return isSponsored(update, 0);
@@ -70,9 +150,8 @@ public final class LinkedInFilter {
 
     private static boolean isSponsored(Object update, int depth) {
         if (update == null || depth > MAX_UPDATE_DEPTH) return false;
-        Object tracking = field(field(update, "metadata"), "trackingData");
-        if (field(tracking, "sponsoredTracking") != null) return true;
-        if (isTrue(tracking, "hasSponsoredTracking")) return true;
+        if (hasSponsoredUrn(update)) return true;
+        if (hasSponsoredTracking(field(field(update, "metadata"), "trackingData"))) return true;
         if (field(update, "leadGenFormContent") != null) return true;
         if (isTrue(update, "hasLeadGenFormContent")) return true;
         if (isTrue(update, "hasBoostHeader") || field(update, "boostHeader") != null) return true;
@@ -80,7 +159,58 @@ public final class LinkedInFilter {
         if (hasPromotedLabel(update)) return true;
         if (hasSponsoredCarouselItem(update, depth)) return true;
         if (isSponsored(field(update, "resharedUpdate"), depth + 1)) return true;
-        return isSponsored(field(field(update, "attachment"), "update"), depth + 1);
+        if (isSponsored(field(field(update, "attachment"), "update"), depth + 1)) return true;
+        return hasSponsoredAggregatedUpdate(update, depth);
+    }
+
+    /**
+     * {@code UpdateMetadata.trackingData}. A present {@code sponsoredTracking}
+     * ({@code SponsoredMetadata}) is only attached to ad responses; its {@code adUrn},
+     * {@code adServingUrn}, campaign, tracking-code and serving leaves identify the serving
+     * record. The boolean flag covers builds that omit the object.
+     */
+    private static boolean hasSponsoredTracking(Object tracking) {
+        if (tracking == null) return false;
+        if (isTrue(tracking, "hasSponsoredTracking")) return true;
+        if (field(tracking, "adUrn") != null) return true;
+        return field(tracking, "sponsoredTracking") != null;
+    }
+
+    /**
+     * Sponsored entity URNs. LinkedIn names ad entities such as {@code sponsoredContent},
+     * {@code sponsoredCreative} and {@code sponsoredUpdate}; organic updates use
+     * {@code update}/{@code activity}. Both the parsed entity type and the raw URN are checked
+     * because failures can leave either one populated.
+     */
+    private static boolean hasSponsoredUrn(Object update) {
+        return isSponsoredUrn(field(update, "entityUrn"))
+                || isSponsoredUrn(field(update, "preDashEntityUrn"))
+                || isSponsoredUrn(field(field(update, "attachment"), "entityUrn"))
+                || isSponsoredUrn(field(field(update, "attachment"), "preDashEntityUrn"));
+    }
+
+    private static boolean isSponsoredUrn(Object urn) {
+        if (urn == null) return false;
+        if (mentionsSponsoredUrn(asString(field(urn, "entityType")))) return true;
+        return mentionsSponsoredUrn(asString(field(urn, "rawUrnString")));
+    }
+
+    private static boolean mentionsSponsoredUrn(String value) {
+        if (value == null) return false;
+        String lower = value.toLowerCase(Locale.ROOT);
+        for (String token : SPONSORED_URN_TOKENS) {
+            if (lower.contains(token)) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasSponsoredAggregatedUpdate(Object update, int depth) {
+        Object updates = field(field(update, "aggregatedContent"), "updates");
+        if (!(updates instanceof List)) return false;
+        for (Object nested : (List) updates) {
+            if (isSponsored(nested, depth + 1)) return true;
+        }
+        return false;
     }
 
     private static boolean hasCallToAction(Object update) {
@@ -95,7 +225,8 @@ public final class LinkedInFilter {
                 || hasPromotedActor(field(field(update, "content"), "actorComponentValue"))
                 || hasPromotedTextIn(field(update, "header"))
                 || hasPromotedTextIn(field(update, "detailHeader"))
-                || hasPromotedTextIn(field(update, "contextualHeader"));
+                || hasPromotedTextIn(field(update, "contextualHeader"))
+                || hasPromotedTextIn(field(update, "contextualDescription"));
     }
 
     private static boolean hasPromotedActor(Object actor) {

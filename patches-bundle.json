@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-06T09:09:59",
-  "description": "## 1.2.0-dev.5 (2026-11-06)\n\n### 🐛 Bug Fixes\n\n* **linkedin:** remove boosted and label-only promoted posts from the feed, including labels in accessibility text, supplementary actor info, headers and call-to-action cards",
-  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.2.0-dev.5/patches-1.2.0-dev.5.mpp",
+  "created_at": "2026-11-06T16:05:00",
+  "description": "## 1.2.0-dev.6 (2026-11-06)\n\n### 🐛 Bug Fixes\n\n* **linkedin:** drop sponsored, promoted, suggested and video updates from the parsed feed page before the list accepts them, so an ad no longer takes a list slot or reaches the presenter; also match sponsored URNs, ad tracking metadata, aggregated updates and contextual labels",
+  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.2.0-dev.6/patches-1.2.0-dev.6.mpp",
   "signature_download_url": "",
-  "version": "1.2.0-dev.5"
+  "version": "1.2.0-dev.6"
 }

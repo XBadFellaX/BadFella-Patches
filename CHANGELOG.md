@@ -1,3 +1,9 @@
+## 1.2.0-dev.6 (2026-11-06)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** drop sponsored, promoted, suggested and video updates from the parsed feed page before the list accepts them, so an ad no longer takes a list slot or reaches the presenter; also match sponsored URNs, ad tracking metadata, aggregated updates and contextual labels
+
 ## 1.2.0-dev.5 (2026-11-06)
 
 ### 🐛 Bug Fixes
