@@ -1,3 +1,11 @@
+## 1.1.0 (2026-11-06)
+
+### ✨ New Features
+
+* support reviewed patch targets without version pins 05fa478
+* **wanderlog:** make dark mode follow the device theme aa6b1a8
+* **wanderlog:** make the theme follow the device dark-mode setting 4cc8368
+
 # BadFella Patches
 
 ## 1.2.0-dev.2
