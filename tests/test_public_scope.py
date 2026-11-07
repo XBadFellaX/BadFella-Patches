@@ -10,7 +10,7 @@ class PublicScopeTests(unittest.TestCase):
         self.assertEqual({p.name for p in modules.iterdir() if p.is_dir()},
                          {'ticktick', 'emby', 'remoteatv', 'peptalk', 'wanderlog', 'linkedin', 'util'})
         catalog = json.loads((root / 'patches-list.json').read_text())
-        self.assertEqual(len(catalog['patches']), 14)
+        self.assertEqual(len(catalog['patches']), 31)
         self.assertEqual({c['packageName'] for p in catalog['patches'] for c in p['compatiblePackages']},
                          {'com.ticktick.task', 'com.mb.android', 'tech.simha.androidtvremote',
                           'com.peptalk.app', 'com.wanderlog.android', 'com.linkedin.android'})

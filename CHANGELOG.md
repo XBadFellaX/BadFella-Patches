@@ -1,3 +1,9 @@
+## 1.2.0-dev.9 (2026-11-06)
+
+### 🚀 Features
+
+* **linkedin:** import comprehensive 22-patch LinkedIn suite from Loki Patches, featuring root SDUI component filtering (`ComponentTransformer.doTransform`), in-app BadFella Patches settings, media download, and version-agnostic support across future LinkedIn releases
+
 ## 1.2.0-dev.8 (2026-11-06)
 
 ### 🐛 Bug Fixes

@@ -1,11 +1,10 @@
-"""Check the actual Morphe output for the LinkedIn patch, rather than a mocked context."""
+"""Check the actual Morphe output for the LinkedIn patch suite against stock APK."""
 import argparse
 import json
 import pathlib
 import re
 import struct
 import subprocess
-import sys
 import tempfile
 import zipfile
 from collections import Counter
@@ -14,30 +13,20 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("apk", type=pathlib.Path)
 parser.add_argument("result", type=pathlib.Path)
 parser.add_argument("build_tools", type=pathlib.Path)
-parser.add_argument("--tabs-mask", type=lambda value: int(value, 0), default=0xA,
-                    help="Bottom-bar mask expected in setItems (0 means the option was not selected)")
 args = parser.parse_args()
 APK = args.apk
 SDK = args.build_tools
-FILTER = "Lapp/badfella/extension/linkedin/LinkedInFilter;"
-PRESENTER = "Lcom/linkedin/android/feed/framework/presentercreator/update/FeedUpdateTransformer;"
-STREAMING_LIST = ("Lcom/linkedin/android/infra/paging/"
-                  "BaseStreamingPagedResource$DataManagerBackedStreamingPagedList;")
-TEMPLATE_PAGED_LIST = "Lcom/linkedin/android/infra/paging/CollectionTemplatePagedList;"
-SDUI_PAGED_LIST = "Lcom/linkedin/android/infra/sdui/viewmodel/SduiPagedList;"
-BOTTOM_BAR = "Lcom/linkedin/android/home/bottomnav/SlimBottomBar;"
-EXPECTED_PATCHES = {
-    "Hide sponsored posts",
-    "Hide promoted jobs",
-    "Hide suggested and follow carousels",
-    "Hide feed videos",
-    "Customize navigation bar",
-}
+
+SDUI_FILTER = "Lapp/badfella/extension/linkedin/SduiComponentFilter;"
+COMPONENT_TRANSFORMER = "Lcom/linkedin/sdui/transformer/impl/ComponentTransformer;"
+SETTINGS = "Lapp/badfella/extension/linkedin/Settings;"
+SETTINGS_ACTIVITY = "Lapp/badfella/extension/linkedin/SettingsActivity;"
+MAIN_ACTIVITY = "Lcom/linkedin/android/infra/navigation/MainActivity;"
 
 result = json.loads(args.result.read_text())
 assert result["success"] and not result["failedPatches"], result
 applied = set(result["appliedPatches"])
-assert applied == EXPECTED_PATCHES, applied
+assert len(applied) >= 18, f"Expected at least 18 default patches applied, got {len(applied)}: {applied}"
 
 manifest = subprocess.check_output(
     [str(SDK / "aapt2.exe"), "dump", "badging", str(APK)],
@@ -78,13 +67,13 @@ with tempfile.TemporaryDirectory() as workspace:
             file.write_bytes(data)
             for descriptor in class_descriptors(data):
                 classes[descriptor] += 1
-                if descriptor in (FILTER, PRESENTER, STREAMING_LIST, TEMPLATE_PAGED_LIST, SDUI_PAGED_LIST, BOTTOM_BAR):
+                if descriptor in (SDUI_FILTER, COMPONENT_TRANSFORMER, SETTINGS, SETTINGS_ACTIVITY, MAIN_ACTIVITY):
                     targets.setdefault(descriptor, name)
 
-    assert classes[FILTER] == 1, "LinkedIn runtime filter is missing or duplicated"
-    assert (classes[PRESENTER] == 1 and classes[STREAMING_LIST] == 1
-            and classes[TEMPLATE_PAGED_LIST] == 1 and classes[SDUI_PAGED_LIST] == 1
-            and classes[BOTTOM_BAR] == 1)
+    assert classes[SDUI_FILTER] == 1, "LinkedIn SDUI filter is missing or duplicated"
+    assert classes[SETTINGS] == 1, "LinkedIn Settings is missing or duplicated"
+    assert classes[COMPONENT_TRANSFORMER] == 1, "ComponentTransformer missing or duplicated"
+    assert classes[MAIN_ACTIVITY] == 1, "MainActivity missing or duplicated"
     assert all(count == 1 for count in classes.values()), "Duplicate DEX classes"
 
     def disassemble(name):
@@ -92,46 +81,13 @@ with tempfile.TemporaryDirectory() as workspace:
             [str(SDK / "dexdump.exe"), "-d", str(root / name)],
             text=True, encoding="utf-8", errors="replace")
 
-    feed = disassemble(targets[PRESENTER])
-    for predicate in ("isSponsoredPost", "isPromotedJob", "isSuggestedCarousel", "isVideoPost"):
-        assert f"{FILTER}.{predicate}:" in feed, f"Feed predicate not injected: {predicate}"
+    transformer = disassemble(targets[COMPONENT_TRANSFORMER])
+    assert "SduiComponentFilter.shouldHide:" in transformer, "SDUI shouldHide hook not injected into ComponentTransformer"
+    assert "SduiComponentFilter.rewrite:" in transformer, "SDUI rewrite hook not injected into ComponentTransformer"
 
-    streaming = disassemble(targets[STREAMING_LIST])
-    for selection in ("filterSponsoredPosts", "filterPromotedJobs",
-                      "filterSuggestedCarousels", "filterVideos"):
-        assert f"{FILTER}.{selection}:" in streaming, \
-            f"Collection-boundary filter not injected: {selection}"
-    for enable in ("enableHideSponsoredPosts", "enableHidePromotedJobs",
-                   "enableHideSuggestedCarousels", "enableHideFeedVideos"):
-        assert f"{FILTER}.{enable}:" in streaming, \
-            f"Parsed-page selection not enabled: {enable}"
-    assert f"{FILTER}.filterCollectionTemplate:" in streaming, \
-        "Streaming parsed-page filter not injected"
-
-    superclass = disassemble(targets[TEMPLATE_PAGED_LIST])
-    assert f"{FILTER}.filterCollectionTemplate:" in superclass, \
-        "Superclass parsed-page filter not injected"
-    for enable in ("enableHideSponsoredPosts", "enableHidePromotedJobs",
-                   "enableHideSuggestedCarousels", "enableHideFeedVideos"):
-        assert f"{FILTER}.{enable}:" in superclass, \
-            f"Superclass selection not enabled: {enable}"
-
-    sdui = disassemble(targets[SDUI_PAGED_LIST])
-    assert f"{FILTER}.filterSduiCollection:" in sdui, \
-        "SDUI paged-list filter not injected"
-    for enable in ("enableHideSponsoredPosts", "enableHidePromotedJobs",
-                   "enableHideSuggestedCarousels", "enableHideFeedVideos"):
-        assert f"{FILTER}.{enable}:" in sdui, \
-            f"SDUI selection not enabled: {enable}"
-
-    nav = disassemble(targets[BOTTOM_BAR])
-    if args.tabs_mask:
-        assert f"{FILTER}.filterTabs:" in nav, "Bottom-bar filter not injected"
-        assert f"const/16 v0, #int {args.tabs_mask}" in nav, \
-            f"Bottom-bar mask {args.tabs_mask:#x} not injected"
-    else:
-        assert f"{FILTER}.filterTabs:" not in nav, "Bottom-bar filter injected without a selection"
+    main_act = disassemble(targets[MAIN_ACTIVITY])
+    assert "SettingsShortcut.onMainActivityCreated:" in main_act, "SettingsShortcut hook not injected into MainActivity"
 
 subprocess.run([str(SDK / "zipalign.exe"), "-c", "4", str(APK)], check=True)
-print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, presenter and collection filters, "
-      f"bottom-bar filter, {len(classes)} unique classes, ZIP alignment")
+print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, SDUI transformer hooks, "
+      f"SettingsShortcut hook, {len(classes)} unique classes, ZIP alignment")
