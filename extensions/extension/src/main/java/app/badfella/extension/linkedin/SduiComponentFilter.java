@@ -166,6 +166,23 @@ public final class SduiComponentFilter {
 
     /** Called with every SDUI component before shouldHide; returns it, or an edited copy (the post ⋯ menu). */
     public static Object rewrite(Object component) {
+        if (Settings.expandPosts()) {
+            try {
+                Object viewTracking = Proto.is(component, "hasViewTracking")
+                        ? Proto.call(component, "getViewTracking") : null;
+                if ("feed-commentary".equals(Proto.string(viewTracking, "getViewName"))) {
+                    byte[] bytes = payload(component);
+                    byte[] edited = bytes == null ? null : expandCommentary(bytes);
+                    if (edited != null && edited != bytes) {
+                        Object copy = component.getClass().getMethod("parseFrom", byte[].class)
+                                .invoke(null, (Object) edited);
+                        if (copy != null) component = copy;
+                    }
+                }
+            } catch (Throwable t) {
+                Diagnostics.error("expand posts failed", t);
+            }
+        }
         if (Settings.viewerTapToHide()) {
             try {
                 Object viewTracking = Proto.is(component, "hasViewTracking")
@@ -180,6 +197,21 @@ public final class SduiComponentFilter {
         return PostMenu.inject(component, payload(component));
     }
 
+    /**
+     * Opens a post's text when it appears by running the action of its own "more" link, so tapping the text still
+     * collapses it. The TextBlock sits in field 2 of the component's field 35, and that action in field 2 of the
+     * TextBlock's field 12. The new trigger is a component field 25, with the action in field 1 and field 13 marking
+     * it as firing on appear, so a collapsed post opens again when it comes back on screen.
+     */
+    private static byte[] expandCommentary(byte[] component) {
+        byte[] expand = ProtoEdit.nested(component, 35, 2, 12, 2);
+        if (expand == null) return component;
+        List<ProtoEdit.Field> fields = ProtoEdit.parse(component);
+        if (fields == null) return component;
+        fields.add(ProtoEdit.message(25, new ProtoEdit.Field(1, 2, expand), ProtoEdit.message(13)));
+        return ProtoEdit.write(fields);
+    }
+
     public static boolean shouldHide(Object component) {
         try {
             Object viewTracking = Proto.is(component, "hasViewTracking")
@@ -188,6 +220,8 @@ public final class SduiComponentFilter {
             String screenName = Proto.string(component, "getObservabilityViewName");
             logViewName(viewName);
             outlineViewer(screenName, component);
+            if (MoreMenu.MORE_SCREEN.equals(screenName)) MoreMenu.capture(payload(component));
+            if (MoreMenu.hideItem(viewName)) return hide(true, "more item: " + viewName);
             if (Settings.hideAi() && isAiView(viewName)) {
                 return hide(true, "ai: " + viewName);
             }

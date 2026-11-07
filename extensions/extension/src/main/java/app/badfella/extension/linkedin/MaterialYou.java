@@ -1,6 +1,7 @@
 package app.badfella.extension.linkedin;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.Build;
 
@@ -98,6 +99,20 @@ public final class MaterialYou {
     private static final int[] DARK_BACKGROUNDS = {0x1B1F23, 0x1D2226, 0x293037, 0x293138};
 
     private MaterialYou() {
+    }
+
+    /**
+     * Injected at the start of AppCompatActivity.attachBaseContext by "AMOLED black bars". The black backgrounds
+     * sit under the {@code notlong} screen qualifier, so this forces it on while the switch is on and off while it
+     * is off. Without it, bars and other screens drawn from resources stay black whatever the switch says.
+     */
+    public static Context pitchBlackContext(Context base) {
+        Configuration override = new Configuration();
+        // Layout direction bits left at 0 keep the base context's own direction.
+        override.screenLayout = base.getResources().getConfiguration().screenLayout
+                & ~(Configuration.SCREENLAYOUT_LONG_MASK | Configuration.SCREENLAYOUT_LAYOUTDIR_MASK)
+                | (Settings.amoledBlack() ? Configuration.SCREENLAYOUT_LONG_NO : Configuration.SCREENLAYOUT_LONG_YES);
+        return base.createConfigurationContext(override);
     }
 
     /** Whether "AMOLED black" turns this packed Compose Color, a dark background, black. */
@@ -342,14 +357,14 @@ public final class MaterialYou {
      * transparent, LinkedIn's white and dark container the card colors.
      */
     public static int navigationBarColor(int color) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !Settings.materialYou()) return color;
+        if (!Settings.materialYou() && !Settings.amoledBlack()) return color;
         if (color == 0xE6FFFFFF || color == 0x801B1B1B) return 0;
         return bar(color);
     }
 
     /** Injected before each call that turns the navigation bar contrast (a white scrim) on or off. */
     public static boolean navigationBarContrast(boolean enforced) {
-        return Settings.materialYou() ? false : enforced;
+        return Settings.materialYou() || Settings.amoledBlack() ? false : enforced;
     }
 
     /** Whether [rgb] is a saturated blue (hue 190° to 250°). */

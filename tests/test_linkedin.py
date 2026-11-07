@@ -14,9 +14,12 @@ EXPECTED_LINKEDIN_PATCHES = {
     "Anonymous profile viewing",
     "Block tracking",
     "Copy text",
+    "Customize navigation bar",
     "Disable double-tap like",
     "Download media",
+    "Expand posts",
     "Feed filters",
+    "Glass navigation bar",
     "GmsCore support",
     "Hide Premium upsells",
     "Hide ads",
@@ -26,16 +29,20 @@ EXPECTED_LINKEDIN_PATCHES = {
     "Keep feed on reopen",
     "Material You",
     "Messaging",
+    "More tab",
+    "Navigation bar",
     "Open links directly",
     "Post menu items",
     "Remove gaps and dividers",
     "Sanitize share links",
     "Swipe between feeds",
+    "Swipe between tabs",
     "Tap to hide in viewers",
 }
 
 NON_DEFAULT_PATCHES = {
     "AMOLED black bars",
+    "Glass navigation bar",
     "GmsCore support",
     "Material You",
     "Remove gaps and dividers",
@@ -51,9 +58,9 @@ class LinkedInCatalogTests(unittest.TestCase):
                    for compat in patch["compatiblePackages"] or [])
         }
 
-    def test_all_22_patches_declared(self):
+    def test_all_28_patches_declared(self):
         self.assertEqual(set(self.patches.keys()), EXPECTED_LINKEDIN_PATCHES)
-        self.assertEqual(len(self.patches), 22)
+        self.assertEqual(len(self.patches), 28)
 
     def test_reviewed_targets_and_version_agnosticism(self):
         for name, patch in self.patches.items():
@@ -79,7 +86,7 @@ class LinkedInCatalogTests(unittest.TestCase):
 class LinkedInSourceTests(unittest.TestCase):
     def test_subpackages_structure(self):
         subdirs = {p.name for p in PATCHES_DIR.iterdir() if p.is_dir()}
-        expected_dirs = {"ads", "download", "feed", "links", "messaging", "misc", "shared", "theme", "tracking"}
+        expected_dirs = {"ads", "download", "feed", "links", "messaging", "misc", "navigation", "shared", "theme", "tracking"}
         self.assertTrue(expected_dirs.issubset(subdirs))
 
     def test_constants_and_compatibility(self):
@@ -124,6 +131,11 @@ class LinkedInSourceTests(unittest.TestCase):
             "MessagingPatch.java",
             "MaterialYou.java",
             "NavPanelPatch.java",
+            "NavigationBar.java",
+            "GlassCapsule.java",
+            "GlassNavigationBar.java",
+            "SwipeTabs.java",
+            "MoreMenu.java",
             "OpenLinksDirectlyPatch.java",
             "Proto.java",
             "ProtoEdit.java",

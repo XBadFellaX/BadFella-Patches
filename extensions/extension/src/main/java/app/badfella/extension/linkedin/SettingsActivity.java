@@ -149,6 +149,7 @@ public final class SettingsActivity extends Activity {
         }
 
         if (Settings.isFeedFiltersIncluded() || Settings.isDisableDoubleTapLikeIncluded()
+                || Settings.isExpandPostsIncluded() || Settings.isSwipeTabsIncluded()
                 || Settings.isCopyTextIncluded() || Settings.isKeepFeedIncluded()
                 || Settings.isPostMenuIncluded() || Settings.isViewerTapToHideIncluded()
                 || Settings.isSwipeFeedsIncluded() || Settings.isHideTabsIncluded()) {
@@ -156,6 +157,14 @@ public final class SettingsActivity extends Activity {
             if (Settings.isDisableDoubleTapLikeIncluded()) {
                 feed.toggle(Settings.DISABLE_DOUBLE_TAP_LIKE, true, "Disable double-tap like",
                         "Double tapping a post or photo no longer likes it.");
+            }
+            if (Settings.isExpandPostsIncluded()) {
+                feed.toggle(Settings.EXPAND_POSTS, false, "Expand posts by default",
+                        "Posts start expanded. Tap the text to collapse.");
+            }
+            if (Settings.isSwipeTabsIncluded()) {
+                feed.toggle(Settings.SWIPE_TABS, true, "Swipe between tabs",
+                        "Swipe sideways to go to the next or previous tab of the navigation bar.");
             }
             if (Settings.isCopyTextIncluded()) {
                 feed.toggle(Settings.COPY_TEXT, true, "Copy text",
@@ -225,7 +234,41 @@ public final class SettingsActivity extends Activity {
             categories.add(feed);
         }
 
-        if (Settings.isRemoveGapsAndDividersIncluded() || Settings.isMaterialYouIncluded()) {
+        if (Settings.isNavigationBarIncluded() || Settings.isGlassNavigationBarIncluded()) {
+            Category navigation = new Category("Navigation bar", IconDrawable.MORE);
+            if (Settings.isGlassNavigationBarIncluded()) {
+                navigation.toggle(Settings.GLASS_NAVIGATION_BAR, true, "Glass navigation bar",
+                        "A floating, translucent navigation bar.");
+            }
+            if (Settings.isNavigationBarIncluded()) {
+                navigation.toggle(Settings.HIDE_TAB_LABELS, false, "Hide tab labels",
+                                "Text under the navigation bar icons.")
+                        .toggle(Settings.HIDE_TAB_BADGES, false, "Hide notification badges",
+                                "The count on the navigation bar tabs.")
+                        .toggle(Settings.SHOW_TAB_JOBS, true, "Show Jobs",
+                                "Jobs in the bottom bar. Restart LinkedIn after changing it.")
+                        .toggle(Settings.SHOW_TAB_NETWORK, true, "Show My Network",
+                                "My Network in the bottom bar. Restart LinkedIn after changing it.")
+                        .toggle(Settings.SHOW_TAB_NOTIFICATIONS, true, "Show Notifications",
+                                "Notifications in the bottom bar. Restart LinkedIn after changing it.")
+                        .toggle(Settings.SHOW_TAB_MORE, Settings.showMoreTab(), "Show More",
+                                "More in the bottom bar. Restart LinkedIn after changing it.");
+            }
+            categories.add(navigation);
+        }
+
+        if (Settings.isMoreMenuIncluded()) {
+            Category more = new Category("More tab", IconDrawable.APPS)
+                    .toggle(Settings.MOVE_MORE_ITEMS, Settings.moveMoreItems(), "Show in the profile menu",
+                            "Also list the items of the More tab in the profile menu.");
+            for (MoreMenu.Item item : MoreMenu.items()) {
+                more.toggle(item.key(), true, item.label, "Show this item in the More tab.");
+            }
+            categories.add(more);
+        }
+
+        if (Settings.isRemoveGapsAndDividersIncluded() || Settings.isMaterialYouIncluded()
+                || Settings.isAmoledBlackIncluded()) {
             Category appearance = new Category("Appearance", IconDrawable.PALETTE);
             if (Settings.isRemoveGapsAndDividersIncluded()) {
                 appearance.toggle(Settings.REMOVE_GAPS_AND_DIVIDERS, true, "Remove gaps and dividers",
@@ -235,6 +278,8 @@ public final class SettingsActivity extends Activity {
                 appearance.toggle(Settings.MATERIAL_YOU, true, "Material You",
                         "Your wallpaper's colors for accents, backgrounds, cards and borders. Restart LinkedIn to "
                                 + "apply. Older screens keep the colors chosen when patching.");
+            }
+            if (Settings.isAmoledBlackIncluded()) {
                 appearance.toggle(Settings.AMOLED_BLACK, false, "AMOLED black",
                         "Pure black backgrounds and cards in dark mode, to save battery on AMOLED screens. Restart "
                                 + "LinkedIn to apply.");
@@ -825,6 +870,7 @@ public final class SettingsActivity extends Activity {
                 {"Hide suggested posts", Settings.isHideSuggestedIncluded()},
                 {"Hide Premium upsells", Settings.isHidePremiumIncluded()},
                 {"Feed filters", Settings.isFeedFiltersIncluded()},
+                {"Expand posts", Settings.isExpandPostsIncluded()},
                 {"Disable double-tap like", Settings.isDisableDoubleTapLikeIncluded()},
                 {"Copy text", Settings.isCopyTextIncluded()},
                 {"Keep feed on reopen", Settings.isKeepFeedIncluded()},
@@ -833,6 +879,11 @@ public final class SettingsActivity extends Activity {
                 {"Swipe between feeds", Settings.isSwipeFeedsIncluded()},
                 {"Hide the My Network tab", Settings.isHideTabsIncluded()},
                 {"Hide the Jobs tab", Settings.isHideTabsIncluded()},
+                {"Navigation bar", Settings.isNavigationBarIncluded()},
+                {"Customize navigation bar", Settings.isCustomizeNavigationIncluded()},
+                {"Swipe between tabs", Settings.isSwipeTabsIncluded()},
+                {"Glass navigation bar", Settings.isGlassNavigationBarIncluded()},
+                {"More tab", Settings.isMoreMenuIncluded()},
                 {"Anonymous profile viewing", Settings.isAnonymousProfileViewingIncluded()},
                 {"Download media", Settings.isDownloadMediaIncluded()},
                 {"Messaging", Settings.isMessagingIncluded()},
@@ -841,6 +892,7 @@ public final class SettingsActivity extends Activity {
                 {"Block tracking", Settings.isBlockTrackingIncluded()},
                 {"Remove gaps and dividers", Settings.isRemoveGapsAndDividersIncluded()},
                 {"Material You", Settings.isMaterialYouIncluded()},
+                {"AMOLED black bars", Settings.isAmoledBlackIncluded()},
                 {"GmsCore support", Settings.isGmsCoreSupportIncluded()},
         };
     }

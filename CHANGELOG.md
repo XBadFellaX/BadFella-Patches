@@ -1,3 +1,9 @@
+## 1.2.0-dev.10 (2026-11-07)
+
+### 🚀 Features
+
+* **linkedin:** add the Expand posts, More tab, Navigation bar, Swipe between tabs and Glass navigation bar patches from Fakh Patches, restore Customize navigation bar with Morphe options for the six bottom tabs, and make AMOLED black bars work with or without Material You
+
 ## 1.2.0-dev.9 (2026-11-06)
 
 ### 🚀 Features

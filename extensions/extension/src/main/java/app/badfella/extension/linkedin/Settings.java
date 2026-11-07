@@ -23,6 +23,7 @@ public final class Settings {
     static final String HIDE_PREMIUM = "hide_premium";
     static final String DOWNLOAD_MEDIA = "download_media";
     static final String FOCUS_MODE = "focus_mode";
+    static final String EXPAND_POSTS = "expand_posts";
     static final String HIDE_CELEBRATIONS = "hide_celebrations";
     static final String HIDE_FEED_JOBS = "hide_feed_jobs";
     static final String HIDE_REPOSTS = "hide_reposts";
@@ -39,6 +40,20 @@ public final class Settings {
     static final String SWIPE_FEEDS = "swipe_feeds";
     static final String HIDE_TAB_NETWORK = "hide_tab_network";
     static final String HIDE_TAB_JOBS = "hide_tab_jobs";
+    static final String SWIPE_TABS = "swipe_tabs";
+    static final String GLASS_NAVIGATION_BAR = "glass_navigation_bar";
+    static final String HIDE_TAB_LABELS = "hide_tab_labels";
+    static final String HIDE_TAB_BADGES = "hide_tab_badges";
+    static final String SHOW_TAB_JOBS = "show_tab_jobs";
+    static final String SHOW_TAB_NETWORK = "show_tab_network";
+    static final String SHOW_TAB_NOTIFICATIONS = "show_tab_notifications";
+    static final String HIDE_MORE_TAB = "hide_more_tab";
+    static final String SHOW_TAB_MORE = "show_tab_more";
+    static final String MOVE_MORE_ITEMS = "move_more_items";
+    /** Items of the More tab last seen, as JSON (MoreMenu). */
+    static final String MORE_ITEMS = "more_items";
+    /** Followed by an item id: whether that More item shows in the Me panel. */
+    static final String MORE_ITEM_PREFIX = "more_item_";
     static final String MUTED_WORDS = "muted_words";
     static final String ANONYMOUS_PROFILE_VIEWING = "anonymous_profile_viewing";
     static final String OPEN_LINKS_DIRECTLY = "open_links_directly";
@@ -93,6 +108,10 @@ public final class Settings {
         return false;
     }
 
+    public static boolean isExpandPostsIncluded() {
+        return false;
+    }
+
     public static boolean isOpenLinksDirectlyIncluded() {
         return false;
     }
@@ -131,6 +150,10 @@ public final class Settings {
         return false;
     }
 
+    public static boolean isAmoledBlackIncluded() {
+        return false;
+    }
+
     // Read once by the Compose themes, so these apply after LinkedIn restarts.
 
     static boolean removeGapsAndDividers() {
@@ -147,7 +170,7 @@ public final class Settings {
 
     /** Pure black dark mode, through the same color hooks as Material You. */
     static boolean amoledBlack() {
-        return isMaterialYouIncluded() && get(AMOLED_BLACK, false);
+        return isAmoledBlackIncluded() && get(AMOLED_BLACK, false);
     }
 
     static boolean disableDoubleTapLike() {
@@ -244,6 +267,11 @@ public final class Settings {
         return isFeedFiltersIncluded() && get(FOCUS_MODE, false);
     }
 
+    /** Long posts start expanded; tapping the text collapses them. */
+    static boolean expandPosts() {
+        return isExpandPostsIncluded() && get(EXPAND_POSTS, false);
+    }
+
     static boolean hideCelebrations() {
         return isFeedFiltersIncluded() && get(HIDE_CELEBRATIONS, false);
     }
@@ -305,6 +333,75 @@ public final class Settings {
     /** Takes Jobs out of the bottom bar. */
     static boolean hideTabJobs() {
         return isHideTabsIncluded() && get(HIDE_TAB_JOBS, false);
+    }
+
+    public static boolean isCustomizeNavigationIncluded() {
+        return false;
+    }
+
+    public static boolean isNavigationBarIncluded() {
+        return false;
+    }
+
+    static boolean hideTabLabels() {
+        return isNavigationBarIncluded() && get(HIDE_TAB_LABELS, false);
+    }
+
+    static boolean hideTabBadges() {
+        return isNavigationBarIncluded() && get(HIDE_TAB_BADGES, false);
+    }
+
+    /** Whether the bottom bar leaves out the tab, named by its constant in HomeTabInfo. */
+    static boolean tabHidden(String tab) {
+        switch (tab) {
+            case "MORE":
+                return isNavigationBarIncluded() && !showMoreTab();
+            case "JOBS":
+                return isNavigationBarIncluded() && !get(SHOW_TAB_JOBS, true);
+            case "RELATIONSHIPS":
+                return isNavigationBarIncluded() && !get(SHOW_TAB_NETWORK, true);
+            case "NOTIFICATIONS":
+                return isNavigationBarIncluded() && !get(SHOW_TAB_NOTIFICATIONS, true);
+            default:
+                return false;
+        }
+    }
+
+    public static boolean isGlassNavigationBarIncluded() {
+        return false;
+    }
+
+    static boolean glassNavigationBar() {
+        return isGlassNavigationBarIncluded() && get(GLASS_NAVIGATION_BAR, true);
+    }
+
+    public static boolean isSwipeTabsIncluded() {
+        return false;
+    }
+
+    static boolean swipeTabs() {
+        return isSwipeTabsIncluded() && get(SWIPE_TABS, true);
+    }
+
+    public static boolean isMoreMenuIncluded() {
+        return false;
+    }
+
+    static boolean moreMenu() {
+        return isMoreMenuIncluded();
+    }
+
+    /** Whether the single switch that both hid the More tab and moved its items was on. */
+    private static boolean moreHiddenAndMoved() {
+        return get(HIDE_MORE_TAB, true);
+    }
+
+    static boolean showMoreTab() {
+        return get(SHOW_TAB_MORE, !moreHiddenAndMoved());
+    }
+
+    static boolean moveMoreItems() {
+        return isMoreMenuIncluded() && get(MOVE_MORE_ITEMS, moreHiddenAndMoved());
     }
 
     public static boolean isSwipeFeedsIncluded() {

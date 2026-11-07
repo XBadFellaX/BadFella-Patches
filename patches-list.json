@@ -1,12 +1,12 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.2.0-dev.9",
+  "version": "1.2.0-dev.10",
   "patches": [
     {
       "name": "AMOLED black bars",
-      "description": "Makes the dark top bar, bottom bar, side menu and other screens drawn by the app pure black, next to the feed that the AMOLED black setting already covers. Needs Material You.",
+      "description": "Makes the dark top bar, bottom bar, side menu and other screens drawn by the app pure black, next to the feed that the AMOLED black setting already covers. Works with or without Material You.",
       "default": false,
-      "category": null,
+      "category": "Theme",
       "compatiblePackages": [
         {
           "packageName": "com.linkedin.android",
@@ -187,6 +187,107 @@
       "options": []
     },
     {
+      "name": "Customize navigation bar",
+      "description": "Takes the bottom navigation buttons you pick off the bar, such as My Network, Post, Notifications, Jobs, Video or News. Each page still opens from the Menu and from links. Restart LinkedIn after changing the selection.",
+      "default": true,
+      "category": "Navigation",
+      "compatiblePackages": [
+        {
+          "packageName": "com.linkedin.android",
+          "name": "LinkedIn",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#0A66C2",
+          "signatures": null,
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "4.1.1267",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "4.1.1271",
+              "versionCodes": {
+                "ARM64_V8A": 217900,
+                "ARMEABI_V7A": 217900,
+                "X86_64": 217900,
+                "X86": 217900
+              },
+              "isExperimental": false,
+              "minSdk": null,
+              "description": "Version 4.1.1271, build 217900."
+            },
+            {
+              "version": null,
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": "Any version (experimental). Every patch verifies its own anchors."
+            }
+          ]
+        }
+      ],
+      "options": [
+        {
+          "key": "hide_my_network",
+          "title": "Hide My Network",
+          "description": "Removes the My Network button from the bottom navigation bar.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "hide_post",
+          "title": "Hide Post",
+          "description": "Removes the center Post button from the bottom navigation bar.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "hide_notifications",
+          "title": "Hide Notifications",
+          "description": "Removes the Notifications button from the bottom navigation bar.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "hide_jobs",
+          "title": "Hide Jobs",
+          "description": "Removes the Jobs button from the bottom navigation bar.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "hide_video",
+          "title": "Hide Video",
+          "description": "Removes the Video button from the bottom navigation bar.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "hide_news",
+          "title": "Hide News",
+          "description": "Removes the News button from the bottom navigation bar.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        }
+      ]
+    },
+    {
       "name": "Disable analytics collection",
       "description": "Disables declared analytics and crash collection and removes advertising permissions. Keeps Firebase Messaging and location permissions. Does not guarantee zero tracking.",
       "default": true,
@@ -360,10 +461,102 @@
       "options": []
     },
     {
+      "name": "Expand posts",
+      "description": "Adds an option (off by default, turned on in BadFella Patches) to show posts expanded by default. Tapping the text collapses them.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.linkedin.android",
+          "name": "LinkedIn",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#0A66C2",
+          "signatures": null,
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "4.1.1267",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "4.1.1271",
+              "versionCodes": {
+                "ARM64_V8A": 217900,
+                "ARMEABI_V7A": 217900,
+                "X86_64": 217900,
+                "X86": 217900
+              },
+              "isExperimental": false,
+              "minSdk": null,
+              "description": "Version 4.1.1271, build 217900."
+            },
+            {
+              "version": null,
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": "Any version (experimental). Every patch verifies its own anchors."
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Feed filters",
       "description": "Adds optional filters (off by default, turned on in BadFella Patches): focus mode, celebrations, job cards, reposts, posts from others' activity, \"Recommended for you\", video posts, games, the \"New posts\" pill and \"See translation\".",
       "default": true,
       "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.linkedin.android",
+          "name": "LinkedIn",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#0A66C2",
+          "signatures": null,
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "4.1.1267",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "4.1.1271",
+              "versionCodes": {
+                "ARM64_V8A": 217900,
+                "ARMEABI_V7A": 217900,
+                "X86_64": 217900,
+                "X86": 217900
+              },
+              "isExperimental": false,
+              "minSdk": null,
+              "description": "Version 4.1.1271, build 217900."
+            },
+            {
+              "version": null,
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": "Any version (experimental). Every patch verifies its own anchors."
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Glass navigation bar",
+      "description": "Draws the navigation bar as a floating, translucent capsule.",
+      "default": false,
+      "category": "Theme",
       "compatiblePackages": [
         {
           "packageName": "com.linkedin.android",
@@ -731,7 +924,7 @@
       "name": "Material You",
       "description": "Uses your wallpaper's colors (Android 12+): the accent color instead of LinkedIn blue and the green of selected filters, and Material 3 surface colors for backgrounds, cards, bars and borders. Some screens drawn by LinkedIn's servers may keep their own colors.",
       "default": false,
-      "category": null,
+      "category": "Theme",
       "compatiblePackages": [
         {
           "packageName": "com.linkedin.android",
@@ -778,6 +971,98 @@
       "description": "Hides sponsored messages, and adds an optional ghost mode that does not send typing indicators or read status.",
       "default": true,
       "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.linkedin.android",
+          "name": "LinkedIn",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#0A66C2",
+          "signatures": null,
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "4.1.1267",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "4.1.1271",
+              "versionCodes": {
+                "ARM64_V8A": 217900,
+                "ARMEABI_V7A": 217900,
+                "X86_64": 217900,
+                "X86": 217900
+              },
+              "isExperimental": false,
+              "minSdk": null,
+              "description": "Version 4.1.1271, build 217900."
+            },
+            {
+              "version": null,
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": "Any version (experimental). Every patch verifies its own anchors."
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "More tab",
+      "description": "Lets you hide items of the More tab (Puzzle games, Groups, Events, Newsletters), or list them at the bottom of the profile menu.",
+      "default": true,
+      "category": "Navigation",
+      "compatiblePackages": [
+        {
+          "packageName": "com.linkedin.android",
+          "name": "LinkedIn",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#0A66C2",
+          "signatures": null,
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "4.1.1267",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "4.1.1271",
+              "versionCodes": {
+                "ARM64_V8A": 217900,
+                "ARMEABI_V7A": 217900,
+                "X86_64": 217900,
+                "X86": 217900
+              },
+              "isExperimental": false,
+              "minSdk": null,
+              "description": "Version 4.1.1271, build 217900."
+            },
+            {
+              "version": null,
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": "Any version (experimental). Every patch verifies its own anchors."
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Navigation bar",
+      "description": "Adds options (turned on in BadFella Patches) to hide the More, Jobs, Network and Notifications tabs of the navigation bar, its count badges and its labels.",
+      "default": true,
+      "category": "Navigation",
       "compatiblePackages": [
         {
           "packageName": "com.linkedin.android",
@@ -1121,6 +1406,52 @@
       "description": "Swipe left and right on the home feed to switch between For you and Network, like on X.",
       "default": true,
       "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.linkedin.android",
+          "name": "LinkedIn",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#0A66C2",
+          "signatures": null,
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "4.1.1267",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "4.1.1271",
+              "versionCodes": {
+                "ARM64_V8A": 217900,
+                "ARMEABI_V7A": 217900,
+                "X86_64": 217900,
+                "X86": 217900
+              },
+              "isExperimental": false,
+              "minSdk": null,
+              "description": "Version 4.1.1271, build 217900."
+            },
+            {
+              "version": null,
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": "Any version (experimental). Every patch verifies its own anchors."
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Swipe between tabs",
+      "description": "Swipe sideways to go to the next or previous tab of the navigation bar.",
+      "default": true,
+      "category": "Navigation",
       "compatiblePackages": [
         {
           "packageName": "com.linkedin.android",

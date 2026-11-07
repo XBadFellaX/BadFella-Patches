@@ -411,7 +411,7 @@ private fun ResourcePatchContext.writeColors(directory: String, colors: Map<Stri
                 it.setAttribute("name", name)
                 resources.appendChild(it)
             }
-            color.textContent = "@android:color/$system"
+            color.textContent = if (system.startsWith("#")) system else "@android:color/$system"
         }
     }
 }
@@ -700,16 +700,12 @@ val removeGapsAndDividersPatch = bytecodePatch(
     }
 }
 
-@Suppress("unused")
-val materialYouPatch = bytecodePatch(
-    name = "Material You",
-    description = "Uses your wallpaper's colors (Android 12+): the accent color instead of LinkedIn blue and the " +
-        "green of selected filters, and Material 3 surface colors for backgrounds, cards, bars and borders. " +
-        "Some screens drawn by LinkedIn's servers may keep their own colors.",
-    default = false
-) {
-    compatibleWith(COMPATIBILITY_LINKEDIN)
-    dependsOn(settingsPatch, materialYouResourcePatch, materialYouBackgroundsResourcePatch, sharedColorsPatch)
+/**
+ * The runtime color hooks of the Compose themes, the server drawn screens and the system bars, which "Material You"
+ * and "AMOLED black bars" both use. Each hook checks the settings of the patches that are included.
+ */
+private val colorHooksPatch = bytecodePatch {
+    dependsOn(settingsPatch, sharedColorsPatch)
 
     execute {
         var replaced = 0
@@ -838,8 +834,22 @@ val materialYouPatch = bytecodePatch(
             }
         }
         if (contrasts == 0) throw PatchException("No navigation bar contrast calls found")
-        markIncluded("isMaterialYouIncluded")
     }
+}
+
+@Suppress("unused")
+val materialYouPatch = bytecodePatch(
+    name = "Material You",
+    description = "Uses your wallpaper's colors (Android 12+): the accent color instead of LinkedIn blue and the " +
+        "green of selected filters, and Material 3 surface colors for backgrounds, cards, bars and borders. " +
+        "Some screens drawn by LinkedIn's servers may keep their own colors.",
+    default = false
+) {
+    compatibleWith(COMPATIBILITY_LINKEDIN)
+    category("Theme")
+    dependsOn(settingsPatch, materialYouResourcePatch, materialYouBackgroundsResourcePatch, colorHooksPatch)
+
+    execute { markIncluded("isMaterialYouIncluded") }
 }
 
 /**
@@ -852,26 +862,53 @@ private fun Instruction.secondArgument(): Int = when (this) {
     else -> throw PatchException("Unexpected call $opcode")
 }
 
-/** The dark background colors of [colors], which AMOLED black turns black: containers and canvases, not the lighter tints. */
-private fun amoledColors(colors: Map<String, String>) =
-    colors.keys.filter { "dark" in it && "tint" !in it }.associateWith { "black" }
+/**
+ * Dark mode backgrounds as pure black: the canvas, cards and the tinted rows a step above them. They are written under
+ * the `notlong` screen qualifier, which outranks Material You's version specific files (values-v31, values-v34)
+ * whichever patch runs first, so the two never conflict.
+ */
+private val AMOLED_COLORS = listOf(
+    "mercado_mvp_color_background_canvas_dark", "mercado_mvp_dark_color_background_canvas",
+    "mercado_mvp_dark_color_background_canvas_dark", "mercado_mvp_dark_color_background_canvas_mobile",
+    "color_splash_canvas_background", "color_status_bar",
+    "mercado_mvp_color_background_container_dark", "mercado_mvp_dark_color_background_container",
+    "mercado_mvp_dark_color_background_container_dark",
+    "mercado_mvp_color_background_canvas_dark_tint", "mercado_mvp_color_background_container_dark_tint",
+    "mercado_mvp_dark_color_background_canvas_dark_tint", "mercado_mvp_dark_color_background_canvas_tint",
+    "mercado_mvp_dark_color_background_container_dark_tint", "mercado_mvp_dark_color_background_container_tint",
+).associateWith { "#000000" }
+
+/**
+ * Puts the black backgrounds under the `notlong` screen qualifier. Phones report `long` or `notlong` on their
+ * own, so the extension forces it per activity: `notlong` while AMOLED black is on, `long` while it is off, and
+ * the black colors of bars and screens follow the switch.
+ */
+private val amoledResourcePatch = resourcePatch {
+    execute { writeColors("values-notlong-night", AMOLED_COLORS) }
+}
 
 @Suppress("unused")
-val amoledBlackBarsPatch = resourcePatch(
+val amoledBlackBarsPatch = bytecodePatch(
     name = "AMOLED black bars",
     description = "Makes the dark top bar, bottom bar, side menu and other screens drawn by the app pure black, " +
-        "next to the feed that the AMOLED black setting already covers. Needs Material You.",
+        "next to the feed that the AMOLED black setting already covers. Works with or without Material You.",
     default = false
 ) {
     compatibleWith(COMPATIBILITY_LINKEDIN)
-    // Runs after Material You, which sets these colors to the wallpaper's tinted dark surface.
-    dependsOn(materialYouPatch)
+    category("Theme")
+    dependsOn(settingsPatch, amoledResourcePatch, colorHooksPatch)
 
     execute {
-        writeColors("values-v31", amoledColors(BACKGROUNDS))
-        writeColors("values-v34", amoledColors(BACKGROUNDS_V34))
-        val night = mapOf("color_splash_canvas_background" to "black", "color_status_bar" to "black")
-        writeColors("values-night-v31", night)
-        writeColors("values-night-v34", night)
+        markIncluded("isAmoledBlackIncluded")
+
+        // Every screen's activity picks the black resources through its base context.
+        mutableClass("Landroidx/appcompat/app/AppCompatActivity;").methods.first { it.name == "attachBaseContext" }
+            .addInstructions(
+                0,
+                """
+                    invoke-static/range { p1 .. p1 }, $EXTENSION_PACKAGE/MaterialYou;->pitchBlackContext(Landroid/content/Context;)Landroid/content/Context;
+                    move-result-object p1
+                """
+            )
     }
 }
