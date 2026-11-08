@@ -1,3 +1,9 @@
+## 1.2.0-dev.11 (2026-11-08)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** make the home feed scroll smoothly by serializing and parsing each server-driven component at most once per visibility sample instead of for every component and every nested part of every post, and by only inspecting the components that Expand posts, Tap to hide in viewers and Post menu items can edit
+
 ## 1.2.0-dev.10 (2026-11-07)
 
 ### 🚀 Features

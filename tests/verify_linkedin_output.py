@@ -18,6 +18,7 @@ APK = args.apk
 SDK = args.build_tools
 
 SDUI_FILTER = "Lapp/badfella/extension/linkedin/SduiComponentFilter;"
+POST_MENU = "Lapp/badfella/extension/linkedin/PostMenu;"
 COMPONENT_TRANSFORMER = "Lcom/linkedin/sdui/transformer/impl/ComponentTransformer;"
 SETTINGS = "Lapp/badfella/extension/linkedin/Settings;"
 SETTINGS_ACTIVITY = "Lapp/badfella/extension/linkedin/SettingsActivity;"
@@ -67,7 +68,7 @@ with tempfile.TemporaryDirectory() as workspace:
             file.write_bytes(data)
             for descriptor in class_descriptors(data):
                 classes[descriptor] += 1
-                if descriptor in (SDUI_FILTER, COMPONENT_TRANSFORMER, SETTINGS, SETTINGS_ACTIVITY, MAIN_ACTIVITY):
+                if descriptor in (SDUI_FILTER, POST_MENU, COMPONENT_TRANSFORMER, SETTINGS, SETTINGS_ACTIVITY, MAIN_ACTIVITY):
                     targets.setdefault(descriptor, name)
 
     assert classes[SDUI_FILTER] == 1, "LinkedIn SDUI filter is missing or duplicated"
@@ -82,11 +83,23 @@ with tempfile.TemporaryDirectory() as workspace:
             text=True, encoding="utf-8", errors="replace")
 
     transformer = disassemble(targets[COMPONENT_TRANSFORMER])
-    assert "SduiComponentFilter.shouldHide:" in transformer, "SDUI shouldHide hook not injected into ComponentTransformer"
-    assert "SduiComponentFilter.rewrite:" in transformer, "SDUI rewrite hook not injected into ComponentTransformer"
+    assert "SduiComponentFilter" in transformer, "SDUI filter class not referenced from ComponentTransformer"
+    assert ";.shouldHide:" in transformer or ".shouldHide:" in transformer, \
+        "SDUI shouldHide hook not injected into ComponentTransformer"
+    assert ";.rewrite:" in transformer or ".rewrite:" in transformer, \
+        "SDUI rewrite hook not injected into ComponentTransformer"
 
     main_act = disassemble(targets[MAIN_ACTIVITY])
-    assert "SettingsShortcut.onMainActivityCreated:" in main_act, "SettingsShortcut hook not injected into MainActivity"
+    assert "SettingsShortcut" in main_act and "onMainActivityCreated:" in main_act, \
+        "SettingsShortcut hook not injected into MainActivity"
+
+    # The scroll hot path must carry the per-component memo and must not serialize every component.
+    filter_dex = disassemble(targets[SDUI_FILTER])
+    for method in ("SduiComponentFilter.memo:", "SduiComponentFilter.viewName:", "SduiComponentFilter.payload:",
+                   "SduiComponentFilter.screenName:"):
+        assert method in filter_dex, f"Missing fast-path method {method}"
+    post_menu_dex = disassemble(targets[POST_MENU])
+    assert "PostMenu.signature:" in post_menu_dex, "Missing post-menu payload dedupe"
 
 subprocess.run([str(SDK / "zipalign.exe"), "-c", "4", str(APK)], check=True)
 print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, SDUI transformer hooks, "

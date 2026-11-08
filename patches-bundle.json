@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-07T00:00:00",
-  "description": "## 1.2.0-dev.10 (2026-11-07)\n\n### 🚀 Features\n\n* **linkedin:** add the Expand posts, More tab, Navigation bar, Swipe between tabs and Glass navigation bar patches from Fakh Patches, restore Customize navigation bar with Morphe options for the six bottom tabs, and make AMOLED black bars work with or without Material You",
-  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.2.0-dev.10/patches-1.2.0-dev.10.mpp",
+  "created_at": "2026-11-08T00:00:00",
+  "description": "## 1.2.0-dev.11 (2026-11-08)\n\n### 🐛 Bug Fixes\n\n* **linkedin:** make the home feed scroll smoothly by serializing and parsing each server-driven component at most once per visibility sample instead of for every component and every nested part of every post, and by only inspecting the components that Expand posts, Tap to hide in viewers and Post menu items can edit",
+  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.2.0-dev.11/patches-1.2.0-dev.11.mpp",
   "signature_download_url": "",
-  "version": "1.2.0-dev.10"
+  "version": "1.2.0-dev.11"
 }

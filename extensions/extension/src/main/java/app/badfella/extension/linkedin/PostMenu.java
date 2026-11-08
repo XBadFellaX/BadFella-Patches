@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.net.Uri;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -55,6 +56,20 @@ final class PostMenu {
         }
     };
 
+    /** Signatures of recently remembered payloads.
+     *  feed-full-update components are transformed again for every viewport-visibility sample while a post is on
+     *  screen, and nothing in the post changes between those samples, so the same payload is parsed only once. */
+    private static final Map<Long, Boolean> remembered = new LinkedHashMap<Long, Boolean>(64, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Long, Boolean> eldest) {
+            return size() > MAX_POSTS;
+        }
+    };
+
+    private static long signature(byte[] payload) {
+        return ((long) payload.length << 32) ^ Arrays.hashCode(payload);
+    }
+
     private PostMenu() {
     }
 
@@ -63,8 +78,13 @@ final class PostMenu {
     /** Called with the payload of every feed post (feed-full-update). */
     static void remember(byte[] payload) {
         if (payload == null || !Settings.postMenu()) return;
+        long signature = signature(payload);
+        synchronized (remembered) {
+            if (remembered.containsKey(signature)) return;
+        }
         try {
-            List<String> strings = ProtoScanner.scan(payload).strings;
+            ProtoScanner scanner = ProtoScanner.scan(payload);
+            List<String> strings = scanner.strings;
             Set<String> urns = new LinkedHashSet<>();
             Post post = new Post();
             for (String s : strings) {
@@ -73,11 +93,15 @@ final class PostMenu {
                 Matcher d = DOCUMENT_URN.matcher(s);
                 while (d.find()) post.documentIds.add(d.group(1));
             }
-            if (urns.isEmpty()) return;
-            post.text = commentary(payload);
-            post.media = MediaItem.extract(ProtoScanner.scan(payload), false);
-            synchronized (posts) {
-                for (String urn : urns) posts.put(urn, post);
+            if (!urns.isEmpty()) {
+                post.text = commentary(payload);
+                post.media = MediaItem.extract(scanner, false);
+                synchronized (posts) {
+                    for (String urn : urns) posts.put(urn, post);
+                }
+            }
+            synchronized (remembered) {
+                remembered.put(signature, Boolean.TRUE);
             }
         } catch (Throwable t) {
             Diagnostics.error("post menu remember failed", t);

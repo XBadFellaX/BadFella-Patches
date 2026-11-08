@@ -160,6 +160,35 @@ class LinkedInSourceTests(unittest.TestCase):
         self.assertIn("hidePromotedJob", sdui_src)
         self.assertIn("hasViewTracking", sdui_src)
 
+    def test_sdui_component_filter_does_not_serialize_every_component(self):
+        """doTransform also runs per viewport sample while scrolling: no path may serialize unconditionally."""
+        sdui_src = (EXT_DIR / "SduiComponentFilter.java").read_text(encoding="utf-8")
+        # rewrite returns before touching the view name when no feature that edits components is on.
+        self.assertIn("if (!expandPosts && !viewer && !postMenu) return component;", sdui_src)
+        # Every editing branch is gated on the component's own view name.
+        self.assertIn('private static final String COMMENTARY = "feed-commentary";', sdui_src)
+        self.assertIn('private static final String VIEWER_CONTAINER = "feed-update-screen-container";', sdui_src)
+        self.assertIn('private static final String CONTROL_MENU = "feed-control-menu";', sdui_src)
+        self.assertIn("expandPosts && COMMENTARY.equals(viewName)", sdui_src)
+        self.assertIn("viewer && VIEWER_CONTAINER.equals(viewName)", sdui_src)
+        self.assertIn("postMenu && viewName.startsWith(CONTROL_MENU)", sdui_src)
+        # One reflective view name and one serialization per component per thread, shared by rewrite and shouldHide.
+        self.assertIn("ThreadLocal<Object[]> MEMO", sdui_src)
+        self.assertIn("memo[0] != component", sdui_src)
+        self.assertIn("private static String viewName(Object component)", sdui_src)
+        self.assertIn("private static byte[] payload(Object component)", sdui_src)
+        # The AI check must not allocate a pattern/array for every component.
+        self.assertNotIn("viewName.split(", sdui_src)
+
+    def test_post_menu_scans_a_post_once(self):
+        postmenu_src = (EXT_DIR / "PostMenu.java").read_text(encoding="utf-8")
+        self.assertIn("private static long signature(byte[] payload)", postmenu_src)
+        self.assertIn("if (remembered.containsKey(signature)) return;", postmenu_src)
+        # The payload is parsed once and shared with the media extraction.
+        self.assertIn("ProtoScanner scanner = ProtoScanner.scan(payload);", postmenu_src)
+        self.assertIn("MediaItem.extract(scanner, false)", postmenu_src)
+        self.assertNotIn("MediaItem.extract(ProtoScanner.scan(payload)", postmenu_src)
+
 
 if __name__ == "__main__":
     unittest.main()

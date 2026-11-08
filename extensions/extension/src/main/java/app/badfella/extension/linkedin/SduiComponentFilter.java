@@ -15,6 +15,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class SduiComponentFilter {
     private static final String MEDIA_SCREEN_PREFIX = "com.linkedin.sdui.impl.mediaproduct.screens.";
     private static final String PROFILE_MEDIA_PREFIX = "com.linkedin.sdui.impl.profile.destinations.";
+    /** A post's text block; Expand posts edits only this component. */
+    private static final String COMMENTARY = "feed-commentary";
+    /** The video and document viewers' root; Tap to hide edits only this component. */
+    private static final String VIEWER_CONTAINER = "feed-update-screen-container";
+    /** Prefix of the feed's ⋯ menu page and its rows; Post menu edits only these components. */
+    private static final String CONTROL_MENU = "feed-control-menu";
     private static final int MAX_LOGGED_VIEW_NAMES = 500;
     private static final Set<String> loggedViewNames = ConcurrentHashMap.newKeySet();
 
@@ -141,10 +147,18 @@ public final class SduiComponentFilter {
     private static final java.util.Set<String> AI_WORDS = new java.util.HashSet<>(java.util.Arrays.asList(
             "ai", "genai", "gai", "llm", "copilot", "assistant", "aigc"));
 
-    /** AI prompts and assistant cards, recognized by a whole word of the view name (feed-ai-prompt, genai-...). */
+    /**
+     * AI prompts and assistant cards, recognized by a whole word of the view name (feed-ai-prompt, genai-...).
+     * Scans the name directly: this runs for every component while the filter is on, where split()'s regex and
+     * array allocation would add up.
+     */
     private static boolean isAiView(String viewName) {
-        for (String word : viewName.split("[-_.]")) {
-            if (AI_WORDS.contains(word)) return true;
+        int start = 0;
+        for (int i = 0; i <= viewName.length(); i++) {
+            char c = i == viewName.length() ? '-' : viewName.charAt(i);
+            if (c != '-' && c != '_' && c != '.') continue;
+            if (AI_WORDS.contains(viewName.substring(start, i))) return true;
+            start = i + 1;
         }
         return false;
     }
@@ -164,37 +178,51 @@ public final class SduiComponentFilter {
                 || viewName.endsWith("-game") || viewName.endsWith("-games");
     }
 
-    /** Called with every SDUI component before shouldHide; returns it, or an edited copy (the post ⋯ menu). */
+    /**
+     * Called with every SDUI component before shouldHide; returns it, or an edited copy (the post ⋯ menu).
+     *
+     * doTransform also runs from the sampled viewport-visibility flow while the feed scrolls, so this runs per
+     * component per sample. Every branch that needs component bytes is therefore gated on the component's view
+     * name first: serializing one component also serializes its whole subtree, and doing that for every nested
+     * component of every post is what made the feed stutter.
+     */
     public static Object rewrite(Object component) {
-        if (Settings.expandPosts()) {
+        if (component == null) return null;
+        boolean expandPosts = Settings.expandPosts();
+        boolean viewer = Settings.viewerTapToHide();
+        boolean postMenu = Settings.postMenu();
+        if (!expandPosts && !viewer && !postMenu) return component;
+        String viewName = viewName(component);
+        if (expandPosts && COMMENTARY.equals(viewName)) {
             try {
-                Object viewTracking = Proto.is(component, "hasViewTracking")
-                        ? Proto.call(component, "getViewTracking") : null;
-                if ("feed-commentary".equals(Proto.string(viewTracking, "getViewName"))) {
-                    byte[] bytes = payload(component);
-                    byte[] edited = bytes == null ? null : expandCommentary(bytes);
-                    if (edited != null && edited != bytes) {
-                        Object copy = component.getClass().getMethod("parseFrom", byte[].class)
-                                .invoke(null, (Object) edited);
-                        if (copy != null) component = copy;
-                    }
+                byte[] bytes = payload(component);
+                byte[] edited = bytes == null ? null : expandCommentary(bytes);
+                if (edited != null && edited != bytes) {
+                    Object copy = component.getClass().getMethod("parseFrom", byte[].class)
+                            .invoke(null, (Object) edited);
+                    if (copy != null) component = copy;
                 }
             } catch (Throwable t) {
                 Diagnostics.error("expand posts failed", t);
             }
         }
-        if (Settings.viewerTapToHide()) {
+        if (viewer && VIEWER_CONTAINER.equals(viewName)) {
             try {
-                Object viewTracking = Proto.is(component, "hasViewTracking")
-                        ? Proto.call(component, "getViewTracking") : null;
-                component = ViewerChrome.rewrite(component, Proto.string(viewTracking, "getViewName"),
-                        Proto.string(component, "getObservabilityViewName"), payload(component));
+                component = ViewerChrome.rewrite(component, viewName,
+                        screenName(component), payload(component));
             } catch (Throwable t) {
                 Diagnostics.error("viewer rewrite failed", t);
             }
         }
-        if (!Settings.postMenu()) return component;
-        return PostMenu.inject(component, payload(component));
+        // Only the feed's control (⋯) menu page and its rows carry the template this edits.
+        if (postMenu && viewName.startsWith(CONTROL_MENU)) {
+            try {
+                component = PostMenu.inject(component, payload(component));
+            } catch (Throwable t) {
+                Diagnostics.error("post menu failed", t);
+            }
+        }
+        return component;
     }
 
     /**
@@ -214,13 +242,15 @@ public final class SduiComponentFilter {
 
     public static boolean shouldHide(Object component) {
         try {
-            Object viewTracking = Proto.is(component, "hasViewTracking")
-                    ? Proto.call(component, "getViewTracking") : null;
-            String viewName = Proto.string(viewTracking, "getViewName");
-            String screenName = Proto.string(component, "getObservabilityViewName");
-            logViewName(viewName);
-            outlineViewer(screenName, component);
-            if (MoreMenu.MORE_SCREEN.equals(screenName)) MoreMenu.capture(payload(component));
+            Object viewTracking = viewTracking(component);
+            String viewName = viewName(component);
+            String screen = screenName(component);
+            boolean debug = Settings.debug();
+            if (debug) {
+                logViewName(viewName);
+                outlineViewer(screen, component);
+            }
+            if (MoreMenu.MORE_SCREEN.equals(screen)) MoreMenu.capture(payload(component));
             if (MoreMenu.hideItem(viewName)) return hide(true, "more item: " + viewName);
             if (Settings.hideAi() && isAiView(viewName)) {
                 return hide(true, "ai: " + viewName);
@@ -233,9 +263,12 @@ public final class SduiComponentFilter {
             }
 
             switch (viewName) {
-                case "feed-full-update":
-                    if (Settings.postMenu()) PostMenu.remember(payload(component));
-                    return hideFeedUpdate(component, viewTracking);
+                case "feed-full-update": {
+                    // One serialization of the post feeds both the remember store and the filters below.
+                    byte[] post = Settings.postMenu() ? payload(component) : null;
+                    if (post != null) PostMenu.remember(post);
+                    return hideFeedUpdate(component, viewTracking, post);
+                }
                 case "job-card":
                     return hidePromotedJob(component);
                 case "multiphoto-viewer":
@@ -266,8 +299,8 @@ public final class SduiComponentFilter {
                 return hide(true, "premium upsell: " + viewName);
             }
 
-            if (screenName.startsWith(MEDIA_SCREEN_PREFIX) || screenName.startsWith(PROFILE_MEDIA_PREFIX)) {
-                collectMedia(component, screenName);
+            if (screen.startsWith(MEDIA_SCREEN_PREFIX) || screen.startsWith(PROFILE_MEDIA_PREFIX)) {
+                collectMedia(component, screen);
             }
             return false;
         } catch (Throwable t) {
@@ -285,7 +318,7 @@ public final class SduiComponentFilter {
         return viewName.contains("interstitial") && SduiMediaDownload.resumedScreen().contains(".premium.wvmp.");
     }
 
-    private static boolean hideFeedUpdate(Object component, Object viewTracking) {
+    private static boolean hideFeedUpdate(Object component, Object viewTracking, byte[] remembered) {
         boolean ads = Settings.hideAds();
         boolean suggested = Settings.hideSuggested();
         boolean celebrations = Settings.hideCelebrations();
@@ -301,9 +334,13 @@ public final class SduiComponentFilter {
             return false;
         }
 
-        byte[] payload = payload(component);
+        byte[] payload = remembered != null ? remembered : payload(component);
+        // Each ProtoScanner.scan() parses the whole post and decodes its strings, so the payload is scanned at most
+        // once here and the result is shared by every check that needs the strings.
+        ProtoScanner scanner = null;
         if (shortLinks && ProtoScanner.containsAscii(payload, ShortLinkResolver.PREFIX)) {
-            for (String s : ProtoScanner.scan(payload).strings) {
+            scanner = ProtoScanner.scan(payload);
+            for (String s : scanner.strings) {
                 if (s.contains(ShortLinkResolver.PREFIX)) OpenLinksDirectlyPatch.prefetchShortLinks(s);
             }
         }
@@ -324,23 +361,37 @@ public final class SduiComponentFilter {
         if (videos && ProtoScanner.containsAscii(payload, "large-single-video-view")) {
             return hide(true, "video post");
         }
-        boolean recommendationModule = (recommendations || activity) && isRecommendationModule(payload);
+        boolean recommendationModule = false;
+        if (recommendations || activity) {
+            // Cheap byte checks first: only a post that could be one of these modules is parsed.
+            if (ProtoScanner.containsAscii(payload, "feed-call-to-action")
+                    && ProtoScanner.containsAscii(payload, "edge-creation-follow-action")
+                    && !ProtoScanner.containsAscii(payload, "feed-commentary")) {
+                if (scanner == null) scanner = ProtoScanner.scan(payload);
+                recommendationModule = isRecommendationModule(scanner);
+            }
+        }
         if (recommendations && recommendationModule) {
             return hide(true, "recommended for you");
         }
-        if (activity && !recommendationModule && isActivityPost(payload)) {
-            return hide(true, "post from someone's activity");
+        if (activity && !recommendationModule && ProtoScanner.containsAscii(payload, "feed-header")) {
+            if (scanner == null) scanner = ProtoScanner.scan(payload);
+            if (isActivityPost(scanner)) return hide(true, "post from someone's activity");
         }
         if (muted != null) {
-            for (String s : ProtoScanner.scan(payload).strings) {
+            if (scanner == null) scanner = ProtoScanner.scan(payload);
+            for (String s : scanner.strings) {
                 java.util.regex.Matcher m = muted.matcher(s);
                 if (m.find()) return hide(true, "muted word: " + m.group());
             }
         }
         // The header label is its own string field, so match the whole string, never a substring
         // of post text.
-        if (suggested && ProtoScanner.hasExactString(payload, "Suggested", "Disarankan")) {
-            return hide(true, "suggested post");
+        if (suggested) {
+            if (scanner == null) scanner = ProtoScanner.scan(payload);
+            for (String s : scanner.strings) {
+                if (s.equals("Suggested") || s.equals("Disarankan")) return hide(true, "suggested post");
+            }
         }
         return false;
     }
@@ -351,9 +402,8 @@ public final class SduiComponentFilter {
      * the payload, so a page action between the two belongs to the header. Matched by structure, so it works in
      * every language.
      */
-    private static boolean isActivityPost(byte[] payload) {
-        if (!ProtoScanner.containsAscii(payload, "feed-header")) return false;
-        List<String> strings = ProtoScanner.scan(payload).strings;
+    private static boolean isActivityPost(ProtoScanner scanner) {
+        List<String> strings = scanner.strings;
         int header = strings.indexOf("feed-header");
         int author = strings.indexOf("feed-actor");
         if (header < 0 || author < header) return false;
@@ -367,14 +417,9 @@ public final class SduiComponentFilter {
      * "Recommended for you": a feed item listing several people or pages to follow, with a "Show more" button and
      * no post text. Regular posts have one author, so two or more authors without post text mark the module.
      */
-    private static boolean isRecommendationModule(byte[] payload) {
-        if (!ProtoScanner.containsAscii(payload, "feed-call-to-action")
-                || !ProtoScanner.containsAscii(payload, "edge-creation-follow-action")
-                || ProtoScanner.containsAscii(payload, "feed-commentary")) {
-            return false;
-        }
+    private static boolean isRecommendationModule(ProtoScanner scanner) {
         int authors = 0;
-        for (String s : ProtoScanner.scan(payload).strings) {
+        for (String s : scanner.strings) {
             if (s.equals("feed-actor") && ++authors >= 2) return true;
         }
         return false;
@@ -426,8 +471,60 @@ public final class SduiComponentFilter {
         SduiMediaDownload.offer(ProtoScanner.scan(payload(component)), source, source.startsWith(PROFILE_MEDIA_PREFIX));
     }
 
-    private static byte[] payload(Object component) {
-        Object bytes = Proto.call(component, "toByteArray");
-        return bytes instanceof byte[] ? (byte[]) bytes : null;
+    // region Per-component memo
+
+    /**
+     * The component being processed and its view tracking, view name and bytes. rewrite and shouldHide run
+     * back to back on the same component, and every lookup here is either a reflective call or a full protobuf
+     * serialization of the component's subtree, so each is computed at most once per thread per component.
+     *
+     * A component may be transformed again for the next visibility sample: the identity check makes this a
+     * cache for one component only, never stale data.
+     */
+    private static final Object NOT_COMPUTED = new Object();
+    private static final ThreadLocal<Object[]> MEMO = new ThreadLocal<>();
+
+    private static Object[] memo(Object component) {
+        Object[] memo = MEMO.get();
+        if (memo == null || memo[0] != component) {
+            memo = new Object[]{component, NOT_COMPUTED, null, NOT_COMPUTED, null};
+            MEMO.set(memo);
+        }
+        return memo;
     }
+
+    private static Object viewTracking(Object component) {
+        Object[] memo = memo(component);
+        if (memo[1] == NOT_COMPUTED) {
+            memo[1] = Proto.is(component, "hasViewTracking")
+                    ? Proto.call(component, "getViewTracking") : null;
+        }
+        return memo[1] == NOT_COMPUTED ? null : memo[1];
+    }
+
+    /** viewTracking.viewName, or "": the name this filter matches components by. */
+    private static String viewName(Object component) {
+        Object[] memo = memo(component);
+        if (memo[2] == null) memo[2] = Proto.string(viewTracking(component), "getViewName");
+        return (String) memo[2];
+    }
+
+    /** The component's protobuf bytes (toByteArray), or null. Serializes the whole subtree, so call sparingly. */
+    private static byte[] payload(Object component) {
+        Object[] memo = memo(component);
+        if (memo[3] == NOT_COMPUTED) {
+            Object bytes = Proto.call(component, "toByteArray");
+            memo[3] = bytes instanceof byte[] ? (byte[]) bytes : null;
+        }
+        return (byte[]) memo[3];
+    }
+
+    /** The screen a component belongs to (observability view name), or "". */
+    private static String screenName(Object component) {
+        Object[] memo = memo(component);
+        if (memo[4] == null) memo[4] = Proto.string(component, "getObservabilityViewName");
+        return (String) memo[4];
+    }
+
+    // endregion
 }
