@@ -148,6 +148,37 @@ public final class SduiComponentFilter {
             "ai", "genai", "gai", "llm", "copilot", "assistant", "aigc"));
 
     /**
+     * URN entity types and raw tokens that identify ad serving rather than an organic update: promoted
+     * posts keep arriving under view names other than feed-full-update, so their payload is checked
+     * directly. Plain byte searches, run before any parsing.
+     */
+    private static final String[] SPONSORED_MARKERS = {
+            "urn:li:sponsoredContentV2:",
+            "urn:li:sponsoredContent:",
+            "urn:li:sponsoredCreative:",
+            "urn:li:sponsoredUpdate:",
+            "urn:li:adCreative:",
+            "urn:li:adUpdate:",
+            "urn:li:promotedUpdate:",
+            "sponsoredcontent",
+            "sponsoredcreative",
+            "promotedupdate",
+            "leadGenForm",
+            "leadgen",
+    };
+
+    /**
+     * Labels LinkedIn puts on a boosted or otherwise promoted post that carries no sponsored URN. Only
+     * used to decide whether the payload is worth parsing; the parsed strings confirm the label.
+     */
+    private static final String[] PROMOTED_LABEL_MARKERS = {
+            "Promoted", "promoted", "Sponsored", "sponsored", "Dipromosikan", "dipromosikan",
+    };
+
+    /** The labels themselves, compared case-insensitively against whole short strings. */
+    private static final String[] PROMOTED_LABELS = {"promoted", "sponsored", "dipromosikan"};
+
+    /**
      * AI prompts and assistant cards, recognized by a whole word of the view name (feed-ai-prompt, genai-...).
      * Scans the name directly: this runs for every component while the filter is on, where split()'s regex and
      * array allocation would add up.
@@ -252,6 +283,11 @@ public final class SduiComponentFilter {
             }
             if (MoreMenu.MORE_SCREEN.equals(screen)) MoreMenu.capture(payload(component));
             if (MoreMenu.hideItem(viewName)) return hide(true, "more item: " + viewName);
+            // viewTracking already carries the unmarshalled ad metadata, so this is a cheap check that
+            // catches a promoted component under any view name, not only feed-full-update.
+            if (Settings.hideAds() && hasSponsoredTracking(viewTracking)) {
+                return hide(true, "sponsored tracking: " + viewName);
+            }
             if (Settings.hideAi() && isAiView(viewName)) {
                 return hide(true, "ai: " + viewName);
             }
@@ -344,9 +380,16 @@ public final class SduiComponentFilter {
                 if (s.contains(ShortLinkResolver.PREFIX)) OpenLinksDirectlyPatch.prefetchShortLinks(s);
             }
         }
-        if (ads && (hasSponsoredTracking(viewTracking)
-                || ProtoScanner.containsAscii(payload, "urn:li:sponsoredContentV2:"))) {
-            return hide(true, "sponsored feed update");
+        if (ads) {
+            if (hasSponsoredTracking(viewTracking) || containsAny(payload, SPONSORED_MARKERS)) {
+                return hide(true, "sponsored feed update");
+            }
+            // A boosted organic post carries no sponsored URN, only a Promoted/Sponsored badge. The byte
+            // check keeps posts without a label from being parsed just for this.
+            if (containsAny(payload, PROMOTED_LABEL_MARKERS)) {
+                if (scanner == null) scanner = ProtoScanner.scan(payload);
+                if (hasPromotedLabel(scanner.strings)) return hide(true, "promoted feed update");
+            }
         }
         // Child components are embedded in the post payload, so their view names identify the post type.
         if (celebrations && ProtoScanner.containsAscii(payload, "feed-celebrations-update-detail")) {
@@ -433,6 +476,34 @@ public final class SduiComponentFilter {
     private static boolean hide(boolean hide, String reason) {
         if (hide) Settings.debugLog("hide " + reason);
         return hide;
+    }
+
+    /** True if the payload contains any of the markers, as a single-byte scan per marker. */
+    private static boolean containsAny(byte[] payload, String[] markers) {
+        for (String marker : markers) {
+            if (ProtoScanner.containsAscii(payload, marker)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * A promoted label is its own short post string ("Promoted", "Promoted by X", "Sponsored ·").
+     * Compare only the leading word so a separator or a suffix does not defeat it, while a post whose
+     * commentary merely mentions the word elsewhere is not matched.
+     */
+    private static boolean hasPromotedLabel(List<String> strings) {
+        for (String s : strings) {
+            if (s.length() > 60) continue;
+            int end = s.length();
+            while (end > 0 && !Character.isLetterOrDigit(s.charAt(end - 1))) end--;
+            String value = s.substring(0, end);
+            for (String label : PROMOTED_LABELS) {
+                if (!value.regionMatches(true, 0, label, 0, label.length())) continue;
+                if (value.length() == label.length()) return true;
+                if (!Character.isLetter(value.charAt(label.length()))) return true;
+            }
+        }
+        return false;
     }
 
     /** viewTracking.metadata[] contains a TrackingMetadata with sponsoredData for ads. */

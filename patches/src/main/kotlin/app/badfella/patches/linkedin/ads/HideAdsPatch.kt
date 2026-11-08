@@ -21,7 +21,7 @@ private const val EXTENSION_METHOD =
 @Suppress("unused")
 val hideAdsPatch = bytecodePatch(
     name = "Hide ads",
-    description = "Removes promoted (sponsored) posts from the feed.",
+    description = "Removes promoted, boosted and sponsored posts from the feed.",
     default = true
 ) {
     compatibleWith(COMPATIBILITY_LINKEDIN)

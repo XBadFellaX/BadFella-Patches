@@ -23,6 +23,7 @@ COMPONENT_TRANSFORMER = "Lcom/linkedin/sdui/transformer/impl/ComponentTransforme
 SETTINGS = "Lapp/badfella/extension/linkedin/Settings;"
 SETTINGS_ACTIVITY = "Lapp/badfella/extension/linkedin/SettingsActivity;"
 MATERIAL_YOU = "Lapp/badfella/extension/linkedin/MaterialYou;"
+HIDE_ADS = "Lapp/badfella/extension/linkedin/HideAdsPatch;"
 APP_COMPAT = "Landroidx/appcompat/app/AppCompatActivity;"
 MAIN_ACTIVITY = "Lcom/linkedin/android/infra/navigation/MainActivity;"
 
@@ -71,11 +72,12 @@ with tempfile.TemporaryDirectory() as workspace:
             for descriptor in class_descriptors(data):
                 classes[descriptor] += 1
                 if descriptor in (SDUI_FILTER, POST_MENU, COMPONENT_TRANSFORMER, SETTINGS, SETTINGS_ACTIVITY,
-                                  MATERIAL_YOU, APP_COMPAT, MAIN_ACTIVITY):
+                                  MATERIAL_YOU, HIDE_ADS, APP_COMPAT, MAIN_ACTIVITY):
                     targets.setdefault(descriptor, name)
 
     assert classes[SDUI_FILTER] == 1, "LinkedIn SDUI filter is missing or duplicated"
     assert classes[SETTINGS] == 1, "LinkedIn Settings is missing or duplicated"
+    assert classes[HIDE_ADS] == 1, "LinkedIn legacy ad filter is missing or duplicated"
     assert classes[COMPONENT_TRANSFORMER] == 1, "ComponentTransformer missing or duplicated"
     assert classes[MAIN_ACTIVITY] == 1, "MainActivity missing or duplicated"
     assert all(count == 1 for count in classes.values()), "Duplicate DEX classes"
@@ -103,6 +105,22 @@ with tempfile.TemporaryDirectory() as workspace:
         assert method in filter_dex, f"Missing fast-path method {method}"
     post_menu_dex = disassemble(targets[POST_MENU])
     assert "PostMenu.signature:" in post_menu_dex, "Missing post-menu payload dedupe"
+
+    # Promoted, boosted and sponsored detection under any view name, plus label-only posts.
+    for marker in ("sponsoredContentV2", "sponsoredCreative", "sponsoredUpdate", "adCreative",
+                   "adUpdate", "promotedUpdate", "leadGenForm", "leadgen"):
+        assert marker in filter_dex, f"Missing SDUI ad marker {marker}"
+    for method in ("hasSponsoredTracking", "hasPromotedLabel"):
+        assert method in filter_dex, f"Missing SDUI ad check {method}"
+
+    # The legacy Pegasus feed path carries the same comprehensive checks.
+    hide_ads_dex = disassemble(targets[HIDE_ADS])
+    for method in ("hasSponsoredUrn", "hasSponsoredTracking", "hasCallToAction",
+                   "hasPromotedLabel", "hasSponsoredCarouselItem", "hasSponsoredAggregatedUpdate"):
+        assert method in hide_ads_dex, f"Missing legacy ad check {method}"
+    for token in ("sponsoredcontent", "sponsoredcreative", "sponsoredupdate",
+                  "adcreative", "adupdate", "promotedupdate"):
+        assert token in hide_ads_dex, f"Missing legacy sponsored URN token {token}"
 
     # Pitch black: the full app AMOLED theme, on by default once its patch is included.
     settings_dex = disassemble(targets[SETTINGS])
@@ -139,4 +157,5 @@ with tempfile.TemporaryDirectory() as workspace:
 
 subprocess.run([str(SDK / "zipalign.exe"), "-c", "4", str(APK)], check=True)
 print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, SDUI transformer hooks, "
-      f"SettingsShortcut hook, Pitch black resources and hooks, {len(classes)} unique classes, ZIP alignment")
+      f"SettingsShortcut hook, sponsored/promoted/boosted filters, Pitch black resources and hooks, "
+      f"{len(classes)} unique classes, ZIP alignment")

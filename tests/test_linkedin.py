@@ -160,6 +160,45 @@ class LinkedInSourceTests(unittest.TestCase):
         self.assertIn("hidePromotedJob", sdui_src)
         self.assertIn("hasViewTracking", sdui_src)
 
+    def test_sponsored_tracking_hides_any_view_name(self):
+        """A promoted component under any view name is dropped, not only feed-full-update."""
+        sdui_src = (EXT_DIR / "SduiComponentFilter.java").read_text(encoding="utf-8")
+        self.assertIn("if (Settings.hideAds() && hasSponsoredTracking(viewTracking))", sdui_src)
+        # That fast path sits in shouldHide before the view-name switch.
+        should_hide = sdui_src.split("public static boolean shouldHide", 1)[1]
+        fast_path = should_hide.split("switch (viewName)", 1)[0]
+        self.assertIn("hasSponsoredTracking(viewTracking)", fast_path)
+
+    def test_sdui_feed_update_covers_all_sponsored_markers_and_labels(self):
+        sdui_src = (EXT_DIR / "SduiComponentFilter.java").read_text(encoding="utf-8")
+        for marker in ("urn:li:sponsoredContentV2:", "urn:li:sponsoredContent:",
+                       "urn:li:sponsoredCreative:", "urn:li:sponsoredUpdate:",
+                       "urn:li:adCreative:", "urn:li:adUpdate:", "urn:li:promotedUpdate:",
+                       "sponsoredcontent", "sponsoredcreative", "leadgen"):
+            self.assertIn(f'"{marker}"', sdui_src)
+        self.assertIn("hasPromotedLabel(scanner.strings)", sdui_src)
+        self.assertIn('"Promoted"', sdui_src)
+        self.assertIn('"Sponsored"', sdui_src)
+        self.assertIn('"Dipromosikan"', sdui_src)
+        self.assertIn("containsAny(payload, SPONSORED_MARKERS)", sdui_src)
+
+    def test_legacy_feed_filter_ports_comprehensive_pegasus_checks(self):
+        hide_ads_src = (EXT_DIR / "HideAdsPatch.java").read_text(encoding="utf-8")
+        for token in ("sponsoredcontent", "sponsoredcreative", "sponsoredupdate",
+                      "adcreative", "adupdate", "promotedupdate"):
+            self.assertIn(f'"{token}"', hide_ads_src)
+        for check in ("hasSponsoredUrn", "hasSponsoredTracking", "hasCallToAction",
+                      "hasPromotedLabel", "hasBoostHeader", "boostHeader",
+                      "leadGenFormContent", "hasSponsoredCarouselItem",
+                      "hasSponsoredAggregatedUpdate", "resharedUpdate",
+                      "supplementaryActorInfo", "subDescription",
+                      "contextualTitleSupplementaryInfo", "MAX_UPDATE_DEPTH"):
+            self.assertIn(check, hide_ads_src)
+        # Labels are matched in every relevant locale, like the SDUI path.
+        self.assertIn('lower.contains("promoted")', hide_ads_src)
+        self.assertIn('lower.contains("sponsored")', hide_ads_src)
+        self.assertIn('lower.contains("dipromosikan")', hide_ads_src)
+
     def test_sdui_component_filter_does_not_serialize_every_component(self):
         """doTransform also runs per viewport sample while scrolling: no path may serialize unconditionally."""
         sdui_src = (EXT_DIR / "SduiComponentFilter.java").read_text(encoding="utf-8")

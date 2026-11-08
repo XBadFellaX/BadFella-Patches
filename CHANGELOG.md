@@ -1,3 +1,9 @@
+## 1.2.0-dev.13 (2026-11-08)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** remove promoted, boosted and sponsored posts again by hiding any server-driven component that carries sponsored tracking metadata regardless of its view name, expanding sponsored URN detection and matching Promoted/Sponsored badges, and applying the same sponsored URN, boost header, lead-gen, call-to-action and promoted label checks to the legacy feed
+
 ## 1.2.0-dev.12 (2026-11-08)
 
 ### 🚀 Features

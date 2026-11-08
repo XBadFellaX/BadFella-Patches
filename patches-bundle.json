@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-08T00:00:00",
-  "description": "## 1.2.0-dev.12 (2026-11-08)\n\n### 🚀 Features\n\n* **linkedin:** rename AMOLED black bars to Pitch black and give it the complete three tone AMOLED theme (pure black canvas, dark cards and tints) across Compose and View screens, and enable it by default once its patch is included instead of leaving it inert until the in-app switch was found",
-  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.2.0-dev.12/patches-1.2.0-dev.12.mpp",
+  "created_at": "2026-11-08T12:00:00",
+  "description": "## 1.2.0-dev.13 (2026-11-08)\n\n### 🐛 Bug Fixes\n\n* **linkedin:** remove promoted, boosted and sponsored posts again by hiding any server-driven component that carries sponsored tracking metadata regardless of its view name, expanding sponsored URN detection and matching Promoted/Sponsored badges, and applying the same sponsored URN, boost header, lead-gen, call-to-action and promoted label checks to the legacy feed",
+  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.2.0-dev.13/patches-1.2.0-dev.13.mpp",
   "signature_download_url": "",
-  "version": "1.2.0-dev.12"
+  "version": "1.2.0-dev.13"
 }
