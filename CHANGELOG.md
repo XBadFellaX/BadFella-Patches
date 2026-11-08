@@ -1,3 +1,23 @@
+## 1.2.0 (2026-11-08)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** comprehensively eliminate promoted, boosted, and sponsored feed content (v1.2.0-dev.13) b0246b8
+* **linkedin:** describe boosted and label-only promoted coverage 3efbf11
+* **linkedin:** eliminate feed scroll jitter and visual flicker (v1.2.0-dev.11) 802494b
+* **linkedin:** filter ads at the feed collection boundary 6fcaf21
+* **linkedin:** filter sponsored items in SDUI Compose feed (v1.2.0-dev.8) 85951fc
+* **linkedin:** filter the parsed feed page before it reaches the paged list 1f9dcf8
+* **linkedin:** remove boosted and label-only promoted posts from the feed 4e66a05
+* **linkedin:** remove promoted ads and video carousels from the feed 9534f84
+
+### ✨ New Features
+
+* **linkedin:** add LinkedIn 4.1.1271 feed filters and navigation options c741941
+* **linkedin:** add missing Fakh patches and restore customizable navigation (v1.2.0-dev.10) daa6e59
+* **linkedin:** full AMOLED pitch black theme and fix default-enabled behavior (v1.2.0-dev.12) 4aadb58, closes #000000 #0D0D0D #1A1A1A
+* **linkedin:** import complete 22-patch suite and add version-agnostic support (v1.2.0-dev.9) 9be6d86
+
 ## 1.2.0-dev.13 (2026-11-08)
 
 ### 🐛 Bug Fixes
