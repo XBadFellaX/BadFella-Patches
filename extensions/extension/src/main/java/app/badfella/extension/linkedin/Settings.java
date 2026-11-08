@@ -65,6 +65,9 @@ public final class Settings {
     static final String COPY_TEXT_LONG_SHEET = "copy_text_long_sheet";
     static final String REMOVE_GAPS_AND_DIVIDERS = "remove_gaps_and_dividers";
     static final String MATERIAL_YOU = "material_you";
+    static final String PITCH_BLACK = "pitch_black";
+    /** Key of the old "AMOLED black" switch, read once to keep an explicit choice. */
+    @Deprecated
     static final String AMOLED_BLACK = "amoled_black";
     static final String SANITIZE_SHARE_LINKS = "sanitize_share_links";
     static final String RESOLVE_SHORT_LINKS = "resolve_short_links";
@@ -168,9 +171,23 @@ public final class Settings {
         return false;
     }
 
-    /** Pure black dark mode, through the same color hooks as Material You. */
+    /**
+     * Pitch black (the full app AMOLED theme) is on as soon as its patch is included. The old switch defaulted to
+     * off, so a value the user saved there is kept instead of being overridden by the new default.
+     */
+    static boolean pitchBlack() {
+        if (!isAmoledBlackIncluded()) return false;
+        SharedPreferences p = prefs();
+        if (p == null) return true;
+        if (p.contains(PITCH_BLACK)) return p.getBoolean(PITCH_BLACK, true);
+        if (p.contains(AMOLED_BLACK)) return p.getBoolean(AMOLED_BLACK, true);
+        return true;
+    }
+
+    /** Old name of {@link #pitchBlack()}. */
+    @Deprecated
     static boolean amoledBlack() {
-        return isAmoledBlackIncluded() && get(AMOLED_BLACK, false);
+        return pitchBlack();
     }
 
     static boolean disableDoubleTapLike() {

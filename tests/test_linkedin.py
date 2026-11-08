@@ -10,7 +10,7 @@ PATCHES_DIR = ROOT / "patches/src/main/kotlin/app/badfella/patches/linkedin"
 EXT_DIR = ROOT / "extensions/extension/src/main/java/app/badfella/extension/linkedin"
 
 EXPECTED_LINKEDIN_PATCHES = {
-    "AMOLED black bars",
+    "Pitch black",
     "Anonymous profile viewing",
     "Block tracking",
     "Copy text",
@@ -41,7 +41,7 @@ EXPECTED_LINKEDIN_PATCHES = {
 }
 
 NON_DEFAULT_PATCHES = {
-    "AMOLED black bars",
+    "Pitch black",
     "Glass navigation bar",
     "GmsCore support",
     "Material You",

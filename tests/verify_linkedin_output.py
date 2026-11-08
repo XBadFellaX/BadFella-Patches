@@ -22,6 +22,8 @@ POST_MENU = "Lapp/badfella/extension/linkedin/PostMenu;"
 COMPONENT_TRANSFORMER = "Lcom/linkedin/sdui/transformer/impl/ComponentTransformer;"
 SETTINGS = "Lapp/badfella/extension/linkedin/Settings;"
 SETTINGS_ACTIVITY = "Lapp/badfella/extension/linkedin/SettingsActivity;"
+MATERIAL_YOU = "Lapp/badfella/extension/linkedin/MaterialYou;"
+APP_COMPAT = "Landroidx/appcompat/app/AppCompatActivity;"
 MAIN_ACTIVITY = "Lcom/linkedin/android/infra/navigation/MainActivity;"
 
 result = json.loads(args.result.read_text())
@@ -68,7 +70,8 @@ with tempfile.TemporaryDirectory() as workspace:
             file.write_bytes(data)
             for descriptor in class_descriptors(data):
                 classes[descriptor] += 1
-                if descriptor in (SDUI_FILTER, POST_MENU, COMPONENT_TRANSFORMER, SETTINGS, SETTINGS_ACTIVITY, MAIN_ACTIVITY):
+                if descriptor in (SDUI_FILTER, POST_MENU, COMPONENT_TRANSFORMER, SETTINGS, SETTINGS_ACTIVITY,
+                                  MATERIAL_YOU, APP_COMPAT, MAIN_ACTIVITY):
                     targets.setdefault(descriptor, name)
 
     assert classes[SDUI_FILTER] == 1, "LinkedIn SDUI filter is missing or duplicated"
@@ -101,6 +104,39 @@ with tempfile.TemporaryDirectory() as workspace:
     post_menu_dex = disassemble(targets[POST_MENU])
     assert "PostMenu.signature:" in post_menu_dex, "Missing post-menu payload dedupe"
 
+    # Pitch black: the full app AMOLED theme, on by default once its patch is included.
+    settings_dex = disassemble(targets[SETTINGS])
+    assert re.search(r"name\s+: 'pitchBlack'", settings_dex), "Pitch black switch missing from Settings"
+    assert "pitch_black" in settings_dex, "Pitch black preference key missing"
+    assert "amoled_black" in settings_dex, "Legacy AMOLED preference key is not migrated"
+
+    material_you = disassemble(targets[MATERIAL_YOU])
+    assert re.search(r"name\s+: 'amoled'", material_you), "Pitch black tone mapping missing"
+    assert re.search(r"name\s+: 'pitchBlackContext'", material_you), "Pitch black context hook missing"
+    for tone in ("ff000000", "ff0d0d0d", "ff1a1a1a"):
+        assert tone in material_you, f"Missing Pitch black tone {tone}"
+
+    app_compat = disassemble(targets[APP_COMPAT])
+    assert "MaterialYou;.pitchBlackContext:" in app_compat, \
+        "Pitch black context hook not injected into AppCompatActivity.attachBaseContext"
+
+    # The three AMOLED tones must reach the dark View themes through values-notlong-night.
+    resources = subprocess.check_output(
+        [str(SDK / "aapt2.exe"), "dump", "resources", str(APK)],
+        text=True, encoding="utf-8", errors="replace")
+
+    def notlong_color(name):
+        entry = re.search(r"resource 0x[0-9a-f]+ color/" + re.escape(name) + r"\n(.*?)(?=\n    resource |\Z)",
+                          resources, re.S)
+        assert entry, f"Color {name} missing from resources"
+        value = re.search(r"\(notlong-night\) (#[0-9a-fA-F]+)", entry.group(1))
+        assert value, f"Color {name} has no notlong-night value"
+        return value.group(1).lower()
+
+    assert notlong_color("mercado_mvp_dark_color_background_canvas") == "#ff000000"
+    assert notlong_color("mercado_mvp_dark_color_background_container") == "#ff0d0d0d"
+    assert notlong_color("mercado_mvp_dark_color_background_canvas_tint") == "#ff1a1a1a"
+
 subprocess.run([str(SDK / "zipalign.exe"), "-c", "4", str(APK)], check=True)
 print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, SDUI transformer hooks, "
-      f"SettingsShortcut hook, {len(classes)} unique classes, ZIP alignment")
+      f"SettingsShortcut hook, Pitch black resources and hooks, {len(classes)} unique classes, ZIP alignment")

@@ -702,7 +702,7 @@ val removeGapsAndDividersPatch = bytecodePatch(
 
 /**
  * The runtime color hooks of the Compose themes, the server drawn screens and the system bars, which "Material You"
- * and "AMOLED black bars" both use. Each hook checks the settings of the patches that are included.
+ * and "Pitch black" both use. Each hook checks the settings of the patches that are included.
  */
 private val colorHooksPatch = bytecodePatch {
     dependsOn(settingsPatch, sharedColorsPatch)
@@ -863,35 +863,45 @@ private fun Instruction.secondArgument(): Int = when (this) {
 }
 
 /**
- * Dark mode backgrounds as pure black: the canvas, cards and the tinted rows a step above them. They are written under
- * the `notlong` screen qualifier, which outranks Material You's version specific files (values-v31, values-v34)
- * whichever patch runs first, so the two never conflict.
+ * Dark mode colors of the Mercado themes as AMOLED tones, from the deepest canvas to the tinted rows: pure black
+ * canvas, cards a step above it and tints a step above the cards. They are written under the `notlong` screen
+ * qualifier, which outranks Material You's version specific files (values-v31, values-v34) whichever patch runs
+ * first, so the two never conflict.
  */
-private val AMOLED_COLORS = listOf(
-    "mercado_mvp_color_background_canvas_dark", "mercado_mvp_dark_color_background_canvas",
-    "mercado_mvp_dark_color_background_canvas_dark", "mercado_mvp_dark_color_background_canvas_mobile",
-    "color_splash_canvas_background", "color_status_bar",
-    "mercado_mvp_color_background_container_dark", "mercado_mvp_dark_color_background_container",
-    "mercado_mvp_dark_color_background_container_dark",
-    "mercado_mvp_color_background_canvas_dark_tint", "mercado_mvp_color_background_container_dark_tint",
-    "mercado_mvp_dark_color_background_canvas_dark_tint", "mercado_mvp_dark_color_background_canvas_tint",
-    "mercado_mvp_dark_color_background_container_dark_tint", "mercado_mvp_dark_color_background_container_tint",
-).associateWith { "#000000" }
+private val AMOLED_COLORS = mapOf(
+    "#000000" to listOf(
+        "mercado_mvp_color_background_canvas_dark", "mercado_mvp_dark_color_background_canvas",
+        "mercado_mvp_dark_color_background_canvas_dark", "mercado_mvp_dark_color_background_canvas_mobile",
+        "color_splash_canvas_background", "color_status_bar",
+    ),
+    "#0D0D0D" to listOf(
+        "mercado_mvp_color_background_container_dark", "mercado_mvp_dark_color_background_container",
+        "mercado_mvp_dark_color_background_container_dark",
+    ),
+    "#1A1A1A" to listOf(
+        "mercado_mvp_color_background_canvas_dark_tint", "mercado_mvp_color_background_container_dark_tint",
+        "mercado_mvp_dark_color_background_canvas_dark_tint", "mercado_mvp_dark_color_background_canvas_tint",
+        "mercado_mvp_dark_color_background_container_dark_tint", "mercado_mvp_dark_color_background_container_tint",
+    ),
+)
 
 /**
- * Puts the black backgrounds under the `notlong` screen qualifier. Phones report `long` or `notlong` on their
- * own, so the extension forces it per activity: `notlong` while AMOLED black is on, `long` while it is off, and
- * the black colors of bars and screens follow the switch.
+ * Puts the AMOLED backgrounds in a night colors file under the `notlong` screen qualifier. Phones report `long` or
+ * `notlong` on their own, so the extension forces it per activity: `notlong` while Pitch black is on, `long` while
+ * it is off, and the black colors of bars and screens follow the switch.
  */
 private val amoledResourcePatch = resourcePatch {
-    execute { writeColors("values-notlong-night", AMOLED_COLORS) }
+    execute {
+        writeColors("values-notlong-night", AMOLED_COLORS.flatMap { (hex, names) -> names.map { it to hex } }.toMap())
+    }
 }
 
 @Suppress("unused")
 val amoledBlackBarsPatch = bytecodePatch(
-    name = "AMOLED black bars",
-    description = "Makes the dark top bar, bottom bar, side menu and other screens drawn by the app pure black, " +
-        "next to the feed that the AMOLED black setting already covers. Works with or without Material You.",
+    name = "Pitch black",
+    description = "Replaces the gray backgrounds of dark mode with black, and cards with a slightly lighter " +
+        "black, across the entire app. Takes effect when the system is in dark mode. Works with or without " +
+        "Material You.",
     default = false
 ) {
     compatibleWith(COMPATIBILITY_LINKEDIN)

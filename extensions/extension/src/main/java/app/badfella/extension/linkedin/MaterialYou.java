@@ -93,53 +93,34 @@ public final class MaterialYou {
         }
     }
 
-    /** Packed Compose black, for "AMOLED black". */
-    private static final long BLACK = 0xFF000000L << 32;
-    /** LinkedIn's dark backgrounds (0xRRGGBB): cards, containers and tinted rows. */
-    private static final int[] DARK_BACKGROUNDS = {0x1B1F23, 0x1D2226, 0x293037, 0x293138};
+    /** Pitch black tones of the dark theme: canvas, cards and tints. */
+    private static final int AMOLED_CANVAS = 0xFF000000;
+    private static final int AMOLED_CARD = 0xFF0D0D0D;
+    private static final int AMOLED_TINT = 0xFF1A1A1A;
 
     private MaterialYou() {
     }
 
     /**
-     * Injected at the start of AppCompatActivity.attachBaseContext by "AMOLED black bars". The black backgrounds
-     * sit under the {@code notlong} screen qualifier, so this forces it on while the switch is on and off while it
-     * is off. Without it, bars and other screens drawn from resources stay black whatever the switch says.
+     * Injected at the start of AppCompatActivity.attachBaseContext by "Pitch black". The black colors sit under the
+     * {@code notlong} screen qualifier, so this forces it on while the switch is on and off while it is off.
+     * Without it, bars and other screens drawn from resources stay black whatever the switch says.
      */
     public static Context pitchBlackContext(Context base) {
         Configuration override = new Configuration();
         // Layout direction bits left at 0 keep the base context's own direction.
         override.screenLayout = base.getResources().getConfiguration().screenLayout
                 & ~(Configuration.SCREENLAYOUT_LONG_MASK | Configuration.SCREENLAYOUT_LAYOUTDIR_MASK)
-                | (Settings.amoledBlack() ? Configuration.SCREENLAYOUT_LONG_NO : Configuration.SCREENLAYOUT_LONG_YES);
+                | (Settings.pitchBlack() ? Configuration.SCREENLAYOUT_LONG_NO : Configuration.SCREENLAYOUT_LONG_YES);
         return base.createConfigurationContext(override);
-    }
-
-    /** Whether "AMOLED black" turns this packed Compose Color, a dark background, black. */
-    private static boolean isAmoledDark(long packed) {
-        // sRGB Compose colors keep the ARGB value in the upper 32 bits and color space 0 in the lower ones.
-        if ((packed & 0x3F) != 0 || !Settings.amoledBlack()) return false;
-        int argb = (int) (packed >>> 32);
-        return (argb >>> 24) == 0xFF && luminance(argb) < 128;
-    }
-
-    /** Whether "AMOLED black" turns this ARGB color, one of LinkedIn's dark backgrounds, black. */
-    private static boolean isAmoledBackground(long argb) {
-        if ((argb >>> 24) != 0xFF || !Settings.amoledBlack()) return false;
-        int rgb = (int) (argb & 0xFFFFFF);
-        for (int dark : DARK_BACKGROUNDS) {
-            if (rgb == dark) return true;
-        }
-        return false;
     }
 
     /**
      * Injected at the end of the Compose themes' static initializer for the card token. Takes and returns a
-     * packed Compose Color: a light card becomes the light neutral, a dark one the dark neutral.
+     * packed Compose Color: a light card becomes the light neutral, a dark one the dark neutral or its AMOLED tone.
      */
     public static long surface(long packed) {
-        if (isAmoledDark(packed)) return BLACK;
-        if (!Settings.materialYou()) return packed;
+        if (!Settings.materialYou() && !Settings.pitchBlack()) return packed;
         return tone(packed, LIGHT_SURFACE, DARK_SURFACE);
     }
 
@@ -150,8 +131,7 @@ public final class MaterialYou {
      */
     public static long canvas(long packed, long card) {
         if (packed == card) return surface(card);
-        if (isAmoledDark(packed)) return BLACK;
-        if (!Settings.materialYou()) return packed;
+        if (!Settings.materialYou() && !Settings.pitchBlack()) return packed;
         return tone(packed, LIGHT_CANVAS, DARK_CANVAS);
     }
 
@@ -176,7 +156,7 @@ public final class MaterialYou {
      * container become the card colors.
      */
     public static int bar(int color) {
-        if (color == 0xFF1D2226 && Settings.amoledBlack()) return 0xFF000000;
+        if (color == 0xFF1D2226 && Settings.pitchBlack()) return AMOLED_CARD;
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !Settings.materialYou()) return color;
         if (color == 0xFFFFFFFF) return resources().getColor(LIGHT_SURFACE, null);
         if (color == 0xFF1D2226) return resources().getColor(DARK_SURFACE, null);
@@ -222,10 +202,16 @@ public final class MaterialYou {
     /** The system color [light] for a light packed Compose Color, [dark] for a dark one. */
     private static long tone(long packed, int light, int dark) {
         try {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || (packed & 0x3F) != 0) return packed;
+            if ((packed & 0x3F) != 0) return packed;
             int argb = (int) (packed >>> 32);
             if ((argb >>> 24) != 0xFF) return packed;
             int luminance = (299 * ((argb >> 16) & 0xFF) + 587 * ((argb >> 8) & 0xFF) + 114 * (argb & 0xFF)) / 1000;
+            // Pitch black applies before the Android 12 check, since it does not need the system palette.
+            if (luminance < 128 && Settings.pitchBlack()) {
+                int black = dark == DARK_CANVAS ? AMOLED_CANVAS : dark == DARK_SURFACE_HIGH ? AMOLED_TINT : AMOLED_CARD;
+                return (black & 0xFFFFFFFFL) << 32;
+            }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !Settings.materialYou()) return packed;
             return (resources().getColor(luminance >= 128 ? light : dark, null) & 0xFFFFFFFFL) << 32;
         } catch (Throwable t) {
             Diagnostics.error("Material You surface failed", t);
@@ -240,8 +226,28 @@ public final class MaterialYou {
 
     /** Injected after each background constant of the Compose themes: an ARGB value as used by Color(long). */
     public static long background(long argb) {
-        if (isAmoledBackground(argb)) return 0xFF000000L;
+        long amoled = amoled(argb);
+        if (amoled != argb) return amoled;
         return Settings.materialYou() ? map(BACKGROUNDS, argb) : argb;
+    }
+
+    /**
+     * LinkedIn's dark background [argb] as a pitch black tone (canvas, card or tint), or [argb] when it is none or
+     * the patch is off. The packed result is what {@link android.graphics.Color#Color(long)} takes.
+     */
+    private static long amoled(long argb) {
+        if (!Settings.pitchBlack() || (argb >>> 24) != 0xFF) return argb;
+        switch ((int) (argb & 0xFFFFFF)) {
+            case 0x1B1F23:
+                return AMOLED_CANVAS & 0xFFFFFFFFL;
+            case 0x1D2226:
+                return AMOLED_CARD & 0xFFFFFFFFL;
+            case 0x293037:
+            case 0x293138:
+                return AMOLED_TINT & 0xFFFFFFFFL;
+            default:
+                return argb;
+        }
     }
 
     private static long map(Map<Integer, Integer> colors, long argb) {
@@ -270,10 +276,9 @@ public final class MaterialYou {
      * other blues the accent tone of the nearest lightness.
      */
     public static Map<Object, Object> sduiColors(Map<Object, Object> overrides) {
-        if (overrides == null || overrides.isEmpty()) return overrides;
-        if ((Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !Settings.materialYou()) && !Settings.amoledBlack()) {
-            return overrides;
-        }
+        if (overrides == null || overrides.isEmpty()
+                || !Settings.pitchBlack() && (Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+                || !Settings.materialYou())) return overrides;
         try {
             Map<Object, Object> result = new LinkedHashMap<>(overrides);
             Method box = null;
@@ -301,7 +306,9 @@ public final class MaterialYou {
      * palette colors the server sends, which skip the theme.
      */
     public static Object sduiUIColor(Object color) {
-        if (color == null || (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !Settings.amoledBlack())) return color;
+        if (color == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !Settings.pitchBlack()) {
+            return color;
+        }
         try {
             long packed = (long) Reflect.get(color, "value");
             long mapped = sduiColor(packed);
@@ -319,8 +326,9 @@ public final class MaterialYou {
         long argb = packed >>> 32;
         int rgb = (int) (argb & 0xFFFFFF);
         if (rgb == WARM_GRAY_30 && (argb >>> 24) == 0xFF) return mvpCanvas(packed);
-        if (isAmoledBackground(argb)) return BLACK;
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !Settings.materialYou()) return packed;
+        long amoled = amoled(argb);
+        if (amoled != argb) return amoled << 32;
+        if (!Settings.materialYou()) return packed;
         if ((argb >>> 24) != 0xFF) return translucentAccent(packed);
         long mapped = argb;
         if (ACCENTS.containsKey(rgb)) mapped = map(ACCENTS, argb);
@@ -343,8 +351,7 @@ public final class MaterialYou {
             long card = isLight(packed) ? 0xFFFFFFFFL << 32 : 0xFF1D2226L << 32;
             return surface(card);
         }
-        if (isAmoledDark(packed)) return BLACK;
-        if (!Settings.materialYou()) return packed;
+        if (!Settings.materialYou() && !Settings.pitchBlack()) return packed;
         return tone(packed, LIGHT_CANVAS, DARK_CANVAS);
     }
 
@@ -357,14 +364,14 @@ public final class MaterialYou {
      * transparent, LinkedIn's white and dark container the card colors.
      */
     public static int navigationBarColor(int color) {
-        if (!Settings.materialYou() && !Settings.amoledBlack()) return color;
+        if (!Settings.materialYou() && !Settings.pitchBlack()) return color;
         if (color == 0xE6FFFFFF || color == 0x801B1B1B) return 0;
         return bar(color);
     }
 
     /** Injected before each call that turns the navigation bar contrast (a white scrim) on or off. */
     public static boolean navigationBarContrast(boolean enforced) {
-        return Settings.materialYou() || Settings.amoledBlack() ? false : enforced;
+        return Settings.materialYou() || Settings.pitchBlack() ? false : enforced;
     }
 
     /** Whether [rgb] is a saturated blue (hue 190° to 250°). */

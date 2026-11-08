@@ -1,3 +1,9 @@
+## 1.2.0-dev.12 (2026-11-08)
+
+### 🚀 Features
+
+* **linkedin:** rename AMOLED black bars to Pitch black and give it the complete three tone AMOLED theme (pure black canvas, dark cards and tints) across Compose and View screens, and enable it by default once its patch is included instead of leaving it inert until the in-app switch was found
+
 ## 1.2.0-dev.11 (2026-11-08)
 
 ### 🐛 Bug Fixes

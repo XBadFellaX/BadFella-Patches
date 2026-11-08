@@ -280,9 +280,9 @@ public final class SettingsActivity extends Activity {
                                 + "apply. Older screens keep the colors chosen when patching.");
             }
             if (Settings.isAmoledBlackIncluded()) {
-                appearance.toggle(Settings.AMOLED_BLACK, false, "AMOLED black",
-                        "Pure black backgrounds and cards in dark mode, to save battery on AMOLED screens. Restart "
-                                + "LinkedIn to apply.");
+                appearance.toggle(Settings.PITCH_BLACK, true, "Pitch black",
+                        "Replaces the gray backgrounds of dark mode with black, and cards with a slightly darker "
+                                + "black, across the entire app. Restart LinkedIn to apply.");
             }
             categories.add(appearance);
         }
@@ -501,10 +501,10 @@ public final class SettingsActivity extends Activity {
             divider = materialYou[2];
             accent = materialYou[3];
         }
-        if (dark && Settings.amoledBlack()) {
-            // AMOLED black wins over the wallpaper's tinted dark surface.
+        if (dark && Settings.pitchBlack()) {
+            // Pitch black wins over the wallpaper's tinted dark surface.
             background = 0xFF000000;
-            surface = 0xFF161616;
+            surface = 0xFF0D0D0D;
         }
 
         Window window = getWindow();
@@ -892,7 +892,7 @@ public final class SettingsActivity extends Activity {
                 {"Block tracking", Settings.isBlockTrackingIncluded()},
                 {"Remove gaps and dividers", Settings.isRemoveGapsAndDividersIncluded()},
                 {"Material You", Settings.isMaterialYouIncluded()},
-                {"AMOLED black bars", Settings.isAmoledBlackIncluded()},
+                {"Pitch black", Settings.isAmoledBlackIncluded()},
                 {"GmsCore support", Settings.isGmsCoreSupportIncluded()},
         };
     }
