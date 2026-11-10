@@ -1,3 +1,9 @@
+## 1.3.0-dev.1 (2026-11-10)
+
+### 🚀 Features
+
+* **ultimea:** add Pitch black AMOLED dark theme, Hide Explorer tab, and Use system font patches for Ultimea 1.4.4
+
 ## 1.2.0 (2026-11-08)
 
 ### 🐛 Bug Fixes
