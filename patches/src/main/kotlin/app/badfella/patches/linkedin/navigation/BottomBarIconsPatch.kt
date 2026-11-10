@@ -85,8 +85,11 @@ val bottomBarIconsPatch = resourcePatch(
         var replaced = 0
         val missing = mutableListOf<String>()
         TAB_ICONS.forEach { (name, icons) ->
-            val file = get("res").resolve("drawable").resolve("$name.xml")
-            if (!file.exists()) {
+            // Asking for the exact file makes Morphe decode it out of the resource table on demand; the res tree
+            // itself is not pre-extracted, so resolving the path by hand would find nothing.
+            val file = try {
+                get("res/drawable/$name.xml")
+            } catch (_: PatchException) {
                 missing += name
                 return@forEach
             }
