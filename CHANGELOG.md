@@ -1,3 +1,18 @@
+## 1.3.0-dev.4 (2026-11-10)
+
+### ✨ New Features
+
+* **linkedin:** add a Dark app icon option that paints the launcher icon background black while keeping the white "in"
+* **linkedin:** add Material icons to the bottom navigation bar, filled when selected and outlined otherwise
+* **linkedin:** add an Icon-only post actions option that shows Like, Comment, Repost and Send as icons without their labels
+* **linkedin:** add Copy post text, so long pressing a post's text copies all of it, including the part behind "...more"
+* **linkedin:** add an Always show navigation bar option that keeps the bar on screen while scrolling
+
+### 🐛 Bug Fixes
+
+* **linkedin:** close an empty Premium upsell full-page takeover instead of leaving a blank screen
+* **linkedin:** resolve the My Network tab from the visible tab row when swiping between feeds
+
 ## 1.3.0-dev.3 (2026-11-10)
 
 ### ✨ New Features
