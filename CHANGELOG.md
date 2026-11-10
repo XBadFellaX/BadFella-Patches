@@ -1,3 +1,14 @@
+## 1.3.0-dev.3 (2026-11-10)
+
+### ✨ New Features
+
+* **linkedin:** add the Install next to LinkedIn patch for LinkedIn 4.1.1271 and 4.1.1267, which installs the patched build as a second app with its own package name, home screen name and data, so both the copy and the installed LinkedIn can be signed in side by side (closes #2)
+
+### Notes
+
+* The copy starts with empty data and needs its own sign-in.
+* Features that check the installed package or signing certificate, such as verified app links and Google Play services based sign-in, may behave differently in the copy. Select GmsCore support as well to sign in with Google through microG RE.
+
 ## 1.3.0-dev.2 (2026-11-10)
 
 ### 🐛 Bug Fixes

@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "com.linkedin.android"
 PATCHES_DIR = ROOT / "patches/src/main/kotlin/app/badfella/patches/linkedin"
 EXT_DIR = ROOT / "extensions/extension/src/main/java/app/badfella/extension/linkedin"
+CLONE_KT = PATCHES_DIR / "misc/ClonePatch.kt"
 
 EXPECTED_LINKEDIN_PATCHES = {
     "Pitch black",
@@ -26,6 +27,7 @@ EXPECTED_LINKEDIN_PATCHES = {
     "Hide bottom tabs",
     "Hide promoted jobs",
     "Hide suggested posts",
+    "Install next to LinkedIn",
     "Keep feed on reopen",
     "Material You",
     "Messaging",
@@ -44,6 +46,7 @@ NON_DEFAULT_PATCHES = {
     "Pitch black",
     "Glass navigation bar",
     "GmsCore support",
+    "Install next to LinkedIn",
     "Material You",
     "Remove gaps and dividers",
 }
@@ -58,9 +61,9 @@ class LinkedInCatalogTests(unittest.TestCase):
                    for compat in patch["compatiblePackages"] or [])
         }
 
-    def test_all_28_patches_declared(self):
+    def test_all_29_patches_declared(self):
         self.assertEqual(set(self.patches.keys()), EXPECTED_LINKEDIN_PATCHES)
-        self.assertEqual(len(self.patches), 28)
+        self.assertEqual(len(self.patches), 29)
 
     def test_reviewed_targets_and_version_agnosticism(self):
         for name, patch in self.patches.items():
@@ -227,6 +230,77 @@ class LinkedInSourceTests(unittest.TestCase):
         self.assertIn("ProtoScanner scanner = ProtoScanner.scan(payload);", postmenu_src)
         self.assertIn("MediaItem.extract(scanner, false)", postmenu_src)
         self.assertNotIn("MediaItem.extract(ProtoScanner.scan(payload)", postmenu_src)
+
+
+class LinkedInCloneTests(unittest.TestCase):
+    """The Install next to LinkedIn patch: its catalog entry, its manifest rename and its code rename."""
+
+    def test_catalog_entry_options_and_default(self):
+        catalog = json.loads((ROOT / "patches-list.json").read_text(encoding="utf-8"))
+        patch = next(patch for patch in catalog["patches"] if patch["name"] == "Install next to LinkedIn")
+        self.assertFalse(patch["default"])
+        self.assertEqual(patch["category"], "Misc")
+        self.assertEqual([compat["packageName"] for compat in patch["compatiblePackages"]], [PACKAGE])
+        options = {option["key"]: option for option in patch["options"]}
+        self.assertEqual(set(options), {"packageName", "appName"})
+        self.assertEqual(options["packageName"]["default"], "com.linkedin.android.clone")
+        self.assertEqual(options["appName"]["default"], "LinkedIn Clone")
+        self.assertEqual(options["packageName"]["type"], "kotlin.String")
+        self.assertEqual(options["appName"]["type"], "kotlin.String")
+        self.assertTrue(options["packageName"]["required"] and options["appName"]["required"])
+
+    def test_patch_is_opt_in_and_linkedin_only(self):
+        source = CLONE_KT.read_text(encoding="utf-8")
+        self.assertIn('name = PATCH_NAME', source)
+        self.assertIn('default = false', source)
+        self.assertIn('category("Misc")', source)
+        self.assertIn("compatibleWith(COMPATIBILITY_LINKEDIN)", source)
+        self.assertIn("key = \"packageName\"", source)
+        self.assertIn("key = \"appName\"", source)
+        self.assertIn("clonePackageProblem(it) == null", source)
+        self.assertIn("cloneLabelProblem(it) == null", source)
+
+    def test_manifest_rename_covers_package_permissions_authorities_and_classes(self):
+        source = CLONE_KT.read_text(encoding="utf-8")
+        for token in (
+            'root.setAttribute("package", clone)',
+            'private const val AUTHORITIES = "android:authorities"',
+            'private const val AFFINITY = "android:taskAffinity"',
+            'private const val PROCESS = "android:process"',
+            "PERMISSION_DECLARATIONS",
+            "PERMISSION_REQUESTS",
+            "GUARDS",
+            "underClone(name, clone)",
+            "cloneAuthority(",
+            'private const val TAB_HOST = "cct.$LINKEDIN"',
+            'element.setAttribute(HOST, "cct.$clone")',
+            "SPOOFED_PACKAGE_NAME",
+            "CLONE_LABEL_RESOURCE",
+            "CLASS_NAMES",
+            'value.startsWith(".")',
+            "LINKEDIN + value",
+        ):
+            self.assertIn(token, source)
+
+    def test_code_rename_handles_authorities_content_uris_and_host(self):
+        source = CLONE_KT.read_text(encoding="utf-8")
+        for token in (
+            "renameCloneStrings",
+            "CONST_STRING_JUMBO",
+            '"content://"',
+            "namesAuthority",
+            "cloneAuthority(authority, clone)",
+        ):
+            self.assertIn(token, source)
+
+    def test_package_and_app_name_validation_refuse_stock_names(self):
+        source = CLONE_KT.read_text(encoding="utf-8")
+        self.assertIn("private val TAKEN = listOf(", source)
+        self.assertIn('"$LINKEDIN.debug"', source)
+        self.assertIn('"$LINKEDIN.learning"', source)
+        self.assertIn('"$LINKEDIN.salesnavigator"', source)
+        self.assertIn("private val PACKAGE_PART = Regex", source)
+        self.assertIn("LABEL_MARKS", source)
 
 
 if __name__ == "__main__":

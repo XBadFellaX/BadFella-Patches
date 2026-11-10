@@ -13,9 +13,15 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("apk", type=pathlib.Path)
 parser.add_argument("result", type=pathlib.Path)
 parser.add_argument("build_tools", type=pathlib.Path)
+parser.add_argument(
+    "--clone-package", metavar="PACKAGE",
+    help="The copy's package name; verifies Install next to LinkedIn renamed the app, authorities and permissions")
+parser.add_argument("--clone-label", metavar="LABEL", default="LinkedIn Clone",
+                    help="The copy's home screen name, checked with --clone-package")
 args = parser.parse_args()
 APK = args.apk
 SDK = args.build_tools
+CLONE = args.clone_package
 
 SDUI_FILTER = "Lapp/badfella/extension/linkedin/SduiComponentFilter;"
 POST_MENU = "Lapp/badfella/extension/linkedin/PostMenu;"
@@ -35,7 +41,24 @@ assert len(applied) >= 18, f"Expected at least 18 default patches applied, got {
 manifest = subprocess.check_output(
     [str(SDK / "aapt2.exe"), "dump", "badging", str(APK)],
     text=True, encoding="utf-8", errors="replace")
-assert "package: name='com.linkedin.android' versionCode='217900' versionName='4.1.1271'" in manifest
+expected_package = CLONE or "com.linkedin.android"
+assert f"package: name='{expected_package}' versionCode='217900' versionName='4.1.1271'" in manifest, manifest[:400]
+if CLONE:
+    assert "Install next to LinkedIn" in applied, "Clone patch not applied"
+    assert f"application-label:'{args.clone_label}'" in manifest, "Clone app name missing"
+    tree = subprocess.check_output(
+        [str(SDK / "aapt2.exe"), "dump", "xmltree", "--file", "AndroidManifest.xml", str(APK)],
+        text=True, encoding="utf-8", errors="replace")
+    assert f'package="{CLONE}"' in tree, "Clone package missing from the manifest"
+    for authority in ("fileprovider", "androidx-startup", "meridian-provider", "appfinder.suggestions",
+                      "RealTimeSystemSubscriptions", "persona.provider", "mlkitinitprovider", "firebaseinitprovider"):
+        assert f'"{CLONE}.{authority}"' in tree, f"Provider authority {authority} not moved"
+        assert f'"com.linkedin.android.{authority}"' not in tree, f"Provider authority {authority} still the stock one"
+    assert f'"{CLONE}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"' in tree, "Not-exported receiver permission not moved"
+    assert '"com.linkedin.android.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"' not in tree
+    assert f'"cct.{CLONE}"' in tree, "Custom tab return host not moved"
+    assert '"cct.com.linkedin.android"' not in tree
+    print(f"Clone package: {CLONE}, label: {args.clone_label}")
 
 
 def class_descriptors(data):
@@ -155,7 +178,15 @@ with tempfile.TemporaryDirectory() as workspace:
     assert notlong_color("mercado_mvp_dark_color_background_container") == "#ff0d0d0d"
     assert notlong_color("mercado_mvp_dark_color_background_canvas_tint") == "#ff1a1a1a"
 
+    if CLONE:
+        # The searchable activity names its suggestion provider through this string resource.
+        entry = re.search(r"resource 0x[0-9a-f]+ string/appfinder_authority\n(.*?)(?=\n    resource |\Z)",
+                          resources, re.S)
+        assert entry, "appfinder_authority string missing from resources"
+        assert f'"{CLONE}.appfinder.suggestions"' in entry.group(1), \
+            "appfinder_authority still names the stock suggestion provider"
+
 subprocess.run([str(SDK / "zipalign.exe"), "-c", "4", str(APK)], check=True)
 print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, SDUI transformer hooks, "
       f"SettingsShortcut hook, sponsored/promoted/boosted filters, Pitch black resources and hooks, "
-      f"{len(classes)} unique classes, ZIP alignment")
+      f"{len(classes)} unique classes, ZIP alignment" + (f", clone package {CLONE}" if CLONE else ""))
