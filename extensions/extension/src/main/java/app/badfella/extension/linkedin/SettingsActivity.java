@@ -152,7 +152,8 @@ public final class SettingsActivity extends Activity {
                 || Settings.isExpandPostsIncluded() || Settings.isSwipeTabsIncluded()
                 || Settings.isCopyTextIncluded() || Settings.isKeepFeedIncluded()
                 || Settings.isPostMenuIncluded() || Settings.isViewerTapToHideIncluded()
-                || Settings.isSwipeFeedsIncluded() || Settings.isHideTabsIncluded()) {
+                || Settings.isSwipeFeedsIncluded() || Settings.isHideTabsIncluded()
+                || Settings.isCopyPostTextIncluded() || Settings.isIconOnlyActionsIncluded()) {
             Category feed = new Category("Feed", IconDrawable.FEED);
             if (Settings.isDisableDoubleTapLikeIncluded()) {
                 feed.toggle(Settings.DISABLE_DOUBLE_TAP_LIKE, true, "Disable double-tap like",
@@ -166,11 +167,19 @@ public final class SettingsActivity extends Activity {
                 feed.toggle(Settings.SWIPE_TABS, true, "Swipe between tabs",
                         "Swipe sideways to go to the next or previous tab of the navigation bar.");
             }
+            if (Settings.isIconOnlyActionsIncluded()) {
+                feed.toggle(Settings.ICON_ONLY_ACTIONS, false, "Icon-only post actions",
+                        "Show Like, Comment, Repost and Send as icons under posts, without their labels.");
+            }
             if (Settings.isCopyTextIncluded()) {
                 feed.toggle(Settings.COPY_TEXT, true, "Copy text",
                         "Long press a post, comment, or any text to select and copy it, like on Reddit.");
                 feed.toggle(Settings.COPY_TEXT_LONG_SHEET, true, "Long posts in a sheet",
                         "Long posts open in a scrollable sheet with the whole text. Off: selected in place like short text.");
+            }
+            if (Settings.isCopyPostTextIncluded()) {
+                feed.toggle(Settings.COPY_POST_TEXT, true, "Copy full post text",
+                        "Long press a post's text to copy all of it, including the part behind \"...more\".");
             }
             if (Settings.isPostMenuIncluded()) {
                 feed.toggle(Settings.POST_MENU, true, "Post menu items",
@@ -234,11 +243,16 @@ public final class SettingsActivity extends Activity {
             categories.add(feed);
         }
 
-        if (Settings.isNavigationBarIncluded() || Settings.isGlassNavigationBarIncluded()) {
+        if (Settings.isNavigationBarIncluded() || Settings.isGlassNavigationBarIncluded()
+                || Settings.isAlwaysShowNavigationBarIncluded()) {
             Category navigation = new Category("Navigation bar", IconDrawable.MORE);
             if (Settings.isGlassNavigationBarIncluded()) {
                 navigation.toggle(Settings.GLASS_NAVIGATION_BAR, true, "Glass navigation bar",
                         "A floating, translucent navigation bar.");
+            }
+            if (Settings.isAlwaysShowNavigationBarIncluded()) {
+                navigation.toggle(Settings.ALWAYS_SHOW_NAVIGATION_BAR, false, "Always show navigation bar",
+                        "Keep the navigation bar on screen while you scroll.");
             }
             if (Settings.isNavigationBarIncluded()) {
                 navigation.toggle(Settings.HIDE_TAB_LABELS, false, "Hide tab labels",
@@ -873,6 +887,8 @@ public final class SettingsActivity extends Activity {
                 {"Expand posts", Settings.isExpandPostsIncluded()},
                 {"Disable double-tap like", Settings.isDisableDoubleTapLikeIncluded()},
                 {"Copy text", Settings.isCopyTextIncluded()},
+                {"Copy post text", Settings.isCopyPostTextIncluded()},
+                {"Icon-only post actions", Settings.isIconOnlyActionsIncluded()},
                 {"Keep feed on reopen", Settings.isKeepFeedIncluded()},
                 {"Post menu items", Settings.isPostMenuIncluded()},
                 {"Tap to hide in viewers", Settings.isViewerTapToHideIncluded()},
@@ -882,6 +898,7 @@ public final class SettingsActivity extends Activity {
                 {"Navigation bar", Settings.isNavigationBarIncluded()},
                 {"Customize navigation bar", Settings.isCustomizeNavigationIncluded()},
                 {"Swipe between tabs", Settings.isSwipeTabsIncluded()},
+                {"Always show navigation bar", Settings.isAlwaysShowNavigationBarIncluded()},
                 {"Glass navigation bar", Settings.isGlassNavigationBarIncluded()},
                 {"More tab", Settings.isMoreMenuIncluded()},
                 {"Anonymous profile viewing", Settings.isAnonymousProfileViewingIncluded()},

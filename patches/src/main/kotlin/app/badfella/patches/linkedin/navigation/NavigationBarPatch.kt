@@ -7,14 +7,17 @@ import app.badfella.patches.linkedin.shared.settingsPatch
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
+import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
 private const val EXTENSION_CLASS = "$EXTENSION_PACKAGE/NavigationBar;"
+private const val SETTINGS_CLASS = "$EXTENSION_PACKAGE/Settings;"
 
 /** HomeNavTabsManager.getHomeNavTabs(): the tabs of the bottom bar. */
 private object HomeNavTabsFingerprint : Fingerprint(
@@ -87,6 +90,41 @@ internal val navigationHooksPatch = bytecodePatch {
                 addInstruction(index + 1, "return-void")
             }
             addInstruction(0, "invoke-static/range { p0 .. p0 }, $EXTENSION_CLASS->beforeTabsSized(Landroid/view/View;)V")
+        }
+    }
+}
+
+/** SlimBottomNavigationBehavior.handleDirection(bar, direction): slides the bottom bar away or back as a screen scrolls. */
+private object ScrollDirectionFingerprint : Fingerprint(
+    definingClass = "Lcom/linkedin/android/home/bottomnav/SlimBottomNavigationBehavior;",
+    name = "handleDirection",
+    returnType = "V",
+    parameters = listOf("Lcom/linkedin/android/home/bottomnav/SlimBottomBar;", "I"),
+)
+
+@Suppress("unused")
+val alwaysShowNavigationBarPatch = bytecodePatch(
+    name = "Always show navigation bar",
+    description = "Adds an option in BadFella Patches to keep the navigation bar on screen while you scroll.",
+    default = true
+) {
+    compatibleWith(COMPATIBILITY_LINKEDIN)
+    category("Navigation")
+    dependsOn(settingsPatch)
+    execute {
+        markIncluded("isAlwaysShowNavigationBarIncluded")
+        // The bar is only ever slid away from here, so skipping it keeps the bar where it is.
+        ScrollDirectionFingerprint.method.apply {
+            addInstructionsWithLabels(
+                0,
+                """
+                    invoke-static { }, $SETTINGS_CLASS->alwaysShowNavigationBar()Z
+                    move-result v0
+                    if-eqz v0, :scroll
+                    return-void
+                """,
+                ExternalLabel("scroll", getInstruction(0))
+            )
         }
     }
 }

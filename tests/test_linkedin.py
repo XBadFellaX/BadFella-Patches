@@ -11,11 +11,13 @@ EXT_DIR = ROOT / "extensions/extension/src/main/java/app/badfella/extension/link
 CLONE_KT = PATCHES_DIR / "misc/ClonePatch.kt"
 
 EXPECTED_LINKEDIN_PATCHES = {
-    "Pitch black",
+    "Always show navigation bar",
     "Anonymous profile viewing",
     "Block tracking",
+    "Copy post text",
     "Copy text",
     "Customize navigation bar",
+    "Dark app icon",
     "Disable double-tap like",
     "Download media",
     "Expand posts",
@@ -27,13 +29,16 @@ EXPECTED_LINKEDIN_PATCHES = {
     "Hide bottom tabs",
     "Hide promoted jobs",
     "Hide suggested posts",
+    "Icon-only post actions",
     "Install next to LinkedIn",
     "Keep feed on reopen",
     "Material You",
+    "Material icons in the bottom bar",
     "Messaging",
     "More tab",
     "Navigation bar",
     "Open links directly",
+    "Pitch black",
     "Post menu items",
     "Remove gaps and dividers",
     "Sanitize share links",
@@ -43,11 +48,13 @@ EXPECTED_LINKEDIN_PATCHES = {
 }
 
 NON_DEFAULT_PATCHES = {
+    "Dark app icon",
     "Pitch black",
     "Glass navigation bar",
     "GmsCore support",
     "Install next to LinkedIn",
     "Material You",
+    "Material icons in the bottom bar",
     "Remove gaps and dividers",
 }
 
@@ -61,9 +68,9 @@ class LinkedInCatalogTests(unittest.TestCase):
                    for compat in patch["compatiblePackages"] or [])
         }
 
-    def test_all_29_patches_declared(self):
+    def test_all_34_patches_declared(self):
         self.assertEqual(set(self.patches.keys()), EXPECTED_LINKEDIN_PATCHES)
-        self.assertEqual(len(self.patches), 29)
+        self.assertEqual(len(self.patches), 34)
 
     def test_reviewed_targets_and_version_agnosticism(self):
         for name, patch in self.patches.items():
@@ -149,6 +156,9 @@ class LinkedInSourceTests(unittest.TestCase):
             "TrackingPatch.java",
             "ViewerChrome.java",
             "WhatsNew.java",
+            "PremiumTakeover.java",
+            "ActionBarStyle.java",
+            "CopyPostText.java",
         ]
         for cls in expected_classes:
             self.assertTrue((EXT_DIR / cls).is_file(), f"Missing extension class: {cls}")
@@ -206,7 +216,7 @@ class LinkedInSourceTests(unittest.TestCase):
         """doTransform also runs per viewport sample while scrolling: no path may serialize unconditionally."""
         sdui_src = (EXT_DIR / "SduiComponentFilter.java").read_text(encoding="utf-8")
         # rewrite returns before touching the view name when no feature that edits components is on.
-        self.assertIn("if (!expandPosts && !viewer && !postMenu) return component;", sdui_src)
+        self.assertIn("if (!expandPosts && !viewer && !postMenu && !copyPostText) return component;", sdui_src)
         # Every editing branch is gated on the component's own view name.
         self.assertIn('private static final String COMMENTARY = "feed-commentary";', sdui_src)
         self.assertIn('private static final String VIEWER_CONTAINER = "feed-update-screen-container";', sdui_src)
@@ -230,6 +240,105 @@ class LinkedInSourceTests(unittest.TestCase):
         self.assertIn("ProtoScanner scanner = ProtoScanner.scan(payload);", postmenu_src)
         self.assertIn("MediaItem.extract(scanner, false)", postmenu_src)
         self.assertNotIn("MediaItem.extract(ProtoScanner.scan(payload)", postmenu_src)
+
+
+class LinkedInUpstreamSyncTests(unittest.TestCase):
+    """The patches ported from loki-patches, fakh-patches and michii-patches."""
+
+    def test_premium_takeover_closes_only_the_shown_page(self):
+        src = (EXT_DIR / "PremiumTakeover.java").read_text(encoding="utf-8")
+        self.assertIn(".premium.upsells.PremiumUpsellFullPageTakeoverNavGraphScreen", src)
+        self.assertIn("Settings.hidePremium()", src)
+        self.assertIn("SduiMediaDownload.resumedScreen().endsWith(SCREEN)", src)
+        self.assertIn("isShown(fragment)", src)
+        self.assertIn("host.onBackPressed()", src)
+        # Only closed once the page is really in front and visible, never for a prepared one behind it.
+        self.assertIn("host.isFinishing() || host.isDestroyed()", src)
+        hook = (EXT_DIR / "SduiMediaDownload.java").read_text(encoding="utf-8")
+        self.assertIn("PremiumTakeover.onScreenResumed(activity, fragment, screen);", hook)
+
+    def test_feed_swipe_resolves_the_my_network_tab(self):
+        src = (EXT_DIR / "FeedSwipe.java").read_text(encoding="utf-8")
+        # The hidden My Network tab is found from the visible tab row, then placed from memory.
+        self.assertIn("private static Rect tabNextTo(Rect openLabel, int tab, List<Rect> tappable)", src)
+        self.assertIn("private static Rect movedWith(View root, int tab, Rect otherNow)", src)
+        self.assertIn("private static Rect remembered(View root, int tab)", src)
+        self.assertIn("lastTabBounds", src)
+        self.assertIn("onMyNetwork()", src)
+        self.assertIn("cancelledSwipe(view, event)", src)
+        # A parked Copy text selection must not block the swipe.
+        self.assertIn("TextSelectionOverlay.isShowing()", src)
+        overlay = (EXT_DIR / "TextSelectionOverlay.java").read_text(encoding="utf-8")
+        self.assertIn("static boolean isShowing()", overlay)
+        self.assertIn("!a.suspended && a.root.getVisibility() == View.VISIBLE", overlay)
+
+    def test_dark_app_icon_patch_is_a_resource_patch(self):
+        src = (PATCHES_DIR / "theme/DarkAppIconPatch.kt").read_text(encoding="utf-8")
+        self.assertIn("val darkAppIconPatch = resourcePatch(", src)
+        self.assertIn("default = false", src)
+        self.assertIn('category("Theme")', src)
+        self.assertIn('"res/drawable/ic_launcher_background.xml"', src)
+        self.assertIn('LINKEDIN_BLUE_RGB = "0a66c2"', src)
+        self.assertIn('BLACK = "#ff000000"', src)
+        self.assertIn("getElementsByTagName(\"path\")", src)
+
+    def test_icon_only_actions_hook_measure_and_render_mode(self):
+        kt = (PATCHES_DIR / "theme/IconOnlyActionsPatch.kt").read_text(encoding="utf-8")
+        self.assertIn("ButtonBarMeasureFingerprint", kt)
+        self.assertIn("ButtonBarKt\\$ButtonBarLayout\\$1\\$1;", kt)
+        self.assertIn("measure-3p2s80s", kt)
+        self.assertIn("->renderMode(Ljava/lang/Object;)Ljava/lang/Object;", kt)
+        self.assertIn("->onBarMeasure(Ljava/lang/Object;)V", kt)
+        src = (EXT_DIR / "ActionBarStyle.java").read_text(encoding="utf-8")
+        for view in ("reaction-button", "feed-comment-button", "feed-share-button",
+                     "feed-combined-share-message"):
+            self.assertIn(f'case "{view}":', src)
+        self.assertIn('"IconOnly"', src)
+        self.assertIn('field(policy, "$buttonBarViewData")', src)
+
+    def test_bottom_bar_material_icons_do_not_duplicate_label_and_badge_hooks(self):
+        kt = (PATCHES_DIR / "navigation/BottomBarIconsPatch.kt").read_text(encoding="utf-8")
+        self.assertIn("val bottomBarIconsPatch = resourcePatch(", kt)
+        self.assertIn('MATERIAL_ICONS_OPTION = "materialIcons"', kt)
+        self.assertIn("default = false", kt)
+        for name in ("ic_nav_mercado_feed_selector_24dp", "ic_nav_mercado_people_selector_24dp",
+                     "ic_nav_mercado_notifications_selector_24dp", "ic_nav_mercado_jobs_selector_24dp",
+                     "ic_nav_mercado_video_tab_selector_24dp"):
+            self.assertIn(f'"{name}"', kt)
+        self.assertIn('android:state_selected=\\"true\\"', kt)
+        # Labels, badges and hidden tabs stay in NavigationBar's single pair of hooks.
+        self.assertNotIn("resizeTabsToCorrectSizes", kt)
+        self.assertNotIn("SlimNotificationBadge", kt)
+
+    def test_copy_post_text_reads_the_text_block_payload(self):
+        kt = (PATCHES_DIR / "feed/CopyPostTextPatch.kt").read_text(encoding="utf-8")
+        self.assertIn("LongClickActionsFingerprint", kt)
+        self.assertIn("Lcom/linkedin/sdui/viewdata/action/ClickActions;", kt)
+        self.assertIn("dependsOn(sduiComponentFilterPatch)", kt)
+        self.assertIn("CopyPostText;->longClick(Ljava/lang/Object;)Ljava/lang/Object;", kt)
+        src = (EXT_DIR / "CopyPostText.java").read_text(encoding="utf-8")
+        self.assertIn("TEXT_BLOCK_TYPE = 13158", src)
+        self.assertIn("isCopyPostTextIncluded", (EXT_DIR / "Settings.java").read_text(encoding="utf-8"))
+        self.assertIn("copyPostText", src)
+        # The filter hands it the text before the transform builds the ClickActions.
+        sdui = (EXT_DIR / "SduiComponentFilter.java").read_text(encoding="utf-8")
+        self.assertIn("CopyPostText.onComponent(component, viewName)", sdui)
+
+    def test_always_show_navigation_bar_skips_the_scroll_direction_hook(self):
+        kt = (PATCHES_DIR / "navigation/NavigationBarPatch.kt").read_text(encoding="utf-8")
+        self.assertIn("val alwaysShowNavigationBarPatch = bytecodePatch(", kt)
+        self.assertIn("ScrollDirectionFingerprint", kt)
+        self.assertIn("SlimBottomNavigationBehavior;", kt)
+        self.assertIn("handleDirection", kt)
+        self.assertIn("->alwaysShowNavigationBar()Z", kt)
+        self.assertIn('markIncluded("isAlwaysShowNavigationBarIncluded")', kt)
+        # The method lives on Settings, not on NavigationBar, which is what EXTENSION_CLASS points at here.
+        self.assertIn(
+            'invoke-static { }, $SETTINGS_CLASS->alwaysShowNavigationBar()Z', kt)
+        self.assertIn('SETTINGS_CLASS = "$EXTENSION_PACKAGE/Settings;"', kt)
+        src = (EXT_DIR / "Settings.java").read_text(encoding="utf-8")
+        self.assertIn("public static boolean isAlwaysShowNavigationBarIncluded()", src)
+        self.assertIn("public static boolean alwaysShowNavigationBar()", src)
 
 
 class LinkedInCloneTests(unittest.TestCase):
