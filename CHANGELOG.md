@@ -1,3 +1,13 @@
+## 1.3.0-dev.2 (2026-11-10)
+
+### 🐛 Bug Fixes
+
+* **ultimea:** make the Ultimea patches take effect on device: pitch black dark mode now replaces the reviewed dark palette tokens and the native night window colors, the Explorer/Community tab is removed from the bottom navigation and its icons are blanked, and the chosen font is injected through the Flutter font manifest so it renders across the app
+
+### 🚀 Features
+
+* **ultimea:** add a Custom font option with Rosemary (Samsung), Google Sans, Open Sans, Segoe UI and System Default
+
 ## 1.3.0-dev.1 (2026-11-10)
 
 ### 🚀 Features
