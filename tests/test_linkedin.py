@@ -340,6 +340,39 @@ class LinkedInUpstreamSyncTests(unittest.TestCase):
         self.assertIn("public static boolean isAlwaysShowNavigationBarIncluded()", src)
         self.assertIn("public static boolean alwaysShowNavigationBar()", src)
 
+    def test_glass_bar_floats_above_the_system_navigation_bar(self):
+        src = (EXT_DIR / "GlassNavigationBar.java").read_text(encoding="utf-8")
+        # The bar keeps its own padding and adds the capsule's room, the floating margin and the nav bar inset.
+        self.assertIn("CAPSULE_ROOM_DP = 6", src)
+        self.assertIn("FLOATING_MARGIN_DP = 10", src)
+        self.assertIn("void floatOverSystemBar()", src)
+        self.assertIn("bar.setPadding(own[0], above, own[2], down)", src)
+        self.assertIn("getStableInsetBottom()", src)
+        self.assertIn("bar.getRootWindowInsets()", src)
+        # A slide that hides the bar must not change the padding, or the bar would relayout while it moves.
+        self.assertIn("bar.getTranslationY()", src)
+        # The capsule covers the room above and below the tabs, and the pill is inset from it on all sides.
+        self.assertIn("top = row.getTop() + tabs.getTop() - room", src)
+        self.assertIn("bottom = top + tabs.getHeight() + 2 * room", src)
+        self.assertIn("PILL_INSET_DP = 5", src)
+        self.assertIn("top + inset", src)
+        self.assertIn("bottom - inset", src)
+
+    def test_hidden_tab_labels_leave_the_icon_centered(self):
+        src = (EXT_DIR / "NavigationBar.java").read_text(encoding="utf-8")
+        # A hidden label takes no room, and the icon's own constraints center it once its margins are cleared.
+        self.assertIn('ICON = "slim_notification_badge_icon"', src)
+        self.assertIn('LABEL = "slim_notification_badge_label"', src)
+        self.assertIn("label.setVisibility(show ? View.VISIBLE : View.GONE)", src)
+        self.assertIn("setMargins(icon, show ? own[0] : 0, show ? own[1] : 0)", src)
+        self.assertIn("private static int[] ownMargins(View icon)", src)
+        self.assertIn("private static void setMargins(View icon, int top, int bottom)", src)
+        # The icon and its label are moved together until the pair sits in the middle of the tab.
+        self.assertIn("(tab.getHeight() - (below - above)) / 2f - above", src)
+        self.assertNotIn("View.INVISIBLE", src)
+        # A tab is laid out again on its own when a label is shown or hidden, so every layout pass is shaped.
+        self.assertIn("addOnGlobalLayoutListener(() -> arrange(bar, tabs))", src)
+
 
 class LinkedInCloneTests(unittest.TestCase):
     """The Install next to LinkedIn patch: its catalog entry, its manifest rename and its code rename."""

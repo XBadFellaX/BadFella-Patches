@@ -30,6 +30,8 @@ SETTINGS = "Lapp/badfella/extension/linkedin/Settings;"
 SETTINGS_ACTIVITY = "Lapp/badfella/extension/linkedin/SettingsActivity;"
 MATERIAL_YOU = "Lapp/badfella/extension/linkedin/MaterialYou;"
 HIDE_ADS = "Lapp/badfella/extension/linkedin/HideAdsPatch;"
+GLASS_BAR = "Lapp/badfella/extension/linkedin/GlassNavigationBar;"
+NAVIGATION_BAR = "Lapp/badfella/extension/linkedin/NavigationBar;"
 APP_COMPAT = "Landroidx/appcompat/app/AppCompatActivity;"
 MAIN_ACTIVITY = "Lcom/linkedin/android/infra/navigation/MainActivity;"
 
@@ -95,12 +97,14 @@ with tempfile.TemporaryDirectory() as workspace:
             for descriptor in class_descriptors(data):
                 classes[descriptor] += 1
                 if descriptor in (SDUI_FILTER, POST_MENU, COMPONENT_TRANSFORMER, SETTINGS, SETTINGS_ACTIVITY,
-                                  MATERIAL_YOU, HIDE_ADS, APP_COMPAT, MAIN_ACTIVITY):
+                                  MATERIAL_YOU, HIDE_ADS, GLASS_BAR, NAVIGATION_BAR, APP_COMPAT, MAIN_ACTIVITY):
                     targets.setdefault(descriptor, name)
 
     assert classes[SDUI_FILTER] == 1, "LinkedIn SDUI filter is missing or duplicated"
     assert classes[SETTINGS] == 1, "LinkedIn Settings is missing or duplicated"
     assert classes[HIDE_ADS] == 1, "LinkedIn legacy ad filter is missing or duplicated"
+    assert classes[GLASS_BAR] == 1, "LinkedIn glass navigation bar is missing or duplicated"
+    assert classes[NAVIGATION_BAR] == 1, "LinkedIn navigation bar helper is missing or duplicated"
     assert classes[COMPONENT_TRANSFORMER] == 1, "ComponentTransformer missing or duplicated"
     assert classes[MAIN_ACTIVITY] == 1, "MainActivity missing or duplicated"
     assert all(count == 1 for count in classes.values()), "Duplicate DEX classes"
@@ -161,6 +165,19 @@ with tempfile.TemporaryDirectory() as workspace:
     assert "MaterialYou;.pitchBlackContext:" in app_compat, \
         "Pitch black context hook not injected into AppCompatActivity.attachBaseContext"
 
+    # The glass bar keeps its own padding and pads the bar so the capsule floats above the system navigation bar.
+    glass_bar = disassemble(targets[GLASS_BAR])
+    for method in ("GlassNavigationBar$Selection;.floatOverSystemBar:",
+                   "GlassNavigationBar$Selection;.navigationBar:"):
+        assert method in glass_bar, f"Missing glass bar layout method {method}"
+    assert "getStableInsetBottom" in glass_bar, "Glass bar does not read the system navigation bar inset"
+    assert "setPadding" in glass_bar, "Glass bar does not make room for the floating capsule"
+
+    # A hidden tab label takes no room, and the icon's margins are cleared so its constraints center it.
+    navigation_bar = disassemble(targets[NAVIGATION_BAR])
+    for method in ("NavigationBar.showLabel:", "NavigationBar.ownMargins:", "NavigationBar.setMargins:"):
+        assert method in navigation_bar, f"Missing tab label layout method {method}"
+
     # The three AMOLED tones must reach the dark View themes through values-notlong-night.
     resources = subprocess.check_output(
         [str(SDK / "aapt2.exe"), "dump", "resources", str(APK)],
@@ -189,4 +206,5 @@ with tempfile.TemporaryDirectory() as workspace:
 subprocess.run([str(SDK / "zipalign.exe"), "-c", "4", str(APK)], check=True)
 print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, SDUI transformer hooks, "
       f"SettingsShortcut hook, sponsored/promoted/boosted filters, Pitch black resources and hooks, "
+      f"floating glass navigation bar, "
       f"{len(classes)} unique classes, ZIP alignment" + (f", clone package {CLONE}" if CLONE else ""))
