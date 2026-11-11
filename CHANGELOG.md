@@ -1,3 +1,14 @@
+## 1.3.0-dev.9 (2026-11-11)
+
+### ✨ New Features
+
+* **ticktick:** support TickTick 8.3.0.1 (build 8301) by finding the premium wrapper, limits, privacy gate, reminder guard and analytics provider through their reviewed bytecode shapes instead of the class names that R8 renamed, and declare 8.3.0.1 as an explicit target so Morphe sources can fetch that exact version
+
+### Notes
+
+* TickTick also keeps the experimental any-version target. Every patch still verifies its own anchors and fails closed on a changed one.
+* TickTick Premium remains client-side only: it does not grant server AI access, cloud quota or a subscription.
+
 ## 1.3.0-dev.8 (2026-11-10)
 
 ### 🗑️ Removed
