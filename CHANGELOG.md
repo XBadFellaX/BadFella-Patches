@@ -1,3 +1,9 @@
+## 1.3.0-dev.5 (2026-11-11)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** float the glass navigation bar above the system navigation bar, with the screen showing through the room under it, and center the tab icons and labels inside the capsule
+
 ## 1.3.0-dev.4 (2026-11-10)
 
 ### ✨ New Features
