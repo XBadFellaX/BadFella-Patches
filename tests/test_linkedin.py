@@ -442,6 +442,16 @@ class LinkedInCloneTests(unittest.TestCase):
         ):
             self.assertIn(token, source)
 
+    def test_spoofed_package_name_stays_linkedin_for_google_sign_in(self):
+        """microG may only ask Google for the client registered to LinkedIn's package and certificate."""
+        source = CLONE_KT.read_text(encoding="utf-8")
+        self.assertIn("SPOOFED_PACKAGE_NAME", source)
+        self.assertIn("Google OAuth", source)
+        # The value is read to count it, never rewritten to the copy's package.
+        self.assertNotIn("setAttribute(VALUE, clone)", source)
+        spoof = source.split('endsWith(".gms.SPOOFED_PACKAGE_NAME")', 1)[1].split("spoofedNames++", 1)[0]
+        self.assertNotIn("setAttribute(VALUE", spoof)
+
     def test_code_rename_handles_authorities_content_uris_and_host(self):
         source = CLONE_KT.read_text(encoding="utf-8")
         for token in (

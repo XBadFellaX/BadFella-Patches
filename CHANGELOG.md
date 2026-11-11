@@ -1,3 +1,9 @@
+## 1.3.0-dev.7 (2026-11-11)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** keep the Install next to LinkedIn copy's microG spoofed package name as LinkedIn's own, so Continue with Google signs in instead of reporting an account abnormality
+
 ## 1.3.0-dev.6 (2026-11-11)
 
 ### 🐛 Bug Fixes

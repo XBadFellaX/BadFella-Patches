@@ -36,6 +36,18 @@ SLIM_BEHAVIOR = "Lcom/linkedin/android/home/bottomnav/SlimBottomNavigationBehavi
 APP_COMPAT = "Landroidx/appcompat/app/AppCompatActivity;"
 MAIN_ACTIVITY = "Lcom/linkedin/android/infra/navigation/MainActivity;"
 
+LINKEDIN_SIGNATURE = "443cb997718d0ac5162888bae5e4724582862676"
+
+
+def meta_data_value(tree, name):
+    """The literal android:value aapt2 prints for the meta-data named [name], or None."""
+    for block in re.split(r"\n\s*E: ", tree):
+        if block.startswith("meta-data") and f':name(0x01010003)="{name}"' in block:
+            value = re.search(r':value\(0x01010024\)="([^"]*)"', block)
+            return value.group(1) if value else None
+    return None
+
+
 result = json.loads(args.result.read_text())
 assert result["success"] and not result["failedPatches"], result
 applied = set(result["appliedPatches"])
@@ -61,7 +73,15 @@ if CLONE:
     assert '"com.linkedin.android.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"' not in tree
     assert f'"cct.{CLONE}"' in tree, "Custom tab return host not moved"
     assert '"cct.com.linkedin.android"' not in tree
-    print(f"Clone package: {CLONE}, label: {args.clone_label}")
+    # microG presents the copy to Google with LinkedIn's own package and certificate, because
+    # LinkedIn's OAuth client is registered for those. Renaming the spoof made Google reject sign-in.
+    spoofed_name = meta_data_value(tree, "app.revanced.android.gms.SPOOFED_PACKAGE_NAME")
+    assert spoofed_name == "com.linkedin.android", \
+        f"SPOOFED_PACKAGE_NAME is {spoofed_name!r}; Google only knows LinkedIn's own package"
+    spoofed_signature = meta_data_value(tree, "app.revanced.android.gms.SPOOFED_PACKAGE_SIGNATURE")
+    assert spoofed_signature == LINKEDIN_SIGNATURE, \
+        f"SPOOFED_PACKAGE_SIGNATURE is {spoofed_signature!r}, not LinkedIn's certificate"
+    print(f"Clone package: {CLONE}, label: {args.clone_label}, Google identity: {spoofed_name}")
 
 
 def class_descriptors(data):
@@ -217,4 +237,5 @@ subprocess.run([str(SDK / "zipalign.exe"), "-c", "4", str(APK)], check=True)
 print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, SDUI transformer hooks, "
       f"SettingsShortcut hook, sponsored/promoted/boosted filters, Pitch black resources and hooks, "
       f"floating glass navigation bar with a full-height slide, "
-      f"{len(classes)} unique classes, ZIP alignment" + (f", clone package {CLONE}" if CLONE else ""))
+      f"{len(classes)} unique classes, ZIP alignment" +
+      (f", clone package {CLONE} keeping LinkedIn's Google identity" if CLONE else ""))

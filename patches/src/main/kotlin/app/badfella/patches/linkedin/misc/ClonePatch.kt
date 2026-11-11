@@ -80,7 +80,8 @@ private data class ManifestRename(
     val categories: Int,
     val hosts: Int,
     val classNames: Int,
-    val spoofs: Int,
+    /** The spoofed package names left as LinkedIn's own for Google sign-in. */
+    val spoofedNames: Int,
 )
 
 private var manifestFacts: CloneManifestFacts? = null
@@ -157,11 +158,13 @@ private fun moveAppFinderAuthority(strings: Document, clone: String) {
  * under LinkedIn's package moves to the copy's, and any other authority gets the copy's package in
  * front. A relative permission name follows the package by itself. Task affinities and process names
  * move the same way as authorities, so the copy's screens never join a task of the installed
- * LinkedIn's. The push category, the custom tab return host and the spoofed package name that
- * GmsCore support gives microG name the package too, so they move as well. Labels equal to the
- * application's are the launcher entries, and they take [label] through a string resource. A class
- * name starting with a dot is written out in full first, since it would otherwise name a class under
- * the copy's package. Actions and meta-data names stay as they are.
+ * LinkedIn's. The push category and the custom tab return host name the package too, so they move as
+ * well. The package name GmsCore support gives microG to spoof does not: LinkedIn's Google OAuth
+ * client belongs to LinkedIn's own package and signing certificate, so the copy has to present
+ * LinkedIn's identity to Google rather than its own. Labels equal to the application's are the
+ * launcher entries, and they take [label] through a string resource. A class name starting with a dot
+ * is written out in full first, since it would otherwise name a class under the copy's package.
+ * Actions and meta-data names stay as they are.
  */
 private fun renameManifest(manifest: Document, facts: CloneManifestFacts, clone: String, label: String): ManifestRename {
     clonePackageProblem(clone)?.let(::refuse)
@@ -227,7 +230,7 @@ private fun renameManifest(manifest: Document, facts: CloneManifestFacts, clone:
     var processes = 0
     var categories = 0
     var hosts = 0
-    var spoofs = 0
+    var spoofedNames = 0
     for (element in everything) {
         val affinity = element.getAttribute(AFFINITY)
         if (affinity.isNotEmpty()) {
@@ -246,17 +249,22 @@ private fun renameManifest(manifest: Document, facts: CloneManifestFacts, clone:
             element.setAttribute(HOST, "cct.$clone")
             hosts++
         }
+        // GmsCore support's SPOOFED_PACKAGE_NAME tells microG which package to present to Google, so it
+        // stays LinkedIn's own instead of following the copy. LinkedIn's Google OAuth client is
+        // registered for $LINKEDIN and its signing certificate, which GmsCore already spoofs: a copy
+        // that spoofed its own name instead would ask Google for a client that doesn't exist and be
+        // turned away with an account abnormality. Counted, never renamed.
         if (element.tagName == "meta-data" &&
             element.getAttribute(NAME).endsWith(".gms.SPOOFED_PACKAGE_NAME") &&
             element.getAttribute(VALUE) == LINKEDIN
         ) {
-            element.setAttribute(VALUE, clone)
-            spoofs++
+            spoofedNames++
         }
     }
 
     return ManifestRename(
-        labels, authorities, permissions, permissionUses, affinities, processes, categories, hosts, classNames, spoofs,
+        labels, authorities, permissions, permissionUses, affinities, processes, categories, hosts, classNames,
+        spoofedNames,
     )
 }
 
@@ -282,8 +290,8 @@ private val LINKEDIN_MANIFEST = resourcePatch {
             "$PATCH_NAME: moved ${moved.authorities} provider authorities, ${moved.permissions} permission " +
                 "declarations, ${moved.permissionUses} permission uses, ${moved.labels} labels, " +
                 "${moved.affinities} task affinities, ${moved.processes} processes, ${moved.categories} " +
-                "categories, ${moved.hosts} hosts, ${moved.classNames} class names and ${moved.spoofs} " +
-                "spoofed package names to ${request.packageName}",
+                "categories, ${moved.hosts} hosts and ${moved.classNames} class names to " +
+                "${request.packageName}, keeping ${moved.spoofedNames} spoofed package names as $LINKEDIN",
         )
     }
 }
