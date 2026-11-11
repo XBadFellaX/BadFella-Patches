@@ -358,6 +358,24 @@ class LinkedInUpstreamSyncTests(unittest.TestCase):
         self.assertIn("top + inset", src)
         self.assertIn("bottom - inset", src)
 
+    def test_glass_bar_slides_its_full_height_when_hidden(self):
+        src = (EXT_DIR / "NavigationBar.java").read_text(encoding="utf-8")
+        # The stock offset is the tab row's height; the padded glass bar is taller, so it slides by its own height.
+        self.assertIn("public static int slideOffset(View bar, int offset)", src)
+        self.assertIn("offset <= 0", src)
+        self.assertIn("Math.max(offset, height + below)", src)
+        self.assertIn("bar.getParent() instanceof View", src)
+        # The stock bar keeps its own scrolling when the glass bar is off.
+        self.assertIn("!Settings.glassNavigationBar()", src)
+        kt = (PATCHES_DIR / "navigation/NavigationBarPatch.kt").read_text(encoding="utf-8")
+        self.assertIn("AnimateOffsetFingerprint", kt)
+        self.assertIn('name = "animateOffset"', kt)
+        self.assertIn('"Lcom/linkedin/android/home/bottomnav/SlimBottomBar;"', kt)
+        self.assertIn("->slideOffset(Landroid/view/View;I)I", kt)
+        # animateOffset is an instance method: p1 is the bar and p2 is the offset.
+        self.assertIn("invoke-static { p1, p2 }, $EXTENSION_CLASS->slideOffset", kt)
+        self.assertIn("move-result p2", kt)
+
     def test_hidden_tab_labels_leave_the_icon_centered(self):
         src = (EXT_DIR / "NavigationBar.java").read_text(encoding="utf-8")
         # A hidden label takes no room, and the icon's own constraints center it once its margins are cleared.

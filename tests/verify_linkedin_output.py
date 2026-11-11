@@ -32,6 +32,7 @@ MATERIAL_YOU = "Lapp/badfella/extension/linkedin/MaterialYou;"
 HIDE_ADS = "Lapp/badfella/extension/linkedin/HideAdsPatch;"
 GLASS_BAR = "Lapp/badfella/extension/linkedin/GlassNavigationBar;"
 NAVIGATION_BAR = "Lapp/badfella/extension/linkedin/NavigationBar;"
+SLIM_BEHAVIOR = "Lcom/linkedin/android/home/bottomnav/SlimBottomNavigationBehavior;"
 APP_COMPAT = "Landroidx/appcompat/app/AppCompatActivity;"
 MAIN_ACTIVITY = "Lcom/linkedin/android/infra/navigation/MainActivity;"
 
@@ -97,7 +98,8 @@ with tempfile.TemporaryDirectory() as workspace:
             for descriptor in class_descriptors(data):
                 classes[descriptor] += 1
                 if descriptor in (SDUI_FILTER, POST_MENU, COMPONENT_TRANSFORMER, SETTINGS, SETTINGS_ACTIVITY,
-                                  MATERIAL_YOU, HIDE_ADS, GLASS_BAR, NAVIGATION_BAR, APP_COMPAT, MAIN_ACTIVITY):
+                                  MATERIAL_YOU, HIDE_ADS, GLASS_BAR, NAVIGATION_BAR, SLIM_BEHAVIOR,
+                                  APP_COMPAT, MAIN_ACTIVITY):
                     targets.setdefault(descriptor, name)
 
     assert classes[SDUI_FILTER] == 1, "LinkedIn SDUI filter is missing or duplicated"
@@ -175,8 +177,16 @@ with tempfile.TemporaryDirectory() as workspace:
 
     # A hidden tab label takes no room, and the icon's margins are cleared so its constraints center it.
     navigation_bar = disassemble(targets[NAVIGATION_BAR])
-    for method in ("NavigationBar.showLabel:", "NavigationBar.ownMargins:", "NavigationBar.setMargins:"):
-        assert method in navigation_bar, f"Missing tab label layout method {method}"
+    for method in ("NavigationBar.showLabel:", "NavigationBar.ownMargins:", "NavigationBar.setMargins:",
+                   "NavigationBar.slideOffset:"):
+        assert method in navigation_bar, f"Missing navigation bar method {method}"
+    assert "Math;.max:" in navigation_bar and "View;.getHeight:" in navigation_bar, \
+        "NavigationBar.slideOffset does not use the bar's own height"
+
+    # Hiding the glass bar slides it by its padded height, so no part of the capsule stays on screen.
+    behavior = disassemble(targets[SLIM_BEHAVIOR])
+    assert "NavigationBar;.slideOffset:" in behavior, \
+        "slideOffset hook not injected into SlimBottomNavigationBehavior.animateOffset"
 
     # The three AMOLED tones must reach the dark View themes through values-notlong-night.
     resources = subprocess.check_output(
@@ -206,5 +216,5 @@ with tempfile.TemporaryDirectory() as workspace:
 subprocess.run([str(SDK / "zipalign.exe"), "-c", "4", str(APK)], check=True)
 print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, SDUI transformer hooks, "
       f"SettingsShortcut hook, sponsored/promoted/boosted filters, Pitch black resources and hooks, "
-      f"floating glass navigation bar, "
+      f"floating glass navigation bar with a full-height slide, "
       f"{len(classes)} unique classes, ZIP alignment" + (f", clone package {CLONE}" if CLONE else ""))

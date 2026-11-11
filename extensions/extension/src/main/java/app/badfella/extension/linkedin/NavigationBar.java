@@ -153,6 +153,24 @@ public final class NavigationBar {
         for (int i = 0; i < tab.getChildCount(); i++) tab.getChildAt(i).setTranslationY(offset);
     }
 
+    /**
+     * How far the bar is slid down to hide it. The stock offset is the height of the tab row, but the glass bar pads
+     * itself to float above the system navigation bar, so it is taller than its tabs and that offset leaves the rest
+     * of the capsule on screen. Its full height, plus any room under it in the parent, takes it completely off.
+     * Injected at the start of SlimBottomNavigationBehavior.animateOffset(bar, offset).
+     */
+    public static int slideOffset(View bar, int offset) {
+        if (bar == null || offset <= 0 || !Settings.glassNavigationBar()) return offset;
+        int height = bar.getHeight();
+        if (height <= 0) return offset;
+        int below = 0;
+        if (bar.getParent() instanceof View) {
+            View parent = (View) bar.getParent();
+            below = Math.max(0, parent.getHeight() - bar.getBottom());
+        }
+        return Math.max(offset, height + below);
+    }
+
     /** The icon's own top and bottom margins, taken the first time they are changed. */
     private static int[] ownMargins(View icon) {
         int[] own = iconMargins.get(icon);

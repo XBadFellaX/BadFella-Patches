@@ -1,3 +1,9 @@
+## 1.3.0-dev.6 (2026-11-11)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** slide the floating glass navigation bar completely off screen when scrolling, instead of leaving half of the capsule at the bottom
+
 ## 1.3.0-dev.5 (2026-11-11)
 
 ### 🐛 Bug Fixes

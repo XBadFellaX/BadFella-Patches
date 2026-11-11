@@ -102,6 +102,14 @@ private object ScrollDirectionFingerprint : Fingerprint(
     parameters = listOf("Lcom/linkedin/android/home/bottomnav/SlimBottomBar;", "I"),
 )
 
+/** SlimBottomNavigationBehavior.animateOffset(bar, offset): translates the bottom bar by the offset it is given. */
+private object AnimateOffsetFingerprint : Fingerprint(
+    definingClass = "Lcom/linkedin/android/home/bottomnav/SlimBottomNavigationBehavior;",
+    name = "animateOffset",
+    returnType = "V",
+    parameters = listOf("Lcom/linkedin/android/home/bottomnav/SlimBottomBar;", "I"),
+)
+
 @Suppress("unused")
 val alwaysShowNavigationBarPatch = bytecodePatch(
     name = "Always show navigation bar",
@@ -163,7 +171,18 @@ val glassNavigationBarPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_LINKEDIN)
     category("Theme")
     dependsOn(navigationHooksPatch)
-    execute { markIncluded("isGlassNavigationBarIncluded") }
+    execute {
+        markIncluded("isGlassNavigationBarIncluded")
+        // The padding that floats the capsule makes the bar taller than its tab row, so the stock
+        // offset would leave the lower half of the bar on screen when a scroll hides it.
+        AnimateOffsetFingerprint.method.addInstructions(
+            0,
+            """
+                invoke-static { p1, p2 }, $EXTENSION_CLASS->slideOffset(Landroid/view/View;I)I
+                move-result p2
+            """
+        )
+    }
 }
 
 /** Indices of all instructions with the opcode, last first so edits keep earlier indices valid. */
