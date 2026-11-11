@@ -9,10 +9,9 @@ class PublicScopeTests(unittest.TestCase):
         modules = root / 'patches/src/main/kotlin/app/badfella/patches'
         self.assertEqual({p.name for p in modules.iterdir() if p.is_dir()},
                          {'ticktick', 'emby', 'remoteatv', 'peptalk', 'wanderlog', 'linkedin',
-                          'ultimea', 'util'})
+                          'util'})
         catalog = json.loads((root / 'patches-list.json').read_text())
-        self.assertEqual(len(catalog['patches']), 46)
+        self.assertEqual(len(catalog['patches']), 43)
         self.assertEqual({c['packageName'] for p in catalog['patches'] for c in p['compatiblePackages']},
                          {'com.ticktick.task', 'com.mb.android', 'tech.simha.androidtvremote',
-                          'com.peptalk.app', 'com.wanderlog.android', 'com.linkedin.android',
-                          'com.dynanic.ultimea'})
+                          'com.peptalk.app', 'com.wanderlog.android', 'com.linkedin.android'})

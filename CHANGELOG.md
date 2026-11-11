@@ -1,3 +1,13 @@
+## 1.3.0-dev.8 (2026-11-10)
+
+### 🗑️ Removed
+
+* **ultimea:** remove the experimental Ultimea patches (Pitch black, Hide Explorer tab and Custom font) and the font files bundled only for them, so the bundle covers LinkedIn, TickTick, Emby, Remote for Android TV, Pep Talk and Wanderlog again
+
+### Notes
+
+* Preparation of a clean baseline for the upcoming stable release after the experimental Ultimea patches are withdrawn. An already patched Ultimea install is unaffected by this bundle change.
+
 ## 1.3.0-dev.7 (2026-11-11)
 
 ### 🐛 Bug Fixes
