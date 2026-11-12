@@ -1,8 +1,19 @@
 ## 1.4.0 (2026-11-12)
 
+Includes the complete 44-patch BadFella bundle, with the following LinkedIn improvements.
+
 ### ✨ New Features
 
-* **linkedin:** add upstream accents, menu icons and spring navigation 6740bdb
+* **LinkedIn:** add preset and custom hex accent colors alongside wallpaper colors; give Copy text, Download and Save PDF their own post-menu icons; refine the glass navigation bar with a spring selection pill, a thin rim and no press ripple while keeping its floating inset and full-height hiding behavior.
+
+### 🔧 Improvements
+
+* **LinkedIn:** use Morphe's class, string and method-call indexes for theme, share-link and GmsCore patch discovery, preserving the existing checks and Google identity.
+* Keep the post-text extraction and failed PDF-download cleanup fixes from 1.3.1.
+
+### Updating
+
+Refresh Sources in Morphe Manager and patch the original app again with the same signing key. Accent colors require Material You; glass styling requires Glass navigation bar. Restart LinkedIn after changing colors. Experimental features remain experimental.
 
 ## 1.4.0-dev.1 (2026-11-12)
 
