@@ -1,3 +1,15 @@
+## 1.4.1-dev.1 (2026-11-12)
+
+The complete 44-patch BadFella Patches bundle includes this LinkedIn layout fix.
+
+### Fixes
+
+* **LinkedIn 4.1.1271:** place BadFella Patches directly after the Groups shortcut in the Me panel, with the same inset width, icon, spacing and native card styling as Puzzle games. If Groups is hidden or More items stay in their tab, settings remains available above Settings & Privacy.
+
+### Updating
+
+Enable pre-releases for the BadFella Patches source in Morphe Manager, refresh Sources and patch the original app again with the same signing key.
+
 ## 1.4.0 (2026-11-12)
 
 The complete 44-patch BadFella Patches bundle includes these improvements to our LinkedIn patches.
