@@ -1,5 +1,6 @@
 """Run production Java against synthetic payloads and a failing localhost PDF endpoint."""
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -57,10 +58,11 @@ class LinkedInRegressionTests(unittest.TestCase):
         javac = cls.java.with_name('javac.exe' if os.name == 'nt' else 'javac')
         sdk = Path(os.environ.get('ANDROID_HOME') or os.environ.get('ANDROID_SDK_ROOT') or
                    str(Path.home() / 'AppData/Local/Android/Sdk'))
-        jars = list((sdk / 'platforms').glob('android-*/android.jar'))
+        jars = [p for p in (sdk / 'platforms').glob('android-*/android.jar')
+                if re.match(r'android-\d+', p.parent.name)]
         if not cls.java.is_file() or not javac.is_file() or not jars:
             raise RuntimeError('Java JDK and Android SDK platform are required for LinkedIn regression checks')
-        cls.android = max(jars, key=lambda p: int(p.parent.name.removeprefix('android-').split('.')[0]))
+        cls.android = max(jars, key=lambda p: int(re.match(r'android-(\d+)', p.parent.name)[1]))
         cls.directory = tempfile.TemporaryDirectory(prefix='linkedin-regressions-')
         cls.addClassCleanup(cls.directory.cleanup)
         cls.work = Path(cls.directory.name)
