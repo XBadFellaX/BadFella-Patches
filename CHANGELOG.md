@@ -1,8 +1,16 @@
 ## 1.3.1 (2026-11-12)
 
+Includes the complete 44-patch bundle from v1.3.0 and all dev changes promoted into v1.3.1, across LinkedIn, TickTick, Emby, Remote for Android TV, Pep Talk, Wanderlog and Torrent Search Revolution V2. This is the full BadFella Patches bundle, with additional LinkedIn corrections.
+
 ### 🐛 Bug Fixes
 
-* **linkedin:** copy post text correctly and clean up failed document downloads 0df21e3
+* **LinkedIn:** copy actual post text, including line breaks, from the post menu instead of a tracking identifier.
+* **LinkedIn:** remove temporary document slices when a PDF download fails.
+* Restore upstream copyright notices and source credits.
+
+### Updating
+
+Refresh Sources in Morphe Manager and patch the original app again. Keep the same Manager signing key when updating an existing patched installation. Experimental features remain experimental.
 
 ## 1.3.1-dev.1 (2026-11-12)
 
