@@ -1,3 +1,9 @@
+## 1.4.0 (2026-11-12)
+
+### ✨ New Features
+
+* **linkedin:** add upstream accents, menu icons and spring navigation 6740bdb
+
 ## 1.4.0-dev.1 (2026-11-12)
 
 Includes the complete 44-patch BadFella bundle, with the following LinkedIn improvements.
