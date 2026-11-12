@@ -25,7 +25,7 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.3.1-dev.1](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.3.1-dev.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;44 patches total
+> **[v1.3.1](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.3.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;44 patches total
 <details open>
 <summary>📦 LinkedIn&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>

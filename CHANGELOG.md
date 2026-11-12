@@ -1,3 +1,9 @@
+## 1.3.1 (2026-11-12)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** copy post text correctly and clean up failed document downloads 0df21e3
+
 ## 1.3.1-dev.1 (2026-11-12)
 
 ### 🐛 Bug Fixes
