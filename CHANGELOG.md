@@ -1,3 +1,14 @@
+## 1.3.0-dev.10 (2026-11-12)
+
+### ✨ New Features
+
+* **Torrent Search Revolution V2:** add local Pro/ad-free mode for the original 2.3.5 APKS, covering thirteen local Pro checks across search ads, banners, native ads and Pro settings while retaining startup callbacks.
+
+### Notes
+
+* Patch the unmodified Torrent Search Revolution V2 2.3.5 APKS in Morphe Manager. Keep the same Manager signing key when updating an existing patched installation.
+* This patch changes local app behavior; it does not grant a Pro Key subscription or server entitlement. Changed app bytecode is rejected for review.
+
 ## 1.3.0-dev.9 (2026-11-11)
 
 ### ✨ New Features
