@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2026 Lokesh Sparrow
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 package app.badfella.patches.linkedin.theme
 
 import app.badfella.patches.linkedin.shared.Constants.COMPATIBILITY_LINKEDIN

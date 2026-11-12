@@ -1,3 +1,14 @@
+## 1.3.1-dev.1 (2026-11-12)
+
+### 🐛 Bug Fixes
+
+* **LinkedIn:** copy the actual post text, including line breaks, from the post menu instead of a tracking identifier; remove temporary document slices when a PDF download fails; restore upstream copyright notices and credits.
+
+### Notes
+
+* Applies to the existing LinkedIn 4.1.1271 patches. Keep the same Morphe Manager signing key when updating an existing patched installation.
+* Anonymous profile viewing remains experimental. These fixes do not change Google sign-in or privacy guarantees.
+
 ## 1.3.0 (2026-11-12)
 
 ### ✨ New Features

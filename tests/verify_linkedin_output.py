@@ -25,6 +25,7 @@ CLONE = args.clone_package
 
 SDUI_FILTER = "Lapp/badfella/extension/linkedin/SduiComponentFilter;"
 POST_MENU = "Lapp/badfella/extension/linkedin/PostMenu;"
+POST_COMMENTARY = "Lapp/badfella/extension/linkedin/PostCommentary;"
 COMPONENT_TRANSFORMER = "Lcom/linkedin/sdui/transformer/impl/ComponentTransformer;"
 SETTINGS = "Lapp/badfella/extension/linkedin/Settings;"
 SETTINGS_ACTIVITY = "Lapp/badfella/extension/linkedin/SettingsActivity;"
@@ -125,6 +126,7 @@ with tempfile.TemporaryDirectory() as workspace:
     assert classes[SDUI_FILTER] == 1, "LinkedIn SDUI filter is missing or duplicated"
     assert classes[SETTINGS] == 1, "LinkedIn Settings is missing or duplicated"
     assert classes[HIDE_ADS] == 1, "LinkedIn legacy ad filter is missing or duplicated"
+    assert classes[POST_COMMENTARY] == 1, "LinkedIn post-text parser is missing or duplicated"
     assert classes[GLASS_BAR] == 1, "LinkedIn glass navigation bar is missing or duplicated"
     assert classes[NAVIGATION_BAR] == 1, "LinkedIn navigation bar helper is missing or duplicated"
     assert classes[COMPONENT_TRANSFORMER] == 1, "ComponentTransformer missing or duplicated"
@@ -153,6 +155,7 @@ with tempfile.TemporaryDirectory() as workspace:
                    "SduiComponentFilter.screenName:"):
         assert method in filter_dex, f"Missing fast-path method {method}"
     post_menu_dex = disassemble(targets[POST_MENU])
+    assert "PostCommentary;.text:" in post_menu_dex, "Post menu still uses the tracking-metadata text lookup"
     assert "PostMenu.signature:" in post_menu_dex, "Missing post-menu payload dedupe"
 
     # Promoted, boosted and sponsored detection under any view name, plus label-only posts.
