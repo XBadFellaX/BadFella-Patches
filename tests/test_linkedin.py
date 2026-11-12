@@ -354,7 +354,7 @@ class LinkedInUpstreamSyncTests(unittest.TestCase):
         # The capsule covers the room above and below the tabs, and the pill is inset from it on all sides.
         self.assertIn("top = row.getTop() + tabs.getTop() - room", src)
         self.assertIn("bottom = top + tabs.getHeight() + 2 * room", src)
-        self.assertIn("PILL_INSET_DP = 5", src)
+        self.assertIn("PILL_INSET_DP = 4", src)
         self.assertIn("top + inset", src)
         self.assertIn("bottom - inset", src)
 

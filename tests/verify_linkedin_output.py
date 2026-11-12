@@ -127,6 +127,8 @@ with tempfile.TemporaryDirectory() as workspace:
     assert classes[SETTINGS] == 1, "LinkedIn Settings is missing or duplicated"
     assert classes[HIDE_ADS] == 1, "LinkedIn legacy ad filter is missing or duplicated"
     assert classes[POST_COMMENTARY] == 1, "LinkedIn post-text parser is missing or duplicated"
+    for helper in ("MenuIconIds", "AccentPalette", "SlidingPill"):
+        assert classes[f"Lapp/badfella/extension/linkedin/{helper};"] == 1, f"{helper} missing or duplicated"
     assert classes[GLASS_BAR] == 1, "LinkedIn glass navigation bar is missing or duplicated"
     assert classes[NAVIGATION_BAR] == 1, "LinkedIn navigation bar helper is missing or duplicated"
     assert classes[COMPONENT_TRANSFORMER] == 1, "ComponentTransformer missing or duplicated"
@@ -156,6 +158,7 @@ with tempfile.TemporaryDirectory() as workspace:
         assert method in filter_dex, f"Missing fast-path method {method}"
     post_menu_dex = disassemble(targets[POST_MENU])
     assert "PostCommentary;.text:" in post_menu_dex, "Post menu still uses the tracking-metadata text lookup"
+    assert "MenuIconIds;.swap:" in post_menu_dex, "Post menu icon rewrite is not wired"
     assert "PostMenu.signature:" in post_menu_dex, "Missing post-menu payload dedupe"
 
     # Promoted, boosted and sponsored detection under any view name, plus label-only posts.
@@ -181,6 +184,7 @@ with tempfile.TemporaryDirectory() as workspace:
     assert "amoled_black" in settings_dex, "Legacy AMOLED preference key is not migrated"
 
     material_you = disassemble(targets[MATERIAL_YOU])
+    assert "AccentPalette;.shade:" in material_you, "Custom accent palette is not wired into theme colors"
     assert re.search(r"name\s+: 'amoled'", material_you), "Pitch black tone mapping missing"
     assert re.search(r"name\s+: 'pitchBlackContext'", material_you), "Pitch black context hook missing"
     for tone in ("ff000000", "ff0d0d0d", "ff1a1a1a"):
@@ -192,6 +196,7 @@ with tempfile.TemporaryDirectory() as workspace:
 
     # The glass bar keeps its own padding and pads the bar so the capsule floats above the system navigation bar.
     glass_bar = disassemble(targets[GLASS_BAR])
+    assert "SlidingPill;.select:" in glass_bar, "Glass bar is not using the spring model"
     for method in ("GlassNavigationBar$Selection;.floatOverSystemBar:",
                    "GlassNavigationBar$Selection;.navigationBar:"):
         assert method in glass_bar, f"Missing glass bar layout method {method}"

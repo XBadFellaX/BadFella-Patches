@@ -1,29 +1,25 @@
 package app.badfella.extension.linkedin;
 
-import android.animation.ValueAnimator;
-import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.RippleDrawable;
 import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
-import android.view.animation.DecelerateInterpolator;
 
 /** Draws LinkedIn's bottom bar as a floating, translucent capsule, using the {@link GlassCapsule}. */
 final class GlassNavigationBar {
     private static final int SIDE_MARGIN_DP = 12;
-    private static final int INNER_PADDING_DP = 14;
+    private static final int INNER_PADDING_DP = 7;
     /** Room the capsule leaves above and below the tabs, so the icons sit in the middle of it. */
     private static final int CAPSULE_ROOM_DP = 6;
     /** Room the floating capsule leaves under itself, on top of the system navigation bar. */
     private static final int FLOATING_MARGIN_DP = 10;
     /** How far the pill behind the selected tab is inset from the capsule. */
-    private static final int PILL_INSET_DP = 5;
+    private static final int PILL_INSET_DP = 4;
+    private static final int PILL_GROW_DP = 4;
     /** The widest a tab gets, so the capsule stays compact on a wide screen. */
     private static final int MAX_TAB_DP = 96;
 
@@ -63,7 +59,7 @@ final class GlassNavigationBar {
         });
     }
 
-    /** Gives the tabs equal shares of the capsule, and a ripple that stays inside the tab. */
+    /** Gives the tabs equal shares of the capsule, and no press ripple: the selection pill provides feedback. */
     static void arrangeTabs(ViewGroup tabs, int barWidth) {
         int count = tabs.getChildCount();
         if (count == 0 || barWidth <= 0) return;
@@ -77,21 +73,8 @@ final class GlassNavigationBar {
                 params.width = width;
                 tab.setLayoutParams(params);
             }
-            if (!(tab.getBackground() instanceof TabRipple)) tab.setBackground(new TabRipple());
-        }
-    }
-
-    /** A ripple that stays inside its tab, as a pill, where LinkedIn's own one spreads past the capsule. */
-    private static final class TabRipple extends RippleDrawable {
-        TabRipple() {
-            super(ColorStateList.valueOf(0x33808080), null, mask());
-        }
-
-        private static Drawable mask() {
-            GradientDrawable mask = new GradientDrawable();
-            mask.setColor(Color.WHITE);
-            mask.setCornerRadius(Float.MAX_VALUE);
-            return mask;
+            if (tab.getBackground() != null) tab.setBackground(null);
+            if (tab.getForeground() != null) tab.setForeground(null);
         }
     }
 
@@ -110,17 +93,12 @@ final class GlassNavigationBar {
         private final int[] given = {-1, -1, -1, -1};
         private GlassCapsule glass;
         private int selected = -1;
-        /** Where the pill was drawn last (in the tabs' coordinates), and how far it is on its way to the selected tab. */
-        private float lastLeft;
-        private float lastRight;
-        private float fromLeft;
-        private float fromRight;
-        private float progress = 1;
-        private ValueAnimator slide;
         /** The capsule's edges in the bar, set by {@link #capsule} for {@link #pill}. */
         private float left;
         private float top;
         private float bottom;
+        private float capsuleLeft;
+        private float capsuleRight;
 
         Selection(View bar, ViewGroup tabs, float density) {
             this.bar = bar;
@@ -134,25 +112,12 @@ final class GlassNavigationBar {
             for (int i = 0; i < tabs.getChildCount() && now < 0; i++) {
                 if (tabs.getChildAt(i).isSelected()) now = i;
             }
-            if (now == selected) return;
-            boolean moving = selected >= 0 && now >= 0 && lastRight > lastLeft;
-            selected = now;
-            if (slide != null) slide.cancel();
-            if (moving) {
-                // The pill slides from where it is to the new tab.
-                fromLeft = lastLeft;
-                fromRight = lastRight;
-                progress = 0;
-                slide = ValueAnimator.ofFloat(0, 1).setDuration(260);
-                slide.setInterpolator(new DecelerateInterpolator());
-                slide.addUpdateListener(a -> {
-                    progress = (float) a.getAnimatedValue();
-                    glass.invalidateSelf();
-                });
-                slide.start();
-            } else {
-                progress = 1;
+            if (now >= 0) {
+                View tab = tabs.getChildAt(now);
+                glass.slider().select(tab.getLeft(), tab.getRight());
             }
+            if (now == selected) return;
+            selected = now;
             glass.invalidateSelf();
         }
 
@@ -211,24 +176,19 @@ final class GlassNavigationBar {
             top = row.getTop() + tabs.getTop() - room;
             bottom = top + tabs.getHeight() + 2 * room;
             float padding = INNER_PADDING_DP * density;
-            out.set(left + tabs.getChildAt(0).getLeft() - padding, top,
-                    left + tabs.getChildAt(count - 1).getRight() + padding, bottom);
+            capsuleLeft = left + tabs.getChildAt(0).getLeft() - padding;
+            capsuleRight = left + tabs.getChildAt(count - 1).getRight() + padding;
+            out.set(capsuleLeft, top, capsuleRight, bottom);
             return true;
         }
 
         @Override
         public boolean pill(RectF out) {
-            if (selected < 0 || selected >= tabs.getChildCount()) return false;
-            // A pill behind the selected tab, inset from the capsule so a thin rim of it stays around the pill.
-            View tab = tabs.getChildAt(selected);
+            if (selected < 0 || selected >= tabs.getChildCount() || !glass.slider().has()) return false;
             float inset = PILL_INSET_DP * density;
-            lastLeft = fromLeft + (tab.getLeft() - fromLeft) * progress;
-            lastRight = fromRight + (tab.getRight() - fromRight) * progress;
-            if (progress >= 1) {
-                lastLeft = tab.getLeft();
-                lastRight = tab.getRight();
-            }
-            out.set(left + lastLeft + inset, top + inset, left + lastRight - inset, bottom - inset);
+            float grow = PILL_GROW_DP * density;
+            out.set(Math.max(capsuleLeft + inset, left + glass.slider().start() - grow), top + inset,
+                    Math.min(capsuleRight - inset, left + glass.slider().end() + grow), bottom - inset);
             return true;
         }
     }

@@ -165,7 +165,7 @@ val swipeTabsPatch = bytecodePatch(
 @Suppress("unused")
 val glassNavigationBarPatch = bytecodePatch(
     name = "Glass navigation bar",
-    description = "Draws the navigation bar as a floating, translucent capsule.",
+    description = "Draws the navigation bar as a floating, translucent capsule with a spring selection pill and no press ripple.",
     default = false
 ) {
     compatibleWith(COMPATIBILITY_LINKEDIN)

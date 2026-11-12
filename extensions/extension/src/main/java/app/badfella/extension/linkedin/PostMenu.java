@@ -220,7 +220,9 @@ final class PostMenu {
                 kept.add(field);
             }
         }
-        row.data = relabel(ProtoEdit.write(kept), label, viewName);
+        MenuIconIds.Result icons = new MenuIconIds.Result();
+        byte[] built = MenuIconIds.swap(ProtoEdit.write(kept), action, icons);
+        row.data = relabel(built, label, viewName);
         return row;
     }
 

@@ -68,6 +68,7 @@ public final class Settings {
     static final String ICON_ONLY_ACTIONS = "icon_only_actions";
     static final String REMOVE_GAPS_AND_DIVIDERS = "remove_gaps_and_dividers";
     static final String MATERIAL_YOU = "material_you";
+    static final String ACCENT_COLOR = "accent_color";
     static final String PITCH_BLACK = "pitch_black";
     /** Key of the old "AMOLED black" switch, read once to keep an explicit choice. */
     @Deprecated
@@ -168,6 +169,19 @@ public final class Settings {
 
     static boolean materialYou() {
         return isMaterialYouIncluded() && get(MATERIAL_YOU, true);
+    }
+
+    private static String accentRaw = "";
+    private static int accentParsed = -1;
+
+    static int accentColor() {
+        if (!isMaterialYouIncluded()) return -1;
+        String raw = getString(ACCENT_COLOR, "");
+        if (!raw.equals(accentRaw)) {
+            accentRaw = raw;
+            accentParsed = AccentPalette.parse(raw);
+        }
+        return accentParsed;
     }
 
     public static boolean isGmsCoreSupportIncluded() {
