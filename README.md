@@ -25,7 +25,7 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.4.0](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.4.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;44 patches total
+> **[v1.4.1-dev.2](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.4.1-dev.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;45 patches total
 <details open>
 <summary>📦 LinkedIn&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
@@ -102,6 +102,22 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 |----------|----------------|-----------|
 | [Emby client unlock](#emby-client-unlock) | Enables local in-app feature gates using Kirlif's observed approach. Does not grant server Premiere entitlements. |  |
 | [Emby remove Firebase and DataTransport](#emby-remove-firebase-and-datatransport) | Removes Firebase/DataTransport SDK classes and manifest components. Disables Firebase push messaging; keeps Cast and billing libraries. |  |
+
+</details>
+
+<details open>
+<summary>📦 ChatGPT&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 1.2026.307 |
+| :---: |
+| Version 1.2026.307, build 2630718. | Any version (experimental). Every patch verifies its own anchors. |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Install next to ChatGPT](#install-next-to-chatgpt) | Installs this build as a second ChatGPT beside your normal one, with its own data and sign-in. Pick its package name and app name in the patch's options. Works as soon as you patch it in. | • Package name<br>• App name |
 
 </details>
 

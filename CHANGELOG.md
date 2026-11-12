@@ -1,3 +1,15 @@
+## 1.4.1-dev.2 (2026-11-12)
+
+The complete 45-patch BadFella Patches bundle includes ChatGPT clone support.
+
+### ✨ New Features
+
+* **ChatGPT:** add "Install next to ChatGPT" clone patch with dual OAuth redirect scheme registration for login callback handling, signature and package verification bypass, and Play Integrity escalation interception.
+
+### Updating
+
+Enable pre-releases for the BadFella Patches source in Morphe Manager, refresh Sources and patch the original app again with the same signing key.
+
 ## 1.4.1-dev.1 (2026-11-12)
 
 The complete 44-patch BadFella Patches bundle includes this LinkedIn layout fix.

@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-12T12:21:19",
-  "description": "## 1.4.1-dev.1 (2026-11-12)\n\nThe complete 44-patch BadFella Patches bundle includes this LinkedIn layout fix.\n\n### Fixes\n\n* **LinkedIn 4.1.1271:** place BadFella Patches directly after the Groups shortcut in the Me panel, with the same inset width, icon, spacing and native card styling as Puzzle games. If Groups is hidden or More items stay in their tab, settings remains available above Settings & Privacy.\n\n### Updating\n\nEnable pre-releases for the BadFella Patches source in Morphe Manager, refresh Sources and patch the original app again with the same signing key.",
-  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.4.1-dev.1/patches-1.4.1-dev.1.mpp",
+  "created_at": "2026-11-12T14:02:00",
+  "description": "## 1.4.1-dev.2 (2026-11-12)\n\nThe complete 45-patch BadFella Patches bundle includes ChatGPT clone support.\n\n### ✨ New Features\n\n* **ChatGPT:** add \"Install next to ChatGPT\" clone patch with dual OAuth redirect scheme registration for login callback handling, signature and package verification bypass, and Play Integrity escalation interception.\n\n### Updating\n\nEnable pre-releases for the BadFella Patches source in Morphe Manager, refresh Sources and patch the original app again with the same signing key.",
+  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.4.1-dev.2/patches-1.4.1-dev.2.mpp",
   "signature_download_url": "",
-  "version": "1.4.1-dev.1"
+  "version": "1.4.1-dev.2"
 }
