@@ -1,6 +1,6 @@
 ## 1.4.0 (2026-11-12)
 
-Includes the complete 44-patch BadFella bundle, with the following LinkedIn improvements.
+The complete 44-patch BadFella Patches bundle includes these improvements to our LinkedIn patches.
 
 ### ✨ New Features
 
@@ -17,7 +17,7 @@ Refresh Sources in Morphe Manager and patch the original app again with the same
 
 ## 1.4.0-dev.1 (2026-11-12)
 
-Includes the complete 44-patch BadFella bundle, with the following LinkedIn improvements.
+The complete 44-patch BadFella Patches bundle includes these improvements to our LinkedIn patches.
 
 ### ✨ New Features
 
@@ -40,7 +40,7 @@ Includes the complete 44-patch bundle from v1.3.0 and all dev changes promoted i
 
 * **LinkedIn:** copy actual post text, including line breaks, from the post menu instead of a tracking identifier.
 * **LinkedIn:** remove temporary document slices when a PDF download fails.
-* Restore upstream copyright notices and source credits.
+* Restore copyright notices and source credits.
 
 ### Updating
 
@@ -50,7 +50,7 @@ Refresh Sources in Morphe Manager and patch the original app again. Keep the sam
 
 ### 🐛 Bug Fixes
 
-* **LinkedIn:** copy the actual post text, including line breaks, from the post menu instead of a tracking identifier; remove temporary document slices when a PDF download fails; restore upstream copyright notices and credits.
+* **LinkedIn:** copy the actual post text, including line breaks, from the post menu instead of a tracking identifier; remove temporary document slices when a PDF download fails; restore copyright notices and credits.
 
 ### Notes
 

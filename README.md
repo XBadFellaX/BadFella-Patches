@@ -173,4 +173,4 @@ The ad-free patch supports **6.1.0, build 45 APKM**, including ARMv7, ARM64 and
 x86-64. It works with Morphe's unused-library stripping enabled. Premium purchase
 state is unchanged.
 
-[GPLv3](LICENSE) · [Notices and upstream credits](NOTICE) · [Issues](https://github.com/XBadFellaX/BadFella-Patches/issues)
+[GPLv3](LICENSE) · [Copyright and license notices](NOTICE) · [Issues](https://github.com/XBadFellaX/BadFella-Patches/issues)
