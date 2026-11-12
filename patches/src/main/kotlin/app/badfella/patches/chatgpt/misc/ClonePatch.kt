@@ -1,6 +1,8 @@
 package app.badfella.patches.chatgpt.misc
 
 import app.badfella.patches.chatgpt.shared.Constants.COMPATIBILITY_CHATGPT
+import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
@@ -11,8 +13,10 @@ import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.MethodImplementation
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.Instruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import org.w3c.dom.Document
@@ -25,6 +29,8 @@ private val logger = Logger.getLogger("BadFella Patches")
 
 /** The package ChatGPT ships under, which the copy gives up. */
 private const val CHATGPT = "com.openai.chatgpt"
+
+private const val OAUTH_REDIRECT = "$CHATGPT://auth.openai.com/android/$CHATGPT/callback"
 
 private const val DEFAULT_PACKAGE = "$CHATGPT.clone"
 private const val DEFAULT_LABEL = "ChatGPT Clone"
@@ -136,14 +142,8 @@ private fun addCloneLabel(strings: Document, label: String) {
 }
 
 /**
- * Registers the copy's own OAuth return scheme with the callback activity.
- *
- * ChatGPT builds its redirect URI at run time from the running package,
- * `$CHATGPT://auth.openai.com/android/$CHATGPT/callback`, so a copy under another package asks the
- * server to return to `$clone://...`, a scheme no activity answers. A second filter registers it,
- * modelled on the stock one so the same hosts and the copy's own callback path reach the same
- * activity. The stock filter is left untouched: the server also returns to ChatGPT's URI, and the
- * copy has to receive that too, so its scheme is deliberately not renamed here.
+ * Retains the legacy clone callback filter for compatibility. Sign-in requests must use the stock
+ * redirect URI; registering a clone URI here does not register it with the authorization server.
  */
 private fun addCloneCallbackFilter(manifest: Document, clone: String): Int {
     val application = manifest.documentElement.childElements("application").singleOrNull()
@@ -380,7 +380,8 @@ private fun BytecodePatchContext.mutableMethodOf(method: Method) =
 val installNextToChatGptPatch = bytecodePatch(
     name = PATCH_NAME,
     description = "Installs this build as a second ChatGPT beside your normal one, with its own data and " +
-        "sign-in. Pick its package name and app name in the patch's options. Works as soon as you patch it in.",
+        "sign-in. Pick its package name and app name in the patch's options. Sign-in uses the original OAuth callback; " +
+        "if Android asks which app to open, choose the copy.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_CHATGPT)
@@ -406,6 +407,24 @@ val installNextToChatGptPatch = bytecodePatch(
     execute {
         clonePackageProblem(packageName.value)?.let(::refuse)
         cloneLabelProblem(appName.value)?.let(::refuse)
+
+        // Keep the registered OAuth redirect independent of the clone's Android application id.
+        val redirectBuilder = Fingerprint(
+            strings = listOf("://auth.openai.com/android/", "/callback"),
+        ).method
+        val instructions = redirectBuilder.implementation!!.instructions.toList()
+        val results = instructions.indices.filter { index ->
+            val reference = (instructions[index] as? ReferenceInstruction)?.reference as? MethodReference
+            reference?.definingClass == "Ljava/lang/StringBuilder;" && reference.name == "toString" &&
+                reference.parameterTypes.isEmpty() && reference.returnType == "Ljava/lang/String;"
+        }
+        val resultIndex = results.singleOrNull()?.plus(1)
+            ?: refuse("OAuth redirect builder no longer has a single StringBuilder result")
+        if (instructions.getOrNull(resultIndex)?.opcode != Opcode.MOVE_RESULT_OBJECT) {
+            refuse("OAuth redirect builder no longer stores its URI result")
+        }
+        val register = (instructions[resultIndex] as OneRegisterInstruction).registerA
+        redirectBuilder.replaceInstruction(resultIndex, "const-string v$register, \"$OAUTH_REDIRECT\"")
 
         val signatures = signatureChecks()
         if (signatures.isEmpty()) refuse("no method checks the package and signing certificate")

@@ -1,3 +1,21 @@
+## 1.5.0-dev.1 (2026-11-12)
+
+The complete 45-patch BadFella Patches bundle includes ChatGPT clone support and the LinkedIn drawer layout fix.
+
+### ChatGPT 1.2026.307
+
+* Keep the original OAuth callback in sign-in requests instead of deriving an unregistered address from the clone package. The clone retains its separate Android package and app data.
+* Check the native redirect builder before applying the change and reject changed or ambiguous code.
+* If Android asks which app should handle the sign-in callback, choose the copy. Actual sign-in remains subject to the service's checks; a successful patch does not establish account sign-in compatibility.
+
+### LinkedIn 4.1.1271
+
+* Keep BadFella Patches below Groups with the same inset card width, icon and spacing as Puzzle games.
+
+### Updating
+
+Enable pre-releases for the BadFella Patches source in Morphe Manager, refresh Sources and patch the original app again with the same signing key.
+
 ## 1.4.1-dev.2 (2026-11-12)
 
 The complete 45-patch BadFella Patches bundle includes ChatGPT clone support.

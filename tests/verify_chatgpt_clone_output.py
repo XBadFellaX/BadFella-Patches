@@ -1,18 +1,34 @@
 """Verify the patched ChatGPT clone APK output."""
 import argparse
+import re
+import tempfile
 import subprocess
 import zipfile
 from pathlib import Path
 
 
 def run(*args):
-    result = subprocess.run(list(map(str, args)), text=True, encoding="utf-8", stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    result = subprocess.run(list(map(str, args)), text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if result.returncode != 0:
         raise RuntimeError(result.stdout)
     return result.stdout
 
 
-def verify(stock_path: Path, output_path: Path, aapt_path: Path):
+STOCK_REDIRECT = "com.openai.chatgpt://auth.openai.com/android/com.openai.chatgpt/callback"
+
+
+def verify_redirect_code(dump):
+    # A string table match alone cannot prove that the actual redirect builder uses it.
+    methods = re.split(r"(?m)^    #\d+", dump)
+    builders = [m for m in methods if '"://auth.openai.com/android/"' in m and '"/callback"' in m]
+    assert len(builders) == 1, "Expected one native OAuth redirect builder"
+    builder = builders[0]
+    assert re.search(r'StringBuilder;\.toString:.*\n[^\n]*const-string(?:/jumbo)? v\d+, "'
+                     + re.escape(STOCK_REDIRECT) + '"', builder), \
+        "OAuth redirect still uses the clone package instead of the registered stock URI"
+
+
+def verify(stock_path: Path, output_path: Path, aapt_path: Path, dexdump_path: Path):
     print(f"Verifying patched ChatGPT clone: {output_path}")
 
     # 1. Archive integrity
@@ -71,7 +87,18 @@ def verify(stock_path: Path, output_path: Path, aapt_path: Path):
         "Task affinity com.openai.chatgpt.clone.orbitvoice missing"
     print("PASS: Task affinities namespaced.")
 
-    print("\nALL ACCEPTANCE CRITERIA VERIFIED SUCCESSFULLY (PASS).")
+    with tempfile.TemporaryDirectory(prefix="chatgpt-oauth-") as directory:
+        with zipfile.ZipFile(output_path) as archive:
+            candidates = [n for n in dex_files if b"://auth.openai.com/android/\x00" in archive.read(n)]
+            assert candidates, "No OAuth redirect DEX found"
+            dumps = []
+            for name in candidates:
+                dex = Path(directory) / name
+                dex.write_bytes(archive.read(name))
+                dumps.append(run(dexdump_path, "-d", dex))
+        verify_redirect_code("\n".join(dumps))
+    print("PASS: Native OAuth builder overrides only its URI result with the stock callback.")
+    print("PASS: APK structure and OAuth bytecode checks; account sign-in was not run.")
 
 
 if __name__ == "__main__":
@@ -79,5 +106,6 @@ if __name__ == "__main__":
     parser.add_argument("stock", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--aapt", type=Path, required=True)
+    parser.add_argument("--dexdump", type=Path, required=True)
     args = parser.parse_args()
-    verify(args.stock, args.output, args.aapt)
+    verify(args.stock, args.output, args.aapt, args.dexdump)

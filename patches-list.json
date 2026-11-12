@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.4.1-dev.2",
+  "version": "1.5.0-dev.1",
   "patches": [
     {
       "name": "Always show navigation bar",
@@ -1026,7 +1026,7 @@
     },
     {
       "name": "Install next to ChatGPT",
-      "description": "Installs this build as a second ChatGPT beside your normal one, with its own data and sign-in. Pick its package name and app name in the patch's options. Works as soon as you patch it in.",
+      "description": "Installs this build as a second ChatGPT beside your normal one, with its own data and sign-in. Pick its package name and app name in the patch's options. Sign-in uses the original OAuth callback; if Android asks which app to open, choose the copy.",
       "default": false,
       "category": "Misc",
       "compatiblePackages": [
