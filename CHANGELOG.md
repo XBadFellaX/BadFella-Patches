@@ -1,3 +1,31 @@
+## 1.3.0 (2026-11-12)
+
+### ✨ New Features
+
+* **torrent search revolution:** add the local Pro patch for Torrent Search Revolution V2 2.3.5, covering thirteen local Pro checks across search ads, banners, native ads and Pro settings to unlock the full offline search experience and remove ads while retaining startup callbacks
+* **ticktick:** support TickTick 8.3.0.1 (build 8301) across TickTick Premium, Disable analytics collection, Restore notifications and Restore reminder alarms by finding the reviewed bytecode shapes instead of the class names R8 renamed, and declare 8.3.0.1 as an explicit target so Morphe can fetch that exact version
+* **linkedin:** add the Install next to LinkedIn patch for LinkedIn 4.1.1271 and 4.1.1267, which installs the patched build as a second app with its own package name, home screen name and data, so both the copy and the installed LinkedIn can be signed in side by side (closes #2)
+* **linkedin:** add a Dark app icon option, Material bottom navigation icons, an Icon-only post actions option, Copy post text and an Always show navigation bar option
+* **linkedin:** float the glass navigation bar above the system navigation bar, with the screen showing through the room under it, and slide it fully off screen while scrolling
+
+### 🐛 Bug Fixes
+
+* **linkedin:** keep the Install next to LinkedIn copy's microG spoofed package name as LinkedIn's own, so Continue with Google signs in instead of reporting an account abnormality
+* **linkedin:** center the tab icons and labels inside the glass navigation bar capsule
+* **linkedin:** decode bottom bar icon resources before replacing them
+* **linkedin:** close an empty Premium upsell full-page takeover instead of leaving a blank screen
+* **linkedin:** resolve the My Network tab from the visible tab row when swiping between feeds
+
+### 🗑️ Removed
+
+* **ultimea:** remove the experimental Pitch black, Hide Explorer tab and Custom font patches and the font files bundled only for them, so the bundle covers LinkedIn, TickTick, Emby, Remote for Android TV, Pep Talk, Wanderlog and Torrent Search Revolution V2
+
+### Notes
+
+* Patch the unmodified APKs in Morphe Manager. Keep the same Manager signing key when updating an existing patched installation.
+* TickTick Premium and the Torrent Search Revolution local Pro patch change local app behavior only; they do not grant a Pro Key, a subscription or a server entitlement.
+* The Install next to LinkedIn copy starts with empty data and needs its own sign-in. Select GmsCore support to sign in with Google through microG RE.
+
 ## 1.3.0-dev.10 (2026-11-12)
 
 ### ✨ New Features
