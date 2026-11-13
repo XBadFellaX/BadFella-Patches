@@ -23,7 +23,7 @@ import java.lang.reflect.Method;
  * It is only closed when it is really on screen: LinkedIn also reports this screen when it prepares it behind the
  * current one, and pressing back there would close something else.
  */
-final class PremiumTakeover {
+public final class PremiumTakeover {
     /** The nav destination of the takeover page; it keeps this name in every supported version. */
     private static final String SCREEN = ".premium.upsells.PremiumUpsellFullPageTakeoverNavGraphScreen";
     /** Time for the page to finish opening and for its component to be hidden before it is closed. */
