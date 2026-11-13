@@ -7,6 +7,7 @@ package app.badfella.extension.linkedin;
 
 import android.app.Activity;
 import android.graphics.Rect;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -35,6 +36,29 @@ final class PremiumTakeover {
     private static Method viewOf;
 
     private PremiumTakeover() {
+    }
+
+    /** The page key LinkedIn sends for the takeover page. */
+    private static final String PAGE_KEY = "premium_upsell_full_page_takeover";
+
+    /**
+     * Injection point, at the start of UniversalNavigationController.navigate(int, Bundle, NavOptions).
+     *
+     * @return true to skip the navigation, so the takeover page is never opened instead of being closed again.
+     */
+    public static boolean blocksNavigation(Bundle arguments) {
+        try {
+            if (arguments == null || !Settings.hidePremium()) return false;
+            String screen = arguments.getString("sduiScreenId");
+            if (!PAGE_KEY.equals(arguments.getString("sduiPageKey")) && (screen == null || !screen.endsWith(SCREEN))) {
+                return false;
+            }
+            Settings.debugLog("premium takeover: navigation skipped");
+            return true;
+        } catch (Throwable failure) {
+            Diagnostics.error("checking the premium takeover navigation failed", failure);
+            return false;
+        }
     }
 
     /** Called when a screen resumes. Closes the takeover page when it would show nothing. */
