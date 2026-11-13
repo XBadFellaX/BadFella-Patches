@@ -190,3 +190,14 @@ x86-64. It works with Morphe's unused-library stripping enabled. Premium purchas
 state is unchanged.
 
 [GPLv3](LICENSE) · [Copyright and license notices](NOTICE) · [Issues](https://github.com/XBadFellaX/BadFella-Patches/issues)
+
+### LinkedIn diagnostics (development preview)
+
+Open **BadFella Patches → Diagnostics** to start a 20-second performance capture,
+copy a report or save it as a text file. Scroll the screen that feels slow during
+the capture, then reopen Diagnostics to export. Reports contain numeric timings,
+versions, device model, included patches, known boolean choices and extension
+error locations. Account identity, post/message text, URLs, cookies, tokens and
+custom setting text are excluded. Nothing is uploaded automatically. Review the
+file before attaching it to a GitHub issue. Results cover the current app process
+and disappear when it ends. Capturing adds some overhead; it does not fix lag.

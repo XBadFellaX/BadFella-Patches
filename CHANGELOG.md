@@ -1,3 +1,22 @@
+## 1.5.0-dev.2 (2026-11-13)
+
+The complete 45-patch bundle retains the existing ChatGPT clone and LinkedIn improvements.
+
+### LinkedIn 4.1.1271 (build 217900)
+
+* Add a Diagnostics section with a 20-second performance capture, clipboard report and text-file export.
+* Capture frame durations, slow-frame counts and aggregate SDUI hook timings only while the capture is running. It stops automatically and is off by default.
+* Reports include versions, device model, included patches, known boolean choices, fixed event counts and extension error locations. Account identity, messages, posts, links, cookies, tokens and custom setting text are excluded. Reports stay local until copied or saved; nothing is uploaded automatically.
+* Remove synchronous diagnostic log writes, verbose component-tree inspection and request-body formatting. Reuse scrolling-hook cache storage and glass-bar position buffers.
+* Include the French translation update and block the Premium takeover page before it opens.
+
+### Updating and diagnostics
+
+Enable pre-releases for the BadFella Patches source in Morphe Manager, refresh Sources, re-patch the original LinkedIn APK and install using the same signing key.
+
+Open BadFella Patches → Diagnostics. Start performance capture and scroll the screen that feels slow for 20 seconds. Reopen Diagnostics and use Save diagnostic report to create a text file. Review the file before sharing it. The capture adds some overhead and is diagnostic information, not a guarantee that scrolling is fixed. Results and event counts cover the current app process only.
+
+
 ## 1.5.0-dev.1 (2026-11-12)
 
 The complete 45-patch BadFella Patches bundle includes ChatGPT clone support and the LinkedIn drawer layout fix.
