@@ -60,7 +60,7 @@ manifest = subprocess.check_output(
     [str(SDK / "aapt2.exe"), "dump", "badging", str(APK)],
     text=True, encoding="utf-8", errors="replace")
 expected_package = CLONE or "com.linkedin.android"
-assert f"package: name='{expected_package}' versionCode='217900' versionName='4.1.1271'" in manifest, manifest[:400]
+assert f"package: name='{expected_package}' versionCode='218000' versionName='4.1.1272'" in manifest, manifest[:400]
 if CLONE:
     assert "Install next to LinkedIn" in applied, "Clone patch not applied"
     assert f"application-label:'{args.clone_label}'" in manifest, "Clone app name missing"
@@ -255,7 +255,7 @@ with tempfile.TemporaryDirectory() as workspace:
             "appfinder_authority still names the stock suggestion provider"
 
 subprocess.run([str(SDK / "zipalign.exe"), "-c", "4", str(APK)], check=True)
-print(f"PASS: LinkedIn 4.1.1271, {len(applied)} patches, SDUI transformer hooks, "
+print(f"PASS: LinkedIn 4.1.1272, {len(applied)} patches, SDUI transformer hooks, "
       f"SettingsShortcut hook, sponsored/promoted/boosted filters, Pitch black resources and hooks, "
       f"floating glass navigation bar with a full-height slide, "
       f"{len(classes)} unique classes, ZIP alignment" +

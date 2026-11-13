@@ -1,3 +1,29 @@
+## 1.5.0-dev.3 (2026-11-13)
+
+### 🚀 Features
+
+* **ticktick:** support TickTick 8.3.0.2 (build 8302)
+* **linkedin:** declare LinkedIn 4.1.1272 (build 218000) as a concrete target
+
+### TickTick 8.3.0.2 support
+
+TickTick 8.3.0.2 (build 8302) renames the obfuscated preferences class from `Ltv8` to `Lov8`. The reminder privacy gate now matches `Lov8->d()Z`, so the reminder scheduler still runs, and every other TickTick patch keeps its existing class, method and instruction anchors. 8.3.0.2 replaces 8.3.0.1 as the concrete target because the reminder gate's class no longer resolves on 8.3.0.1; the previous bundle remains available for that build.
+
+### LinkedIn 4.1.1272 support
+
+LinkedIn 4.1.1272 (build 218000) is declared as a concrete target alongside 4.1.1271 and 4.1.1267. The patches already resolve their classes, methods and instruction shapes, so no patch byte changed; Morphe and Helper for Morphe can now resolve the matching stock APK for 4.1.1272.
+
+### Installation
+
+1. Enable pre-releases for the BadFella Patches source in Morphe Manager and refresh Sources.
+2. Select the original TickTick 8.3.0.2 APKS or LinkedIn 4.1.1272 APK.
+3. Apply the TickTick or LinkedIn patches.
+4. Install with the existing Manager signing key and keep existing app data.
+
+### Limits
+
+Patch-output verification covers the reviewed 8.3.0.2 and 4.1.1272 inputs; it does not establish phone, account or server behavior.
+
 ## 1.5.0-dev.2 (2026-11-13)
 
 The complete 45-patch bundle retains the existing ChatGPT clone and LinkedIn improvements.
