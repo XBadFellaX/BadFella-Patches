@@ -1,3 +1,21 @@
+## 1.5.0-dev.7 (2026-11-13)
+
+### 🐛 Bug Fixes
+
+* **boldvoice:** neutralize PairIP DRM chain to fix "Get this app from Play Store" dialog
+
+### BoldVoice PairIP DRM fix
+
+Fixes the **"Get this app from Play Store"** dialog shown after installing the patched BoldVoice 5.1.3 (build 470) outside Google Play.
+
+The root cause was the PairIP DRM chain executing during app startup even after the manifest application-class swap:
+
+- `StartupLauncher.launch()` is called from `MainApplication.<clinit>` and `CoreComponentFactory.<clinit>`, triggering `VMRunner` which runs the native `libpairipcore.so` DRM program.
+- `SignatureCheck.verifyIntegrity(Context)` compares the APK signature against Google Play's certificate hash and throws `SignatureTamperedException` when re-signed with a different key.
+- `LicenseClient.checkLicense(Context)` contacts Google Play's licensing service and, on failure, calls `LicenseClient.startErrorDialogActivity()` which displays the Play Store install dialog.
+
+**Fix:** All four methods — `StartupLauncher.launch`, `SignatureCheck.verifyIntegrity`, `LicenseClient.checkLicense`, and `LicenseClient.startErrorDialogActivity` — are now replaced with `return-void` in DEX before the manifest is rewritten, neutralizing the entire DRM chain at the bytecode level.
+
 ## 1.5.0-dev.6 (2026-11-13)
 
 ### 🚀 Features
