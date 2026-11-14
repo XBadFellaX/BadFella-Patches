@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.5.0-dev.3",
+  "version": "1.5.0-dev.4",
   "patches": [
     {
       "name": "Always show navigation bar",
@@ -2166,6 +2166,35 @@
               "isExperimental": true,
               "minSdk": null,
               "description": "Any version (experimental). Every patch verifies its own anchors."
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Science News Daily local subscription",
+      "description": "Reports the cached subscription flag as active, so ad-free reading, premium-post browsing, downloads and upsell-free screens stay enabled. Preserves sign-in, Google Play billing callbacks, restore and the server verification request. Does not create a subscription or grant server-authorized content.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.appsfornexus.dailysciencenews",
+          "name": "Science News Daily",
+          "description": null,
+          "apkFileType": "APKS",
+          "appIconColor": null,
+          "signatures": null,
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "23.8",
+              "versionCodes": {
+                "ARM64_V8A": 238
+              },
+              "isExperimental": false,
+              "minSdk": null,
+              "description": "Version 23.8, build 238 (ARM64 split)."
             }
           ]
         }

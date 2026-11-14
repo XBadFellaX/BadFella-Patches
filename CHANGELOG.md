@@ -1,3 +1,24 @@
+## 1.5.0-dev.4 (2026-11-13)
+
+### 🚀 Features
+
+* **sciencenews:** support Science News Daily 23.8 (build 238)
+
+### Science News Daily 23.8 support
+
+Adds **Science News Daily local subscription** for com.appsfornexus.dailysciencenews version 23.8 (build 238, ARM64). The patch reports the cached subscription flag as active (CONST_4 0, 1 return), enabling ad-free reading, premium article browsing, offline downloads, and upsell-free screens. Google Play billing callbacks, authentication, restore flows, and server verification requests remain preserved.
+
+### Installation
+
+1. Enable pre-releases for the BadFella Patches source in Morphe Manager and refresh Sources.
+2. Select the original Science News Daily 23.8 APKS.
+3. Apply **Science News Daily local subscription**.
+4. Install with the existing Manager signing key and keep existing app data.
+
+### Limits
+
+Patch-output verification covers the reviewed 23.8 (build 238) input. Local subscription flag does not create a purchase or grant remote server-authorized content.
+
 ## 1.5.0-dev.3 (2026-11-13)
 
 ### 🚀 Features
