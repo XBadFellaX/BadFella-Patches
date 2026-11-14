@@ -2174,7 +2174,7 @@
     },
     {
       "name": "Science News Daily local subscription",
-      "description": "Reports the cached subscription flag as active, so ad-free reading, premium-post browsing, downloads and upsell-free screens stay enabled. Preserves sign-in, Google Play billing callbacks, restore and the server verification request. Does not create a subscription or grant server-authorized content.",
+      "description": "Reports the cached subscription flag as active, so ad-free reading, premium-post browsing, downloads and upsell-free screens stay enabled. Neutralizes the PairIP installation check so the app runs when installed outside Play Store. Preserves sign-in, Google Play billing callbacks, restore and the server verification request.",
       "default": true,
       "category": null,
       "compatiblePackages": [

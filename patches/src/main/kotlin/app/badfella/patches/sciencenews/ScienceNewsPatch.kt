@@ -16,8 +16,10 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodImplementation
 import com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction11n
 import com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction11x
+import org.w3c.dom.Element
 
 private const val PREFERENCES = "Lcom/appsfornexus/sciencenews/utils/AppPreferences;"
+private const val ANDROID = "http://schemas.android.com/apk/res/android"
 
 /**
  * Science News Daily keeps one persisted subscription flag that the client reads everywhere:
@@ -32,14 +34,17 @@ private const val PREFERENCES = "Lcom/appsfornexus/sciencenews/utils/AppPreferen
  * endpoint and is not authorized by this flag, so enabling it unlocks no withheld server content
  * and writes no purchase.
  *
- * The reviewed method is replaced with a constant-true return of the same shape. Authentication,
- * billing callbacks, real purchase/restore handling and the verification request stay untouched;
- * the app still records the real answer whenever the callback arrives.
+ * In addition, stock builds include Google Play's PairIP license check wrapper
+ * (com.pairip.application.Application and com.pairip.licensecheck.LicenseActivity), which shows a
+ * "Get this app from Play Store" blocker dialog when the app is installed from outside Google Play.
+ * The patch restores the real application class (com.appsfornexus.sciencenews.AppController) in the
+ * manifest, removes the PairIP licensing activity and stamp metadata, and replaces the subscription
+ * gate with a constant-true return.
  */
 @Suppress("unused")
 val scienceNewsLocalSubscriptionPatch = resourcePatch(
     name = "Science News Daily local subscription",
-    description = "Reports the cached subscription flag as active, so ad-free reading, premium-post browsing, downloads and upsell-free screens stay enabled. Preserves sign-in, Google Play billing callbacks, restore and the server verification request. Does not create a subscription or grant server-authorized content.",
+    description = "Reports the cached subscription flag as active, so ad-free reading, premium-post browsing, downloads and upsell-free screens stay enabled. Neutralizes the PairIP installation check so the app runs when installed outside Play Store. Preserves sign-in, Google Play billing callbacks, restore and the server verification request.",
 ) {
     compatibleWith(Compatibility(
         name = "Science News Daily",
@@ -112,5 +117,24 @@ val scienceNewsLocalSubscriptionPatch = resourcePatch(
         handle.replaceClass(owner, ImmutableClassDef(owner.type, owner.accessFlags, owner.superclass,
             owner.interfaces, owner.sourceFile, owner.annotations, owner.fields, methods))
         dexes.commitAll()
+
+        document("AndroidManifest.xml").use { manifest ->
+            val app = manifest.getElementsByTagName("application").item(0) as Element
+            if (app.getAttributeNS(ANDROID, "name") == "com.pairip.application.Application") {
+                app.setAttributeNS(ANDROID, "android:name", "com.appsfornexus.sciencenews.AppController")
+            }
+
+            val removeTags = setOf("activity", "meta-data")
+            val nodes = manifest.getElementsByTagName("*")
+            for (i in nodes.length - 1 downTo 0) {
+                val node = nodes.item(i) as Element
+                val name = node.getAttributeNS(ANDROID, "name")
+                if (node.tagName in removeTags) {
+                    if (name.startsWith("com.pairip.") || name.startsWith("com.android.stamp.")) {
+                        node.parentNode.removeChild(node)
+                    }
+                }
+            }
+        }
     }
 }
