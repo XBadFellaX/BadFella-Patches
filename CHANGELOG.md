@@ -1,3 +1,13 @@
+## 1.5.0-dev.5 (2026-11-13)
+
+### 🐛 Bug Fixes
+
+* **sciencenews:** bypass PairIP Play Store installer check
+
+### Science News Daily PairIP bypass
+
+Restores the application class in AndroidManifest.xml to com.appsfornexus.sciencenews.AppController and removes the PairIP licensing activity and Google Play stamp metadata so the app launches cleanly when installed outside Google Play.
+
 ## 1.5.0-dev.4 (2026-11-13)
 
 ### 🚀 Features
