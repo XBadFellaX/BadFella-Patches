@@ -20,25 +20,29 @@ private const val ANDROID = "http://schemas.android.com/apk/res/android"
  * PairIP DRM void methods that must be replaced with return-void.
  *
  * Maps each class descriptor to the set of (methodName, descriptor) pairs to neutralize.
- * - StartupLauncher.launch(): invoked from MainApplication.<clinit> and CoreComponentFactory.<clinit>;
- *   triggers VMRunner.invoke("yWNWpAe3JlRXk98k") which executes libpairipcore.so DRM checks.
  * - SignatureCheck.verifyIntegrity(Context): compares the apk signature against the Google Play
  *   certificate hash and throws SignatureTamperedException when signed with any other key.
  * - LicenseClient.checkLicense(Context): contacts com.android.vending.licensing.ILicensingService;
  *   on failure (sideloaded install) calls startErrorDialogActivity().
  * - LicenseClient.startErrorDialogActivity(): opens LicenseActivity / sends a Play Store intent
  *   displaying "Get this app from Play Store".
+ * - LicenseClient.scheduleAppShutdown(): terminates the process after delayed check failure.
+ *
+ * NOTE: StartupLauncher.launch() MUST NOT be neutralized. StartupLauncher invokes
+ * VMRunner.invoke("yWNWpAe3JlRXk98k") which executes libpairipcore.so to initialize the obfuscated
+ * method reflection pointers in androidx.constraintlayout.widget.gp.BEMMk (specifically
+ * BEMMk.bRWkwQWZoKIbUe, invoked by MainApplication.onCreate). Neutralizing StartupLauncher leaves
+ * bRWkwQWZoKIbUe null, causing MainApplication.onCreate() to throw a NullPointerException on launch
+ * ("BoldVoice closed because this app has a bug").
  */
 private val PAIRIP_VOID_TARGETS: Map<String, Set<Pair<String, String>>> = mapOf(
-    "Lcom/pairip/StartupLauncher;" to setOf(
-        "launch" to "()V",
-    ),
     "Lcom/pairip/SignatureCheck;" to setOf(
         "verifyIntegrity" to "(Landroid/content/Context;)V",
     ),
     "Lcom/pairip/licensecheck/LicenseClient;" to setOf(
         "checkLicense" to "(Landroid/content/Context;)V",
         "startErrorDialogActivity" to "()V",
+        "scheduleAppShutdown" to "()V",
     ),
 )
 
@@ -60,13 +64,13 @@ private val RETURN_VOID_IMPL = ImmutableMethodImplementation(
  *    informs React components across the UI that subscriber and pro subscriber privileges are active.
  *
  * DEX adjustments:
- * - Stock builds include the PairIP DRM library. On startup, StartupLauncher.launch() is called
- *   from MainApplication.<clinit> and CoreComponentFactory.<clinit>; it invokes VMRunner which
- *   executes the libpairipcore.so native VM program. That program calls SignatureCheck.verifyIntegrity()
- *   (throws SignatureTamperedException when the APK is not signed by Google Play) and
- *   LicenseClient.checkLicense() (which shows "Get this app from Play Store" via
- *   LicenseClient.startErrorDialogActivity() when the app is sideloaded). All four methods are
- *   replaced with return-void to neutralize the entire DRM chain.
+ * - Stock builds include the PairIP DRM library. On startup, StartupLauncher.launch() runs VMRunner
+ *   which executes the native libpairipcore.so program. That program initializes obfuscated method
+ *   tables (including BEMMk.bRWkwQWZoKIbUe used in MainApplication.onCreate). StartupLauncher is
+ *   preserved so application lifecycle methods can be dispatched properly.
+ * - Sideloaded integrity and license checks are neutralized by replacing SignatureCheck.verifyIntegrity(),
+ *   LicenseClient.checkLicense(), LicenseClient.startErrorDialogActivity(), and LicenseClient.scheduleAppShutdown()
+ *   with return-void in DEX.
  *
  * Manifest adjustments:
  * - Stock builds use com.pairip.application.Application as the application class. The patch
@@ -81,7 +85,7 @@ private val RETURN_VOID_IMPL = ImmutableMethodImplementation(
 @Suppress("unused")
 val boldVoiceSubscriptionPatch = resourcePatch(
     name = "BoldVoice subscription features",
-    description = "Enables client-side subscriber features, lessons, and paywall unlock checks by patching Hermes 99 bytecode targets (hasClientPremiumAccess, selectIsSubscriber, selectIsProSubscriber). Neutralizes PairIP DRM (StartupLauncher.launch, SignatureCheck.verifyIntegrity, LicenseClient.checkLicense, LicenseClient.startErrorDialogActivity) with return-void so the app runs outside Play Store. Disables Expo OTA updates to prevent overwriting the patched bundle.",
+    description = "Enables client-side subscriber features, lessons, and paywall unlock checks by patching Hermes 99 bytecode targets (hasClientPremiumAccess, selectIsSubscriber, selectIsProSubscriber). Neutralizes PairIP DRM (SignatureCheck.verifyIntegrity, LicenseClient.checkLicense, LicenseClient.startErrorDialogActivity, LicenseClient.scheduleAppShutdown) with return-void so the app runs outside Play Store while preserving StartupLauncher for bytecode initialization. Disables Expo OTA updates to prevent overwriting the patched bundle.",
 ) {
     compatibleWith(Compatibility(
         name = "BoldVoice",

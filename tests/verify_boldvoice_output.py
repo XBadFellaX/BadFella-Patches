@@ -27,9 +27,8 @@ T3_AFTER = bytes.fromhex("9500" + "7600" * 7)
 
 # PairIP class descriptors whose void methods must be neutralized in DEX.
 PAIRIP_VOID_TARGETS = {
-    "Lcom/pairip/StartupLauncher;": {"launch"},
     "Lcom/pairip/SignatureCheck;": {"verifyIntegrity"},
-    "Lcom/pairip/licensecheck/LicenseClient;": {"checkLicense", "startErrorDialogActivity"},
+    "Lcom/pairip/licensecheck/LicenseClient;": {"checkLicense", "startErrorDialogActivity", "scheduleAppShutdown"},
 }
 
 
@@ -143,9 +142,9 @@ def verify(args):
     assert re.search(r'expo\.modules\.updates\.EXPO_UPDATE_URL[^\n]*\n[^\n]*=""', manifest), "Expo update URL still present"
 
     print("PASS: BoldVoice 5.1.3 output verified: Hermes99 targets patched, valid SHA-1 footer, "
-          "PairIP DEX methods neutralized (StartupLauncher.launch, SignatureCheck.verifyIntegrity, "
-          "LicenseClient.checkLicense, LicenseClient.startErrorDialogActivity), "
-          "PairIP Play Store check neutralized, Expo OTA updates disabled, original native payloads preserved")
+          "PairIP DEX methods neutralized (SignatureCheck.verifyIntegrity, "
+          "LicenseClient.checkLicense, LicenseClient.startErrorDialogActivity, LicenseClient.scheduleAppShutdown), "
+          "StartupLauncher preserved, PairIP Play Store check neutralized, Expo OTA updates disabled, original native payloads preserved")
 
 
 if __name__ == "__main__":

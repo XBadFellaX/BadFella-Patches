@@ -1,3 +1,20 @@
+## 1.5.0-dev.8 (2026-11-14)
+
+### 🐛 Bug Fixes
+
+* **boldvoice:** preserve StartupLauncher to fix startup crash while keeping PairIP DRM neutralized
+
+### BoldVoice startup crash fix
+
+Fixes the startup crash (**"BoldVoice closed because this app has a bug"**) introduced in v1.5.0-dev.7.
+
+The root cause was neutralizing `StartupLauncher.launch()`. StartupLauncher is required to run `VMRunner.invoke()` which initializes the obfuscated reflection method table (`androidx.constraintlayout.widget.gp.BEMMk.bRWkwQWZoKIbUe`) invoked during `MainApplication.onCreate()`. Without this initialization, `MainApplication.onCreate()` threw a `NullPointerException` immediately upon opening the app.
+
+**Fix:**
+- Preserved `StartupLauncher.launch()` so the method pointers required by `MainApplication.onCreate()` are initialized properly.
+- Kept `SignatureCheck.verifyIntegrity()`, `LicenseClient.checkLicense()`, and `LicenseClient.startErrorDialogActivity()` neutralized with `return-void` to prevent the APK signature check and the Google Play licensing "Get this app from Play Store" dialog.
+- Also neutralized `LicenseClient.scheduleAppShutdown()` with `return-void` to prevent delayed shutdown triggers.
+
 ## 1.5.0-dev.7 (2026-11-13)
 
 ### 🐛 Bug Fixes
