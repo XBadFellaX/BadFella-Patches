@@ -1,3 +1,17 @@
+## 1.5.0-dev.10 (2026-11-14)
+
+### LinkedIn 4.1.1272
+
+Adds French translations for the Navigation bar, More tab and newer feed settings, plus the post-copy confirmation. Download buttons now use the selected language for their accessibility labels. Other languages retain English fallback for missing translations.
+
+### BoldVoice 5.1.3 (build 470, ARM64)
+
+Includes the dev.9 startup correction: initializes the local license state and preserves the native VM, application wrapper and protected lifecycle methods. Retains the subscription edits and Expo OTA guard. Server-controlled authentication, scoring and content access retain their existing requirements.
+
+### Installation
+
+Enable pre-releases for BadFella Patches in Morphe Manager and refresh Sources. Repatch the original stock app with dev.10, then install using your existing Manager signing key to preserve app data.
+
 ## 1.5.0-dev.9 (2026-11-14)
 
 ### BoldVoice 5.1.3 (build 470, ARM64)
