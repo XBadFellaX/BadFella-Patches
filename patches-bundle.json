@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-13T21:42:00",
-  "description": "## 1.5.0-dev.5 (2026-11-13)\n\n### \ud83d\udc1b Bug Fixes\n\n* **sciencenews:** bypass PairIP Play Store installer check\n\n### Science News Daily PairIP bypass\n\nRestores the application class in AndroidManifest.xml to com.appsfornexus.sciencenews.AppController and removes the PairIP licensing activity and Google Play stamp metadata so the app launches cleanly when installed outside Google Play.\n",
-  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.5.0-dev.5/patches-1.5.0-dev.5.mpp",
+  "created_at": "2026-11-13T22:15:00",
+  "description": "## 1.5.0-dev.6 (2026-11-13)\n\n### \ud83d\ude80 Features\n\n* **boldvoice:** support BoldVoice 5.1.3 (build 470)\n\n### BoldVoice 5.1.3 support\n\nAdds **BoldVoice subscription features** for com.wellocution.androidapp version 5.1.3 (build 470, ARM64). The patch unlocks client-side premium features and lessons by patching Hermes 99 bytecode targets (hasClientPremiumAccess, selectIsSubscriber, and selectIsProSubscriber) to return constant true. Google Play's PairIP licensing wrapper is neutralized by restoring the real application class (com.wellocution.android.MainApplication) and removing PairIP activities and stamp metadata. Expo OTA updates are disabled to prevent overwriting the patched bundle on launch.\n",
+  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.5.0-dev.6/patches-1.5.0-dev.6.mpp",
   "signature_download_url": "",
-  "version": "1.5.0-dev.5"
+  "version": "1.5.0-dev.6"
 }

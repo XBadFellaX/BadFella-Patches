@@ -1,3 +1,24 @@
+## 1.5.0-dev.6 (2026-11-13)
+
+### 🚀 Features
+
+* **boldvoice:** support BoldVoice 5.1.3 (build 470)
+
+### BoldVoice 5.1.3 support
+
+Adds **BoldVoice subscription features** for com.wellocution.androidapp version 5.1.3 (build 470, ARM64). The patch unlocks client-side premium features and lessons by patching Hermes 99 bytecode targets (`hasClientPremiumAccess`, `selectIsSubscriber`, and `selectIsProSubscriber`) to return constant true. Google Play's PairIP licensing wrapper is neutralized by restoring the real application class (`com.wellocution.android.MainApplication`) and removing PairIP activities and stamp metadata. Expo OTA updates are disabled to prevent overwriting the patched bundle on launch.
+
+### Installation
+
+1. Enable pre-releases for the BadFella Patches source in Morphe Manager and refresh Sources.
+2. Select the original BoldVoice 5.1.3 APKS.
+3. Apply **BoldVoice subscription features**.
+4. Install with the existing Manager signing key and keep existing app data.
+
+### Limits
+
+Patch-output verification covers the reviewed 5.1.3 (build 470) input. Server-side AI processing and accounts remain untouched; microphone recording, pronunciation analysis, and authentication continue to function normally.
+
 ## 1.5.0-dev.5 (2026-11-13)
 
 ### 🐛 Bug Fixes
