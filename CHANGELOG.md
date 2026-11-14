@@ -1,3 +1,19 @@
+## 1.5.0-dev.11 (2026-11-14)
+
+### BoldVoice 5.1.3 (build 470, ARM64)
+
+Complete devirtualization and PairIP neutralization fix:
+- Devirtualizes and inlines the 5 startup lifecycle methods moved to external DEX.
+- Restores 1,417 hoisted static strings across 32 classes via bytecode initialization.
+- Restores notification callbacks (`GuardedAsyncTask.doInBackground` and `NotificationsService.onReceive`) and provides `NotificationTask`.
+- Restores pristine ARM64 native shared libraries (`libreactnative.so`, `libonnxruntime.so`, and `libavformat.so`), completely severing the `libpairipcore.so` dependency and eliminating PairIP tampering detection / Play Store redirects / crashes.
+- Sets `extractNativeLibs=true` to ensure shared libraries load reliably.
+- Retains client-side subscription unlocks and Expo OTA protection.
+
+### Installation
+
+Enable pre-releases for BadFella Patches in Morphe Manager and refresh Sources. Repatch the original stock app with dev.11, then install using your existing Manager signing key to preserve app data.
+
 ## 1.5.0-dev.10 (2026-11-14)
 
 ### LinkedIn 4.1.1272
