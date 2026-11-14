@@ -2,6 +2,8 @@
 import argparse
 import hashlib
 import io
+import os
+import tempfile
 from pathlib import Path
 import re
 import subprocess
@@ -24,13 +26,6 @@ T3_OFFSET = 0x1B1C281
 T3_SIZE = 16
 T3_BEFORE = bytes.fromhex("89000144000000f9450000011be67600")
 T3_AFTER = bytes.fromhex("9500" + "7600" * 7)
-
-# PairIP class descriptors whose void methods must be neutralized in DEX.
-PAIRIP_VOID_TARGETS = {
-    "Lcom/pairip/SignatureCheck;": {"verifyIntegrity"},
-    "Lcom/pairip/licensecheck/LicenseClient;": {"checkLicense", "startErrorDialogActivity", "scheduleAppShutdown"},
-}
-
 
 def sha1(data):
     return hashlib.sha1(data).digest()
@@ -58,20 +53,6 @@ def expected_bundle(stock):
     return bytes(expected)
 
 
-def verify_pairip_dex(output_zip):
-    """Verify PairIP class descriptors are still present in output DEX (methods nullified, not removed)."""
-    dex_names = [n for n in output_zip.namelist() if re.fullmatch(r"classes\d*\.dex", n)]
-    found_classes = set()
-    for dex_name in dex_names:
-        raw = output_zip.read(dex_name)
-        for descriptor in PAIRIP_VOID_TARGETS:
-            if descriptor.encode() in raw:
-                found_classes.add(descriptor)
-    assert found_classes == set(PAIRIP_VOID_TARGETS), (
-        f"PairIP class descriptors missing from output DEX: {set(PAIRIP_VOID_TARGETS) - found_classes}"
-    )
-
-
 def verify(args):
     with zipfile.ZipFile(args.stock) as stock, zipfile.ZipFile(args.output) as output:
         assert len(output.namelist()) == len(set(output.namelist())), "Duplicate ZIP entry in output"
@@ -87,6 +68,18 @@ def verify(args):
             expected = expected_bundle(before_bundle)
             assert after_bundle == expected, "Patched bundle does not match expected reviewed edits"
 
+            with tempfile.TemporaryDirectory(prefix="boldvoice-check-") as directory:
+                work = Path(directory)
+                stock_apk = work / "stock.apk"
+                stock_apk.write_bytes(stock.read("base.apk"))
+                root = Path(__file__).resolve().parents[1]
+                javac = args.java.with_name("javac.exe" if args.java.suffix == ".exe" else "javac")
+                subprocess.run([str(javac), "-cp", str(args.dexlib_jar), "-d", str(work),
+                                str(root / "tools/DexInventory.java"), str(root / "tests/RemoteAtvDexCheck.java"),
+                                str(root / "tests/BoldVoiceDexCheck.java")], check=True)
+                subprocess.run([str(args.java), "-Xmx3g", "-cp", str(work) + os.pathsep + str(args.dexlib_jar),
+                                "BoldVoiceDexCheck", str(stock_apk), str(args.output)], check=True)
+
             # 2. DEX inventory: same set of DEX files (contents changed by PairIP neutralization).
             dex = {n for n in base.namelist() if re.fullmatch(r"classes\d*\.dex", n)}
             assert dex == {n for n in output_names if re.fullmatch(r"classes\d*\.dex", n)}, "DEX inventory changed"
@@ -98,9 +91,8 @@ def verify(args):
                 if name.startswith("assets/"):
                     if name == "assets/index.android.bundle":
                         continue  # already checked above
-                    # Other assets must be preserved; skip if absent from flat output (morphe restructure)
-                    if name in output_names:
-                        assert base.read(name) == output.read(name), f"Asset changed: {name}"
+                    assert name in output_names, f"Asset missing: {name}"
+                    assert base.read(name) == output.read(name), f"Asset changed: {name}"
                     continue
                 # Skip entries not present in flat output (morphe may omit some base APK internals)
                 if name not in output_names:
@@ -109,9 +101,6 @@ def verify(args):
                 if name in ("AndroidManifest.xml", "resources.arsc"):
                     continue
                 assert base.read(name) == output.read(name), f"Original payload changed: {name}"
-
-        # 4. Verify PairIP DEX neutralization.
-        verify_pairip_dex(output)
 
         # 5. Native libraries from splits must be preserved exactly.
         natives = {}
@@ -132,24 +121,24 @@ def verify(args):
         text=True, encoding="utf-8"
     )
 
-    # Verify PairIP bypass: application class restored and PairIP activities/stamps removed.
-    assert re.search(r'android:name\(0x01010003\)="com\.wellocution\.android\.MainApplication"', manifest), "Application class not restored"
-    assert "com.pairip." not in manifest, "PairIP references remain in manifest"
+    # The wrapper establishes VMRunner's context and must remain available.
+    assert re.search(r'android:name\(0x01010003\)="com\.pairip\.application\.Application"', manifest), "VM context wrapper missing"
+    assert "com.pairip.licensecheck.LicenseActivity" not in manifest, "License UI remains in manifest"
     assert "com.android.stamp." not in manifest, "Play stamp metadata remains in manifest"
 
     # Verify Expo OTA updates disabled.
     assert re.search(r'expo\.modules\.updates\.ENABLED[^\n]*\n[^\n]*=false', manifest), "Expo OTA updates still enabled"
     assert re.search(r'expo\.modules\.updates\.EXPO_UPDATE_URL[^\n]*\n[^\n]*=""', manifest), "Expo update URL still present"
 
-    print("PASS: BoldVoice 5.1.3 output verified: Hermes99 targets patched, valid SHA-1 footer, "
-          "PairIP DEX methods neutralized (SignatureCheck.verifyIntegrity, "
-          "LicenseClient.checkLicense, LicenseClient.startErrorDialogActivity, LicenseClient.scheduleAppShutdown), "
-          "StartupLauncher preserved, PairIP Play Store check neutralized, Expo OTA updates disabled, original native payloads preserved")
+    print("PASS: BoldVoice 5.1.3: exact Hermes99 edits/footer, six PairIP method edits, "
+          "unrelated DEX and assets retained, VM application wrapper retained, OTA disabled, native payloads unchanged")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stock", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--java", type=Path, required=True)
+    parser.add_argument("--dexlib-jar", type=Path, required=True)
     parser.add_argument("--aapt2", type=Path, required=True)
     verify(parser.parse_args())

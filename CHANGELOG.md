@@ -1,3 +1,15 @@
+## 1.5.0-dev.9 (2026-11-14)
+
+### BoldVoice 5.1.3 (build 470, ARM64)
+
+Corrects the local PairIP license-state handling used by the startup and Play Store checks. Keeps the native VM, application wrapper and protected lifecycle methods intact. The earlier preview disabled the outer license entry point but left the state at CHECK_REQUIRED; this preview initializes FULL_CHECK_OK and disables the inner license-check entry point and local installer restriction.
+
+Client-side subscription edits and the Expo OTA guard are retained. Server-controlled authentication, scoring and content access retain their existing requirements.
+
+### Installation
+
+Enable pre-releases for BadFella Patches in Morphe Manager, refresh Sources, and apply **BoldVoice subscription features** to the original BoldVoice 5.1.3 APKS. Install the result using the same Manager signing key and preserve existing app data.
+
 ## 1.5.0-dev.8 (2026-11-14)
 
 ### 🐛 Bug Fixes
