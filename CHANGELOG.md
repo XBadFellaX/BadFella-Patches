@@ -1,3 +1,14 @@
+## 1.5.0-dev.12 (2026-11-15)
+
+### LinkedIn
+
+- **GmsCore Push Notifications Fix:** Spoofs the `X-Android-Cert` request header to LinkedIn's official signing certificate when communicating with Firebase, resolving `API_KEY_ANDROID_APP_BLOCKED` and `FIS_AUTH_ERROR` so push notifications register and deliver reliably under microG / GmsCore.
+- **Privacy Defaults:** Enabled **Anonymous profile viewing** and **Block tracking** by default out of the box, ensuring private profile browsing and tracking suppression without requiring manual configuration.
+
+### Installation
+
+Enable pre-releases for BadFella Patches in Morphe Manager and refresh Sources. Repatch the app with dev.12, then install using your existing Manager signing key to preserve app data.
+
 ## 1.5.0-dev.11 (2026-11-14)
 
 ### BoldVoice 5.1.3 (build 470, ARM64)

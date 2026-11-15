@@ -383,11 +383,11 @@ public final class SettingsActivity extends Activity {
                         "Remove tracking parameters (utm, trk, rcm, ...) when copying or sharing LinkedIn links.");
             }
             if (Settings.isAnonymousProfileViewingIncluded()) {
-                privacy.toggle(Settings.ANONYMOUS_PROFILE_VIEWING, false, "Anonymous profile viewing",
+                privacy.toggle(Settings.ANONYMOUS_PROFILE_VIEWING, true, "Anonymous profile viewing",
                         "Doesn't send the analytics events of profile pages, so your visits aren't listed in other people's viewers. Experimental.");
             }
             if (Settings.isBlockTrackingIncluded()) {
-                privacy.toggle(Settings.BLOCK_TRACKING, false, "Block tracking",
+                privacy.toggle(Settings.BLOCK_TRACKING, true, "Block tracking",
                         "Doesn't send most analytics events. Turn off if something behaves oddly.");
             }
             categories.add(privacy);
