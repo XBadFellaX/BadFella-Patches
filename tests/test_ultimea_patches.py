@@ -14,10 +14,10 @@ class UltimeaPatchesTests(unittest.TestCase):
             if any(c['packageName'] == 'com.dynanic.ultimea' for c in p['compatiblePackages'])
         ]
 
-    def test_catalog_contains_exact_two_ultimea_patches(self):
-        self.assertEqual(len(self.ultimea_patches), 2)
+    def test_catalog_contains_exact_six_ultimea_patches(self):
+        self.assertEqual(len(self.ultimea_patches), 6)
         names = {p['name'] for p in self.ultimea_patches}
-        self.assertEqual(names, {'Ultimea Black Mode', 'Ultimea Hide Explorer Tab'})
+        self.assertEqual(names, {'Ultimea Black Mode', 'Ultimea Hide Explorer Tab', 'Accent color', 'Disable tracking', 'Remove distractions', 'Remove popups'})
 
     def test_ultimea_black_mode_metadata(self):
         patch = next(p for p in self.ultimea_patches if p['name'] == 'Ultimea Black Mode')
@@ -43,9 +43,15 @@ class UltimeaPatchesTests(unittest.TestCase):
         source = self.root / 'patches/src/main/kotlin/app/badfella/patches/ultimea'
         text = '\n'.join(p.read_text(encoding='utf-8') for p in source.rglob('*.kt'))
         for symbol in ('libflutter.so', 'FlutterImageDecoder', 'FineEqualizer', 'Xupmix',
-                       'spoofSignaturePatch', 'patchesSettingsPatch', 'removeDistractionsPatch',
-                       'EqualizerConnectionPatch', 'NativeSettings', 'LoganMethodCall'):
+                       'spoofSignaturePatch', 'EqualizerConnection', 'NativeSettings',
+                       'EqualizerConnectionPatch', '--aot-shared-library-name='):
             self.assertNotIn(symbol, text)
+
+    def test_no_automatic_main_activity_recreation(self):
+        source = self.root / 'extensions/extension/src/main/java/app/hxreborn/extension/ultimea'
+        self.assertFalse((source / 'AccentObserver.java').exists())
+        self.assertFalse((source / 'NativeSettings.java').exists())
+        self.assertNotIn('observer', (source / 'AccentColor.java').read_text())
 
     def test_android_bundle(self):
         version = next(line.split('=', 1)[1].strip() for line in
@@ -60,6 +66,7 @@ class UltimeaPatchesTests(unittest.TestCase):
                     for package in (b'javax/imageio/', b'java/awt/', b'javax/swing/'):
                         self.assertNotIn(package, archive.read(name), name)
             self.assertIn('ultimea/theme.bin', archive.namelist())
+            self.assertIn('ultimea/accent.bin', archive.namelist())
             for icon in ('hdmi', 'usb', 'optical', 'aux', 'bluetooth'):
                 self.assertIn(f'ultimea/images/device_input_{icon}_n.png', archive.namelist())
 

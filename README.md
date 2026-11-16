@@ -22,6 +22,21 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 
 **Before replacing an existing installation:** verify your task backup or sync. Apps signed with different keys cannot update each other; uninstalling removes local data.
 
+## Ultimea dev.5 development preview
+
+Adds **Accent color**, **Disable tracking**, **Remove distractions** and
+**Remove popups** from hxreborn for Ultimea 1.4.4 build 495 (ARM64).
+The accent picker is in **hxreborn patches** in Profile (the former Contact Us
+entry). It offers presets, a custom color and Material You. Reopen the app to
+refresh all screens after a color change; wallpaper colors refresh on app launch.
+
+Tracking, distraction and popup removal are selected when patching. Repatch to
+change them. Remove distractions includes the existing Explorer-tab removal.
+The original Bluetooth/device-control code, Flutter engine and native library
+loading are preserved. Device behavior and the accent picker remain unverified;
+the existing Feedback contrast issue is unchanged. Enable pre-releases in Morphe
+Manager and refresh Sources to use this preview.
+
 ## Ultimea development preview
 
 The `1.6.0-dev.4` preview contains exactly two Ultimea patches:
@@ -41,7 +56,27 @@ app data. Upstream attribution is in `NOTICE`.
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.6.0-dev.4](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.4)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;49 patches total
+> **[v1.6.0-dev.5](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.5)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;53 patches total
+<details open>
+<summary>📦 Ultimea&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 1.4.4 |
+| :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Accent color](#accent-color) | Changes accent colors with a chosen color or Material You. |  |
+| [Disable tracking](#disable-tracking) | Disables Firebase Analytics, Crashlytics, Logan and usage event uploads. |  |
+| [Remove distractions](#remove-distractions) | Removes community, message and support entries. |  |
+| [Remove popups](#remove-popups) | Removes promotional and rating popups. |  |
+| [Ultimea Black Mode](#ultimea-black-mode) | Ports hxreborn's dark theme in fixed AMOLED mode, with light text, controls and artwork. ARM64 only. |  |
+| [Ultimea Hide Explorer Tab](#ultimea-hide-explorer-tab) | Ports hxreborn's community navigation removal, including tab bodies, callbacks and controller indexes. ARM64 only. |  |
+
+</details>
+
 <details open>
 <summary>📦 LinkedIn&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
@@ -202,23 +237,6 @@ app data. Upstream attribution is in `NOTICE`.
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
 | [Torrent Search Revolution local Pro](#torrent-search-revolution-local-pro) | Enables the local Pro/ad-free branches, including search, native and banner ads and Pro settings. Preserves startup callbacks. Reviewed on 2.3.5; changed app bytecode requires review. Does not grant a Pro Key subscription or server entitlement. |  |
-
-</details>
-
-<details open>
-<summary>📦 Ultimea&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
-<br>
-
-**🎯 Supported versions:**
-
-| 1.4.4 |
-| :---: |
-| Version 1.4.4, build 495. ARM64 only, matching hxreborn upstream. |
-
-| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
-|----------|----------------|-----------|
-| [Ultimea Black Mode](#ultimea-black-mode) | Ports hxreborn's dark theme in fixed AMOLED mode, with light text, controls and artwork. ARM64 only. |  |
-| [Ultimea Hide Explorer Tab](#ultimea-hide-explorer-tab) | Ports hxreborn's community navigation removal, including tab bodies, callbacks and controller indexes. ARM64 only. |  |
 
 </details>
 
