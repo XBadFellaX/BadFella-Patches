@@ -116,3 +116,4 @@ class OpenLinksDirectlyPatch {static void prefetchShortLinks(String s){}}
  def test_capture_lifecycle_refresh_budget_and_disabled_state(self):self.check("capture")
  def test_component_cache_reuses_storage_without_stale_values(self):self.check("memo")
  def test_feed_post_decision_survives_visibility_samples(self):self.check("samples")
+ def test_hide_video_posts_matches_view_names_not_text(self):self.check("videos")

@@ -59,14 +59,39 @@ public final class SduiComponentFilter {
      * array allocation would add up.
      */
     private static boolean isAiView(String viewName) {
+        return hasWord(viewName, AI_WORDS);
+    }
+
+    private static final java.util.Set<String> VIDEO_WORDS = new java.util.HashSet<>(java.util.Arrays.asList("video", "videos"));
+
+    /** True when a whole word of the view name, split at '-', '_' and '.', is one of [words]. */
+    private static boolean hasWord(String viewName, java.util.Set<String> words) {
         int start = 0;
         for (int i = 0; i <= viewName.length(); i++) {
             char c = i == viewName.length() ? '-' : viewName.charAt(i);
             if (c != '-' && c != '_' && c != '.') continue;
-            if (AI_WORDS.contains(viewName.substring(start, i))) return true;
+            if (words.contains(viewName.substring(start, i))) return true;
             start = i + 1;
         }
         return false;
+    }
+
+    /** A view name rather than text: lowercase words joined by '-', such as large-single-video-view. */
+    private static boolean isViewNameLike(String s) {
+        if (s.length() < 3 || s.length() > 80 || s.indexOf('-') < 0) return false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9') && c != '-' && c != '_') return false;
+        }
+        return true;
+    }
+
+    /**
+     * Feed modules built around videos, such as "Videos for you", whose view names are not feed-full-update: a feed
+     * component named with the word video. Posts are matched by the view names inside them in hideFeedUpdate.
+     */
+    private static boolean isFeedVideoView(String viewName) {
+        return viewName.startsWith("feed-") && hasWord(viewName, VIDEO_WORDS);
     }
 
     /** Components of LinkedIn's puzzle games: search cards (search-game-card-queens), the hub (games-sdui-hub). */
@@ -185,6 +210,9 @@ public final class SduiComponentFilter {
             if (Settings.hideGames() && isGameView(viewName)) {
                 return hide(true, "games: " + viewName);
             }
+            if (Settings.hideVideoPosts() && isFeedVideoView(viewName)) {
+                return hide(true, "video module: " + viewName);
+            }
             if (Settings.hideGames() && viewName.isEmpty()) {
                 Object known = cached(HIDDEN, component);
                 boolean heading = known != null ? (Boolean) known : isPuzzleHeading(component);
@@ -195,6 +223,7 @@ public final class SduiComponentFilter {
             switch (viewName) {
                 case "feed-full-update": {
                     Object known = cached(HIDDEN, component);
+                    PerformanceCapture.postDecision(known != null);
                     if (known != null) return (Boolean) known;
                     // One serialization of the post feeds both the remember store and the filters below.
                     byte[] post = Settings.postMenu() ? payload(component) : null;
@@ -247,6 +276,7 @@ public final class SduiComponentFilter {
             return false;
         } finally {
             PerformanceCapture.endHook(1, captureStart);
+            if (captureStart != 0) PerformanceCapture.endView(viewName(component), captureStart);
         }
     }
 
@@ -306,8 +336,13 @@ public final class SduiComponentFilter {
         if (reposts && ProtoScanner.containsAscii(payload, "feed-original-share-description")) {
             return hide(true, "repost");
         }
-        if (videos && ProtoScanner.containsAscii(payload, "large-single-video-view")) {
-            return hide(true, "video post");
+        // Single videos (large-single-video-view) and carousels such as "Videos for you": any view name inside the
+        // post with the word video. View names are matched whole, never words of the post's text.
+        if (videos && ProtoScanner.containsAscii(payload, "video")) {
+            if (scanner == null) scanner = ProtoScanner.scan(payload);
+            for (String s : scanner.strings) {
+                if (isViewNameLike(s) && hasWord(s, VIDEO_WORDS)) return hide(true, "video post");
+            }
         }
         boolean recommendationModule = false;
         if (recommendations || activity) {

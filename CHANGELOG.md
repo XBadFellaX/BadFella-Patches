@@ -1,3 +1,10 @@
+## 1.6.0-dev.9 (2026-11-16)
+
+- **LinkedIn:** Hide video posts also hides video carousels such as "Videos for you", matched by the video components inside a post or module rather than by its text.
+- **LinkedIn:** The Diagnostics performance capture also reports filter time per LinkedIn component name (server template names such as feed-full-update, no post content) and how often a post's filter result was reused while scrolling.
+
+Enable pre-releases for BadFella Patches in Morphe Manager, refresh Sources and repatch the original stock APK. Install with your existing Manager signing key to preserve app data.
+
 ## 1.6.0-dev.8 (2026-11-16)
 
 - **LinkedIn:** Smoother feed scrolling. Feed filters now check each post once instead of re-reading every visible post on each scroll update.

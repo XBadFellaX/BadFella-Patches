@@ -18,6 +18,7 @@ public class LinkedInDiagnosticsCheck {
         if (args[0].equals("privacy")) privacy(Path.of(args[1]));
         else if (args[0].equals("capture")) capture();
         else if (args[0].equals("samples")) samples();
+        else if (args[0].equals("videos")) videos();
         else memo();
     }
 
@@ -68,6 +69,9 @@ public class LinkedInDiagnosticsCheck {
         listener.onFrameMetricsAvailable(host.window,new FrameMetrics(-1,1,0),0);
         long start=PerformanceCapture.beginHook();
         PerformanceCapture.endHook(0,start);
+        PerformanceCapture.endView("feed-full-update",start);
+        PerformanceCapture.endView("Alice Private Text",start);
+        PerformanceCapture.postDecision(true);
         app.callbacks.onActivityPaused(host);
         check(host.window.listener==null, "Pause retained listener");
         app.callbacks.onActivityResumed(host);
@@ -80,6 +84,9 @@ public class LinkedInDiagnosticsCheck {
         check(report.contains("mean_frame_ms: 12.500; max_frame_ms: 20.000"), report);
         check(report.contains("first_draw_frames_excluded: 1; dropped_metric_callbacks: 2"), report);
         check(report.contains("SDUI rewrite: calls=1"), report);
+        check(report.contains("    feed-full-update: calls=1") && report.contains("    (other): calls=1"), report);
+        check(!report.contains("Alice"), "View name filter leaked text");
+        check(report.contains("feed post decisions: computed=0; reused=1"), report);
         listener.onFrameMetricsAvailable(host.window,new FrameMetrics(99_000_000,1,0),0);
         PerformanceCapture.endHook(0,start);
         check(report.equals(PerformanceCapture.report()), "Late data changed completed capture");
@@ -99,6 +106,7 @@ public class LinkedInDiagnosticsCheck {
         int serializations;
         final byte[] bytes;
         Component(int value) { bytes=new byte[]{(byte)value}; }
+        Component(byte[] value) { bytes=value; }
         public byte[] toByteArray() { serializations++; return bytes; }
     }
 
@@ -108,8 +116,29 @@ public class LinkedInDiagnosticsCheck {
 
     public static class Post extends Component {
         Post(int value) { super(value); }
+        Post(String... strings) { super(proto(strings)); }
         public boolean hasViewTracking() { return true; }
         public Tracking getViewTracking() { return new Tracking(); }
+    }
+
+    /** A message holding each string as field 1. */
+    static byte[] proto(String... strings) {
+        java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();
+        for (String s : strings) {
+            byte[] b=s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            out.write(0x0A); out.write(b.length); out.write(b,0,b.length);
+        }
+        return out.toByteArray();
+    }
+
+    /** Hide video posts: video view names inside a post (single videos, "Videos for you"), never its text. */
+    static void videos() {
+        Settings.values.put("hideVideoPosts", true);
+        check(SduiComponentFilter.shouldHide(new Post("feed-actor", "large-single-video-view")), "Single video kept");
+        check(SduiComponentFilter.shouldHide(new Post("feed-actor", "feed-video-carousel-item")), "Video carousel kept");
+        check(!SduiComponentFilter.shouldHide(new Post("feed-actor", "My video tips", "watch-this video")), "Text matched");
+        check(!SduiComponentFilter.shouldHide(new Post("feed-actor", "feed-commentary")), "Plain post hidden");
+        Settings.values.remove("hideVideoPosts");
     }
 
     /** Visible posts are transformed again for every visibility sample; each must be serialized only once. */
