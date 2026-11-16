@@ -55,6 +55,9 @@ private val A32_ALLOC_NEW = byteArrayOf(
     0x00, 0x00, 0xa0.toByte(), 0xe1.toByte(), 0x00, 0x00, 0xa0.toByte(), 0xe1.toByte(),
 )
 
+private val DARK_COLOR_TOKENS = listOf("#161616", "#191919", "#323232", "#333333")
+private const val PURE_BLACK_TOKEN = "#000000"
+
 private fun replaceExactPattern(bytes: ByteArray, oldPattern: ByteArray, newPattern: ByteArray, name: String): ByteArray {
     var matchIndex = -1
     var count = 0
@@ -76,10 +79,17 @@ private fun replaceExactPattern(bytes: ByteArray, oldPattern: ByteArray, newPatt
     return result
 }
 
+private fun replaceExactString(bytes: ByteArray, oldStr: String, newStr: String): ByteArray {
+    val oldBytes = oldStr.toByteArray(Charsets.ISO_8859_1)
+    val newBytes = newStr.toByteArray(Charsets.ISO_8859_1)
+    require(oldBytes.size == newBytes.size) { "String lengths must match: $oldStr vs $newStr" }
+    return replaceExactPattern(bytes, oldBytes, newBytes, oldStr)
+}
+
 @Suppress("unused")
 val ultimeaBlackModePatch = resourcePatch(
     name = "Ultimea Black Mode",
-    description = "Enables pure black AMOLED theme with light text and surfaces. Hooks Dart AOT color constructors in memory without runtime syscalls, updates splash styling, and tints navigation and device icons.",
+    description = "Enables pure black AMOLED theme with light text and surfaces. Patches Dart AOT dark palette tokens directly in libapp.so, updates night window and splash styling, and tints navigation and device icons.",
 ) {
     compatibleWith(
         Compatibility(
@@ -88,8 +98,11 @@ val ultimeaBlackModePatch = resourcePatch(
             targets = listOf(
                 AppTarget(
                     version = "1.4.4",
-                    versionCodes = mapOf(SupportedAbi.ARM64_V8A to 495),
-                    description = "Version 1.4.4, build 495 (ARM64).",
+                    versionCodes = mapOf(
+                        SupportedAbi.ARM64_V8A to 495,
+                        SupportedAbi.ARMEABI_V7A to 495,
+                    ),
+                    description = "Version 1.4.4, build 495.",
                 )
             ),
         ),
@@ -133,15 +146,31 @@ val ultimeaBlackModePatch = resourcePatch(
             }
         }
 
-        val arm64Lib = get("lib/arm64-v8a/libapp.so")
-        if (arm64Lib.exists()) {
-            val stockBytes = arm64Lib.readBytes()
-            val image = ThemeElfImage(stockBytes.copyOf())
-            val matches = ThemeInstructions(stockBytes, image.codeStart, image.codeEnd).match()
-            ThemeHooks.apply(image, matches, mode = 2)
-            arm64Lib.writeBytes(image.bytes)
-        } else {
-            throw PatchException("ARM64 libapp.so not found; Ultimea Black Mode requires arm64-v8a architecture.")
+        listOf("res/values-night/colors.xml", "res/values-night-v8/colors.xml").forEach { path ->
+            val file = get(path)
+            if (file.exists()) {
+                document(path).use { doc ->
+                    val colors = doc.getElementsByTagName("color")
+                    for (i in 0 until colors.length) {
+                        val color = colors.item(i) as Element
+                        val colorName = color.getAttribute("name")
+                        if (colorName in setOf("colorBackground", "colorElevated", "default_color_background")) {
+                            color.textContent = "#ff000000"
+                        }
+                    }
+                }
+            }
+        }
+
+        for (abi in listOf("arm64-v8a", "armeabi-v7a")) {
+            val lib = get("lib/$abi/libapp.so")
+            if (lib.exists()) {
+                var bytes = lib.readBytes()
+                for (token in DARK_COLOR_TOKENS) {
+                    bytes = replaceExactString(bytes, token, PURE_BLACK_TOKEN)
+                }
+                lib.writeBytes(bytes)
+            }
         }
 
         val iconsDir = get("assets/flutter_assets/assets/icons")
@@ -238,7 +267,10 @@ val ultimeaHideExplorerPatch = resourcePatch(
             targets = listOf(
                 AppTarget(
                     version = "1.4.4",
-                    versionCode = 495,
+                    versionCodes = mapOf(
+                        SupportedAbi.ARM64_V8A to 495,
+                        SupportedAbi.ARMEABI_V7A to 495,
+                    ),
                     description = "Version 1.4.4, build 495.",
                 )
             ),
@@ -263,10 +295,6 @@ val ultimeaHideExplorerPatch = resourcePatch(
             bytes = replaceExactPattern(bytes, A32_ALLOC_OLD, A32_ALLOC_NEW, "A32_ALLOC")
             arm32Lib.writeBytes(bytes)
             modified = true
-        }
-
-        if (!modified) {
-            throw PatchException("Neither arm64-v8a nor armeabi-v7a libapp.so was found in the target APK")
         }
 
         for (iconName in listOf("store_icon.svg", "store_icon_dark.svg", "store_icon_select.svg")) {

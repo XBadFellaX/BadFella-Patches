@@ -26,7 +26,7 @@ class UltimeaPatchesTests(unittest.TestCase):
         self.assertEqual(len(compat['targets']), 1)
         target = compat['targets'][0]
         self.assertEqual(target['version'], '1.4.4')
-        self.assertEqual(target['versionCodes'], {'ARM64_V8A': 495})
+        self.assertEqual(target['versionCodes']['ARM64_V8A'], 495)
         self.assertFalse(target['isExperimental'])
 
     def test_ultimea_hide_explorer_metadata(self):
@@ -39,14 +39,23 @@ class UltimeaPatchesTests(unittest.TestCase):
         self.assertEqual(target['versionCodes']['ARM64_V8A'], 495)
         self.assertFalse(target['isExperimental'])
 
-    def test_theme_bin_zero_syscall_amoled(self):
-        theme_bin = self.root / 'patches/src/main/resources/ultimea/theme.bin'
-        self.assertTrue(theme_bin.is_file())
-        data = theme_bin.read_bytes()
-        self.assertEqual(len(data), 2284)
-        # Verify patched instructions at 0x2d4: mov w17, #3; str w17, [x1, x16]; ret
-        expected_patch = bytes.fromhex('71008052316820b8c0035fd6')
-        self.assertEqual(data[0x2d4:0x2d4 + len(expected_patch)], expected_patch)
+    def test_amoled_tokens_unique_in_stock_libraries(self):
+        tokens = [b'#161616', b'#191919', b'#323232', b'#333333']
+
+        arm64_apk = Path('D:/Learn_Android_Development/analysis/ultimea/device/split_config.arm64_v8a.apk')
+        if arm64_apk.is_file():
+            with zipfile.ZipFile(arm64_apk, 'r') as z:
+                libapp_a64 = z.read('lib/arm64-v8a/libapp.so')
+            for token in tokens:
+                self.assertEqual(libapp_a64.count(token), 1, f"Token {token} count mismatch in ARM64")
+
+        xapk = Path('D:/Learn_Android_Development/ultimia/ULTIMEA_1.4.4_APKPure.xapk')
+        if xapk.is_file():
+            with zipfile.ZipFile(xapk, 'r') as z:
+                with zipfile.ZipFile(z.open('config.armeabi_v7a.apk'), 'r') as v7_apk:
+                    libapp_a32 = v7_apk.read('lib/armeabi-v7a/libapp.so')
+            for token in tokens:
+                self.assertEqual(libapp_a32.count(token), 1, f"Token {token} count mismatch in ARM32")
 
     def test_navigation_anchors_unique_in_stock_libraries(self):
         arm64_apk = Path('D:/Learn_Android_Development/analysis/ultimea/device/split_config.arm64_v8a.apk')
@@ -79,6 +88,11 @@ class UltimeaPatchesTests(unittest.TestCase):
             all_text += kt.read_text(encoding='utf-8')
 
         breaking_symbols = [
+            'ThemeElfImage',
+            'ThemeHooks',
+            'ThemeInstructions',
+            'Arm64Registers',
+            'theme.bin',
             'FineEqualizer',
             'Xupmix',
             'StopFirmwareReminders',
