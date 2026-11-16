@@ -84,15 +84,6 @@ final class PerformanceCapture {
         }
     }
 
-    /** A feed post's filter decision: computed, or reused from the per-post cache. */
-    static void postDecision(boolean reused) {
-        Session session = current;
-        if (session == null) return;
-        synchronized (session.stats) {
-            if (session.running) session.stats.posts[reused ? 1 : 0]++;
-        }
-    }
-
     private static final java.util.regex.Pattern VIEW_NAME = java.util.regex.Pattern.compile("[a-z0-9][a-z0-9._-]{0,63}");
 
     private static final class Session implements Application.ActivityLifecycleCallbacks {
@@ -150,7 +141,6 @@ final class PerformanceCapture {
     static final class Stats {
         private long frames, slow, total, maximum, firstDraws, dropped;
         private final long[] hookCount = new long[2], hookTotal = new long[2], hookMax = new long[2];
-        final long[] posts = new long[2];
         /** View name to {calls, total ns, max ns}. */
         private final java.util.Map<String, long[]> views = new java.util.HashMap<>();
 
@@ -193,7 +183,6 @@ final class PerformanceCapture {
                 out.append(String.format(Locale.ROOT, "  %s: calls=%d; total_ms=%.3f; max_ms=%.3f\n",
                         i == 0 ? "SDUI rewrite" : "SDUI filter", hookCount[i], hookTotal[i] / 1_000_000d, hookMax[i] / 1_000_000d));
             }
-            out.append("  feed post decisions: computed=").append(posts[0]).append("; reused=").append(posts[1]).append('\n');
             java.util.List<java.util.Map.Entry<String, long[]>> top = new java.util.ArrayList<>(views.entrySet());
             top.sort((a, b) -> Long.compare(b.getValue()[1], a.getValue()[1]));
             if (!top.isEmpty()) out.append("  SDUI filter by view name (top 30 by time):\n");

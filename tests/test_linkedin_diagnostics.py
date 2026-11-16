@@ -81,13 +81,13 @@ class LinkedInDiagnosticsTests(unittest.TestCase):
   directory=tempfile.TemporaryDirectory(prefix="linkedin-diagnostics-");cls.addClassCleanup(directory.cleanup)
   cls.work=Path(directory.name)
   stubs=dict(STUBS)
-  methods=set(re.findall(r"Settings\.(\w+)\(", (SOURCE/"SduiComponentFilter.java").read_text()))-{"debug","debugLog","mutedWords","generation"}
+  methods=set(re.findall(r"Settings\.(\w+)\(", (SOURCE/"SduiComponentFilter.java").read_text()))-{"debug","debugLog","mutedWords"}
   stubs["app/badfella/extension/linkedin/Boundaries.java"]='''package app.badfella.extension.linkedin;
 class Settings {
  static final String DEBUG_LOGGING="debug_logging",MUTED_WORDS="muted_words",DOWNLOAD_FOLDER="download_folder";
  static boolean enabled=true; static java.util.Map<String,Object> values=new java.util.HashMap<>();
  static boolean debug(){return enabled;} static void debugLog(String s){Diagnostics.debug(s);}
- static String patchesVersion(){return "1.5.0-dev.2";} static String mutedWords(){return "";} static int generation=0; static int generation(){return generation;}
+ static String patchesVersion(){return "1.5.0-dev.2";} static String mutedWords(){return "";} 
  static android.content.SharedPreferences prefs(){return () -> values;}
 '''+"".join(" static boolean "+name+"(){return Boolean.TRUE.equals(values.get(\""+name+"\"));}\n" for name in sorted(methods))+'''}
 class SettingsActivity extends android.app.Activity {static Object[][] patches(){return new Object[][]{{"Hide ads",true}};}}
@@ -95,14 +95,14 @@ class SduiMediaDownload {static String resumedScreen(){return "";} static void o
 class MoreMenu {static final String MORE_SCREEN="more";static void capture(byte[] b){}static boolean hideItem(String s){return false;}}
 class CopyPostText {static void onComponent(Object o,String n){}}
 class ViewerChrome {static Object rewrite(Object o,String n,String s,byte[] b){return o;}}
-class PostMenu {static Object inject(Object o,byte[] b){return o;}static void remember(byte[] b){}}
+class PostMenu {static Object inject(Object o,byte[] b){return o;}static void remember(byte[] b){}static void rememberLater(byte[] b){}}
 class ShortLinkResolver {static final String PREFIX="https://lnkd.in/";}
 class OpenLinksDirectlyPatch {static void prefetchShortLinks(String s){}}
 '''
   paths=[]
   for name,code in stubs.items():
    path=cls.work/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(code,encoding="utf8");paths.append(path)
-  paths += [SOURCE/name for name in ("Diagnostics.java","PerformanceCapture.java","SduiComponentFilter.java","Proto.java","ProtoEdit.java","ProtoScanner.java")]
+  paths += [SOURCE/name for name in ("Background.java","Diagnostics.java","PerformanceCapture.java","SduiComponentFilter.java","Proto.java","ProtoEdit.java","ProtoScanner.java")]
   paths.append(ROOT/"tests/LinkedInDiagnosticsCheck.java")
   javac=cls.java.with_name("javac.exe" if os.name=="nt" else "javac")
   result=subprocess.run([str(javac),"-cp",str(cls.android),"-d",str(cls.work),*map(str,paths)],capture_output=True,text=True)
@@ -115,5 +115,5 @@ class OpenLinksDirectlyPatch {static void prefetchShortLinks(String s){}}
  def test_account_content_and_custom_preferences_never_enter_report(self):self.check("privacy")
  def test_capture_lifecycle_refresh_budget_and_disabled_state(self):self.check("capture")
  def test_component_cache_reuses_storage_without_stale_values(self):self.check("memo")
- def test_feed_post_decision_survives_visibility_samples(self):self.check("samples")
  def test_hide_video_posts_matches_view_names_not_text(self):self.check("videos")
+ def test_suggested_and_promoted_labels_match_whole_fields(self):self.check("labels")

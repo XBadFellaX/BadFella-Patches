@@ -42,16 +42,8 @@ public final class SduiComponentFilter {
             "leadgen",
     };
 
-    /**
-     * Labels LinkedIn puts on a boosted or otherwise promoted post that carries no sponsored URN. Only
-     * used to decide whether the payload is worth parsing; the parsed strings confirm the label.
-     */
-    private static final String[] PROMOTED_LABEL_MARKERS = {
-            "Promoted", "promoted", "Sponsored", "sponsored", "Dipromosikan", "dipromosikan",
-    };
-
-    /** The labels themselves, compared case-insensitively against whole short strings. */
-    private static final String[] PROMOTED_LABELS = {"promoted", "sponsored", "dipromosikan"};
+    /** The labels themselves, at the start of a short string of their own. */
+    private static final String[] PROMOTED_LABEL_WORDS = {"Promoted", "Sponsored", "Dipromosikan"};
 
     /**
      * AI prompts and assistant cards, recognized by a whole word of the view name (feed-ai-prompt, genai-...).
@@ -76,16 +68,6 @@ public final class SduiComponentFilter {
         return false;
     }
 
-    /** A view name rather than text: lowercase words joined by '-', such as large-single-video-view. */
-    private static boolean isViewNameLike(String s) {
-        if (s.length() < 3 || s.length() > 80 || s.indexOf('-') < 0) return false;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (!(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9') && c != '-' && c != '_') return false;
-        }
-        return true;
-    }
-
     /**
      * Feed modules built around videos, such as "Videos for you", whose view names are not feed-full-update: a feed
      * component named with the word video. Posts are matched by the view names inside them in hideFeedUpdate.
@@ -100,6 +82,9 @@ public final class SduiComponentFilter {
      * small text part without a view name, so it can't be found by name: unnamed parts that mention a puzzle.
      */
     private static boolean isPuzzleHeading(Object component) {
+        // Most unnamed parts are containers: their size is known without serializing their whole subtree.
+        Object size = Proto.call(component, "getSerializedSize");
+        if (size instanceof Integer && (Integer) size >= 4000) return false;
         byte[] bytes = payload(component);
         return bytes != null && bytes.length < 4000 && ProtoScanner.containsAscii(bytes, "uzzle");
     }
@@ -130,23 +115,16 @@ public final class SduiComponentFilter {
             // Before the transform builds this component's ClickActions, which the copy hook then replaces.
             if (copyPostText) CopyPostText.onComponent(component, viewName);
             if (expandPosts && COMMENTARY.equals(viewName)) {
-                Object known = cached(EXPANDED, component);
-                if (known != null) {
-                    component = known;
-                } else {
-                    Object original = component;
-                    try {
-                        byte[] bytes = payload(component);
-                        byte[] edited = bytes == null ? null : expandCommentary(bytes);
-                        if (edited != null && edited != bytes) {
-                            Object copy = component.getClass().getMethod("parseFrom", byte[].class)
-                                    .invoke(null, (Object) edited);
-                            if (copy != null) component = copy;
-                        }
-                    } catch (Throwable t) {
-                        Diagnostics.error("expand posts failed", t);
+                try {
+                    byte[] bytes = payload(component);
+                    byte[] edited = bytes == null ? null : expandCommentary(bytes);
+                    if (edited != null && edited != bytes) {
+                        Object copy = component.getClass().getMethod("parseFrom", byte[].class)
+                                .invoke(null, (Object) edited);
+                        if (copy != null) component = copy;
                     }
-                    cache(EXPANDED, original, component);
+                } catch (Throwable t) {
+                    Diagnostics.error("expand posts failed", t);
                 }
             }
             if (viewer && VIEWER_CONTAINER.equals(viewName)) {
@@ -213,32 +191,20 @@ public final class SduiComponentFilter {
             if (Settings.hideVideoPosts() && isFeedVideoView(viewName)) {
                 return hide(true, "video module: " + viewName);
             }
-            if (Settings.hideGames() && viewName.isEmpty()) {
-                Object known = cached(HIDDEN, component);
-                boolean heading = known != null ? (Boolean) known : isPuzzleHeading(component);
-                if (known == null) cache(HIDDEN, component, heading);
-                if (heading) return hide(true, "games heading");
+            if (Settings.hideGames() && viewName.isEmpty() && isPuzzleHeading(component)) {
+                return hide(true, "games heading");
             }
 
             switch (viewName) {
                 case "feed-full-update": {
-                    Object known = cached(HIDDEN, component);
-                    PerformanceCapture.postDecision(known != null);
-                    if (known != null) return (Boolean) known;
                     // One serialization of the post feeds both the remember store and the filters below.
                     byte[] post = Settings.postMenu() ? payload(component) : null;
-                    if (post != null) PostMenu.remember(post);
-                    boolean hide = hideFeedUpdate(component, viewTracking, post);
-                    cache(HIDDEN, component, hide);
-                    return hide;
+                    // Only needed when the post's menu opens, so it is parsed off the scrolling thread.
+                    if (post != null) PostMenu.rememberLater(post);
+                    return hideFeedUpdate(component, viewTracking, post);
                 }
-                case "job-card": {
-                    Object known = cached(HIDDEN, component);
-                    if (known != null) return (Boolean) known;
-                    boolean hide = hidePromotedJob(component);
-                    cache(HIDDEN, component, hide);
-                    return hide;
-                }
+                case "job-card":
+                    return hidePromotedJob(component);
                 case "multiphoto-viewer":
                     collectMedia(component, viewName);
                     return false;
@@ -306,14 +272,16 @@ public final class SduiComponentFilter {
         }
 
         byte[] payload = remembered != null ? remembered : payload(component);
-        // Each ProtoScanner.scan() parses the whole post and decodes its strings, so the payload is scanned at most
-        // once here and the result is shared by every check that needs the strings.
+        // Every post passes here while the feed scrolls, so the default checks are linear byte searches. A full
+        // ProtoScanner.scan() runs only for the optional checks below that need the strings, at most once.
         ProtoScanner scanner = null;
+        // A prefetch: parsed on the background thread, so scrolling never waits for it.
         if (shortLinks && ProtoScanner.containsAscii(payload, ShortLinkResolver.PREFIX)) {
-            scanner = ProtoScanner.scan(payload);
-            for (String s : scanner.strings) {
-                if (s.contains(ShortLinkResolver.PREFIX)) OpenLinksDirectlyPatch.prefetchShortLinks(s);
-            }
+            Background.run(() -> {
+                for (String s : ProtoScanner.scan(payload).strings) {
+                    if (s.contains(ShortLinkResolver.PREFIX)) OpenLinksDirectlyPatch.prefetchShortLinks(s);
+                }
+            });
         }
         if (ads) {
             if (hasSponsoredTracking(viewTracking) || containsAny(payload, SPONSORED_MARKERS)) {
@@ -321,9 +289,8 @@ public final class SduiComponentFilter {
             }
             // A boosted organic post carries no sponsored URN, only a Promoted/Sponsored badge. The byte
             // check keeps posts without a label from being parsed just for this.
-            if (containsAny(payload, PROMOTED_LABEL_MARKERS)) {
-                if (scanner == null) scanner = ProtoScanner.scan(payload);
-                if (hasPromotedLabel(scanner.strings)) return hide(true, "promoted feed update");
+            if (ProtoScanner.hasFieldStartingWith(payload, 60, PROMOTED_LABEL_WORDS)) {
+                return hide(true, "promoted feed update");
             }
         }
         // Child components are embedded in the post payload, so their view names identify the post type.
@@ -338,11 +305,8 @@ public final class SduiComponentFilter {
         }
         // Single videos (large-single-video-view) and carousels such as "Videos for you": any view name inside the
         // post with the word video. View names are matched whole, never words of the post's text.
-        if (videos && ProtoScanner.containsAscii(payload, "video")) {
-            if (scanner == null) scanner = ProtoScanner.scan(payload);
-            for (String s : scanner.strings) {
-                if (isViewNameLike(s) && hasWord(s, VIDEO_WORDS)) return hide(true, "video post");
-            }
+        if (videos && ProtoScanner.hasViewNameWithWord(payload, "video")) {
+            return hide(true, "video post");
         }
         boolean recommendationModule = false;
         if (recommendations || activity) {
@@ -370,11 +334,9 @@ public final class SduiComponentFilter {
         }
         // The header label is its own string field, so match the whole string, never a substring
         // of post text.
-        if (suggested) {
-            if (scanner == null) scanner = ProtoScanner.scan(payload);
-            for (String s : scanner.strings) {
-                if (s.equals("Suggested") || s.equals("Disarankan")) return hide(true, "suggested post");
-            }
+        if (suggested && (ProtoScanner.hasFieldString(payload, "Suggested")
+                || ProtoScanner.hasFieldString(payload, "Disarankan"))) {
+            return hide(true, "suggested post");
         }
         return false;
     }
@@ -426,26 +388,6 @@ public final class SduiComponentFilter {
         return false;
     }
 
-    /**
-     * A promoted label is its own short post string ("Promoted", "Promoted by X", "Sponsored ·").
-     * Compare only the leading word so a separator or a suffix does not defeat it, while a post whose
-     * commentary merely mentions the word elsewhere is not matched.
-     */
-    private static boolean hasPromotedLabel(List<String> strings) {
-        for (String s : strings) {
-            if (s.length() > 60) continue;
-            int end = s.length();
-            while (end > 0 && !Character.isLetterOrDigit(s.charAt(end - 1))) end--;
-            String value = s.substring(0, end);
-            for (String label : PROMOTED_LABELS) {
-                if (!value.regionMatches(true, 0, label, 0, label.length())) continue;
-                if (value.length() == label.length()) return true;
-                if (!Character.isLetter(value.charAt(label.length()))) return true;
-            }
-        }
-        return false;
-    }
-
     /** viewTracking.metadata[] contains a TrackingMetadata with sponsoredData for ads. */
     private static boolean hasSponsoredTracking(Object viewTracking) {
         Object metadata = Proto.call(viewTracking, "getMetadataList");
@@ -481,45 +423,6 @@ public final class SduiComponentFilter {
         if (!Settings.downloadMedia()) return;
         SduiMediaDownload.offer(ProtoScanner.scan(payload(component)), source, source.startsWith(PROFILE_MEDIA_PREFIX));
     }
-
-    // region Results across visibility samples
-
-    /**
-     * The per-component memo below lasts for one component only, but while the feed scrolls every visible post is
-     * transformed again for each visibility sample. Without this, each sample serialized every visible post's whole
-     * subtree (and parsed its strings for Hide suggested posts, which is on by default): the scroll stutter.
-     *
-     * Components are immutable protobuf messages, so a result stays valid for the same instance until a setting
-     * changes. Direct-mapped by identity with weak keys: bounded, and never keeps a post alive.
-     */
-    private static final class Entry extends java.lang.ref.WeakReference<Object> {
-        final int generation;
-        final Object value;
-
-        Entry(Object key, int generation, Object value) {
-            super(key);
-            this.generation = generation;
-            this.value = value;
-        }
-    }
-
-    private static final int CACHE_MASK = 255;
-    /** shouldHide decisions that needed the payload. */
-    private static final Entry[] HIDDEN = new Entry[CACHE_MASK + 1];
-    /** Expand posts: the original commentary component to its edited copy. */
-    private static final Entry[] EXPANDED = new Entry[CACHE_MASK + 1];
-
-    private static Object cached(Entry[] cache, Object component) {
-        Entry entry = cache[System.identityHashCode(component) & CACHE_MASK];
-        if (entry == null || entry.get() != component || entry.generation != Settings.generation()) return null;
-        return entry.value;
-    }
-
-    private static void cache(Entry[] cache, Object component, Object value) {
-        cache[System.identityHashCode(component) & CACHE_MASK] = new Entry(component, Settings.generation(), value);
-    }
-
-    // endregion
 
     // region Per-component memo
 

@@ -210,7 +210,7 @@ with tempfile.TemporaryDirectory() as workspace:
     for marker in ("sponsoredContentV2", "sponsoredCreative", "sponsoredUpdate", "adCreative",
                    "adUpdate", "promotedUpdate", "leadGenForm", "leadgen"):
         assert marker in filter_dex, f"Missing SDUI ad marker {marker}"
-    for method in ("hasSponsoredTracking", "hasPromotedLabel"):
+    for method in ("hasSponsoredTracking", "hasFieldStartingWith"):
         assert method in filter_dex, f"Missing SDUI ad check {method}"
 
     # The legacy Pegasus feed path carries the same comprehensive checks.

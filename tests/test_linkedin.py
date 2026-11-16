@@ -194,7 +194,7 @@ class LinkedInSourceTests(unittest.TestCase):
                        "urn:li:adCreative:", "urn:li:adUpdate:", "urn:li:promotedUpdate:",
                        "sponsoredcontent", "sponsoredcreative", "leadgen"):
             self.assertIn(f'"{marker}"', sdui_src)
-        self.assertIn("hasPromotedLabel(scanner.strings)", sdui_src)
+        self.assertIn("hasFieldStartingWith(payload, 60, PROMOTED_LABEL_WORDS)", sdui_src)
         self.assertIn('"Promoted"', sdui_src)
         self.assertIn('"Sponsored"', sdui_src)
         self.assertIn('"Dipromosikan"', sdui_src)

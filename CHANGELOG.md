@@ -1,3 +1,10 @@
+## 1.6.0-dev.10 (2026-11-16)
+
+- **LinkedIn:** Smoother feed scrolling. Feed filters no longer parse each whole post while it scrolls into view: Hide suggested posts, Hide ads labels and Hide video posts use quick checks, and the work for the post menu and short links runs in the background.
+- **LinkedIn:** Remove the per-post result cache added in 1.6.0-dev.8, which never matched because LinkedIn creates a new post object on every update.
+
+Enable pre-releases for BadFella Patches in Morphe Manager, refresh Sources and repatch the original stock APK. Install with your existing Manager signing key to preserve app data.
+
 ## 1.6.0-dev.9 (2026-11-16)
 
 - **LinkedIn:** Hide video posts also hides video carousels such as "Videos for you", matched by the video components inside a post or module rather than by its text.

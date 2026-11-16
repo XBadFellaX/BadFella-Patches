@@ -74,7 +74,15 @@ final class PostMenu {
 
     // region Remembering posts
 
-    /** Called with the payload of every feed post (feed-full-update). */
+    /**
+     * Called with the payload of every feed post (feed-full-update). Parsed on the background thread, so scrolling
+     * never waits for it; the bytes are never modified.
+     */
+    static void rememberLater(byte[] payload) {
+        if (payload == null || !Settings.postMenu()) return;
+        Background.run(() -> remember(payload));
+    }
+
     static void remember(byte[] payload) {
         if (payload == null || !Settings.postMenu()) return;
         long signature = signature(payload);

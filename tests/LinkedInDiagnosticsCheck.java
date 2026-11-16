@@ -17,8 +17,8 @@ public class LinkedInDiagnosticsCheck {
     public static void main(String[] args) throws Exception {
         if (args[0].equals("privacy")) privacy(Path.of(args[1]));
         else if (args[0].equals("capture")) capture();
-        else if (args[0].equals("samples")) samples();
         else if (args[0].equals("videos")) videos();
+        else if (args[0].equals("labels")) labels();
         else memo();
     }
 
@@ -71,7 +71,6 @@ public class LinkedInDiagnosticsCheck {
         PerformanceCapture.endHook(0,start);
         PerformanceCapture.endView("feed-full-update",start);
         PerformanceCapture.endView("Alice Private Text",start);
-        PerformanceCapture.postDecision(true);
         app.callbacks.onActivityPaused(host);
         check(host.window.listener==null, "Pause retained listener");
         app.callbacks.onActivityResumed(host);
@@ -86,7 +85,6 @@ public class LinkedInDiagnosticsCheck {
         check(report.contains("SDUI rewrite: calls=1"), report);
         check(report.contains("    feed-full-update: calls=1") && report.contains("    (other): calls=1"), report);
         check(!report.contains("Alice"), "View name filter leaked text");
-        check(report.contains("feed post decisions: computed=0; reused=1"), report);
         listener.onFrameMetricsAvailable(host.window,new FrameMetrics(99_000_000,1,0),0);
         PerformanceCapture.endHook(0,start);
         check(report.equals(PerformanceCapture.report()), "Late data changed completed capture");
@@ -141,18 +139,19 @@ public class LinkedInDiagnosticsCheck {
         Settings.values.remove("hideVideoPosts");
     }
 
-    /** Visible posts are transformed again for every visibility sample; each must be serialized only once. */
-    static void samples() {
+    /** Suggested and promoted labels are whole short fields, found without parsing; post text never matches. */
+    static void labels() {
         Settings.values.put("hideSuggested", true);
-        Post a=new Post(1), b=new Post(2);
-        for (int sample=0; sample<5; sample++) {
-            SduiComponentFilter.shouldHide(a);
-            SduiComponentFilter.shouldHide(b);
-        }
-        check(a.serializations==1 && b.serializations==1, "Post serialized per sample: "+a.serializations+"/"+b.serializations);
-        Settings.generation++;
-        SduiComponentFilter.shouldHide(a);
-        check(a.serializations==2, "Settings change did not re-evaluate the post");
+        check(SduiComponentFilter.shouldHide(new Post("feed-header", "Suggested")), "Suggested kept");
+        check(!SduiComponentFilter.shouldHide(new Post("feed-commentary", "Suggested reading for today")), "Suggested text hidden");
+        Settings.values.remove("hideSuggested");
+        Settings.values.put("hideAds", true);
+        check(SduiComponentFilter.shouldHide(new Post("feed-actor", "Promoted")), "Promoted kept");
+        check(SduiComponentFilter.shouldHide(new Post("feed-actor", "Promoted by Acme")), "Promoted by kept");
+        check(SduiComponentFilter.shouldHide(new Post("feed-actor", "Sponsored · Acme")), "Sponsored dot kept");
+        check(!SduiComponentFilter.shouldHide(new Post("feed-commentary", "I just got promoted at work")), "Promoted text hidden");
+        check(!SduiComponentFilter.shouldHide(new Post("feed-actor", "Promotedness")), "Prefix word hidden");
+        Settings.values.remove("hideAds");
     }
 
     static void memo() throws Exception {
