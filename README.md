@@ -25,22 +25,22 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.4.1-dev.2](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.4.1-dev.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;45 patches total
+> **[v1.5.0](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.5.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;47 patches total
 <details open>
 <summary>📦 LinkedIn&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
 
 **🎯 Supported versions:**
 
-| 4.1.1267 | 4.1.1271 |
-| :---: | :---: |
-|  | Version 4.1.1271, build 217900. | Any version (experimental). Every patch verifies its own anchors. |
+| 4.1.1267 | 4.1.1271 | 4.1.1272 |
+| :---: | :---: | :---: |
+|  | Version 4.1.1271, build 217900. | Version 4.1.1272, build 218000. | Any version (experimental). Every patch verifies its own anchors. |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
 | [Always show navigation bar](#always-show-navigation-bar) | Adds an option in BadFella Patches to keep the navigation bar on screen while you scroll. |  |
-| [Anonymous profile viewing](#anonymous-profile-viewing) | Adds an option (off by default, experimental) to visit profiles without being listed in "Who viewed your profile": the analytics events of profile pages are not sent. |  |
-| [Block tracking](#block-tracking) | Adds an option (off by default) to stop sending most LinkedIn analytics events. |  |
+| [Anonymous profile viewing](#anonymous-profile-viewing) | Adds an option (on by default, experimental) to visit profiles without being listed in "Who viewed your profile": the analytics events of profile pages are not sent. |  |
+| [Block tracking](#block-tracking) | Adds an option (on by default) to stop sending most LinkedIn analytics events. |  |
 | [Copy post text](#copy-post-text) | Long pressing a post's text copies all of it, including the part behind "...more". |  |
 | [Copy text](#copy-text) | Long press a post, comment or any other text to select and copy it in place, like on Reddit. |  |
 | [Customize navigation bar](#customize-navigation-bar) | Takes the bottom navigation buttons you pick off the bar, such as My Network, Post, Notifications, Jobs, Video or News. Each page still opens from the Menu and from links. Restart LinkedIn after changing the selection. | • Hide My Network<br>• Hide Post<br>• Hide Notifications<br>• Hide Jobs<br>• Hide Video<br>• Hide News |
@@ -76,14 +76,30 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 </details>
 
 <details open>
+<summary>📦 BoldVoice&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 5.1.3 |
+| :---: |
+| Version 5.1.3, build 470 (ARM64 split). |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [BoldVoice subscription features](#boldvoice-subscription-features) | Enables client-side subscriber features and lessons in BoldVoice 5.1.3. Restores devirtualized startup lifecycle methods, hoisted strings, and notification callbacks; neutralizes PairIP VM and licensing checks; restores pristine ARM64 native libraries; disables Expo OTA bundle replacement. Server-controlled features retain their existing requirements. |  |
+
+</details>
+
+<details open>
 <summary>📦 TickTick&nbsp;&nbsp;•&nbsp;&nbsp;4 patches</summary>
 <br>
 
 **🎯 Supported versions:**
 
-| 8.3.0.1 |
+| 8.3.0.2 |
 | :---: |
-| Version 8.3.0.1, build 8301. | Any version (experimental). Every patch verifies its own anchors. |
+| Version 8.3.0.2, build 8302. | Any version (experimental). Every patch verifies its own anchors. |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
@@ -117,7 +133,7 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
-| [Install next to ChatGPT](#install-next-to-chatgpt) | Installs this build as a second ChatGPT beside your normal one, with its own data and sign-in. Pick its package name and app name in the patch's options. Works as soon as you patch it in. | • Package name<br>• App name |
+| [Install next to ChatGPT](#install-next-to-chatgpt) | Installs this build as a second ChatGPT beside your normal one, with its own data and sign-in. Pick its package name and app name in the patch's options. Sign-in uses the original OAuth callback; if Android asks which app to open, choose the copy. | • Package name<br>• App name |
 
 </details>
 
@@ -144,6 +160,22 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
 | [Remote ATV ad-free](#remote-atv-ad-free) | Disables advertising, restores startup and replaces premium activation with a local ad-free status. Removes the home banner and its spacing. Does not create a server subscription. |  |
+
+</details>
+
+<details open>
+<summary>📦 Science News Daily&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 23.8 |
+| :---: |
+| Version 23.8, build 238 (ARM64 split). |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Science News Daily local subscription](#science-news-daily-local-subscription) | Reports the cached subscription flag as active, so ad-free reading, premium-post browsing, downloads and upsell-free screens stay enabled. Neutralizes the PairIP installation check so the app runs when installed outside Play Store. Preserves sign-in, Google Play billing callbacks, restore and the server verification request. |  |
 
 </details>
 

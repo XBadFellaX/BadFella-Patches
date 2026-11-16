@@ -1,3 +1,27 @@
+## 1.5.0 (2026-11-16)
+
+### 🐛 Bug Fixes
+
+* **boldvoice:** neutralize PairIP DRM chain to fix Play Store installer check 53e1e16
+* **boldvoice:** preserve startup and complete local license state c6ff92c
+* **boldvoice:** preserve StartupLauncher to fix startup crash ed98d4d
+* **boldvoice:** restore PairIP virtualized startup, strings, and callbacks bceb8d6
+* **chatgpt:** preserve the registered OAuth redirect in clones 5e266fa
+* **linkedin:** expose premium navigation hook to app callers fd111d6
+* **linkedin:** include translated settings in combined development preview 36eb695, closes #6
+* **linkedin:** match settings shortcut to drawer cards 1bcdbd1
+* **linkedin:** never open the full screen Premium page instead of closing it 41905b7
+* **sciencenews:** bypass PairIP Play Store installer check 1f8c536
+
+### ✨ New Features
+
+* **boldvoice:** support BoldVoice 5.1.3 (build 470) 4167628
+* **chatgpt:** add Install next to ChatGPT clone patch (v1.4.1-dev.2) ca484a9
+* **linkedin:** add private performance diagnostics and report export 98ebaef
+* **linkedin:** support GmsCore push notifications and enable privacy by default (v1.5.0-dev.12) bbcda7e
+* **sciencenews:** support Science News Daily 23.8 (build 238) 4b168f6
+* **ticktick,linkedin:** support TickTick 8.3.0.2 and LinkedIn 4.1.1272 60d5b29
+
 ## 1.5.0-dev.12 (2026-11-15)
 
 ### LinkedIn
