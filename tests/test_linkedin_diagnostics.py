@@ -81,15 +81,15 @@ class LinkedInDiagnosticsTests(unittest.TestCase):
   directory=tempfile.TemporaryDirectory(prefix="linkedin-diagnostics-");cls.addClassCleanup(directory.cleanup)
   cls.work=Path(directory.name)
   stubs=dict(STUBS)
-  methods=set(re.findall(r"Settings\.(\w+)\(", (SOURCE/"SduiComponentFilter.java").read_text()))-{"debug","debugLog","mutedWords"}
+  methods=set(re.findall(r"Settings\.(\w+)\(", (SOURCE/"SduiComponentFilter.java").read_text()))-{"debug","debugLog","mutedWords","generation"}
   stubs["app/badfella/extension/linkedin/Boundaries.java"]='''package app.badfella.extension.linkedin;
 class Settings {
  static final String DEBUG_LOGGING="debug_logging",MUTED_WORDS="muted_words",DOWNLOAD_FOLDER="download_folder";
  static boolean enabled=true; static java.util.Map<String,Object> values=new java.util.HashMap<>();
  static boolean debug(){return enabled;} static void debugLog(String s){Diagnostics.debug(s);}
- static String patchesVersion(){return "1.5.0-dev.2";} static String mutedWords(){return "";}
+ static String patchesVersion(){return "1.5.0-dev.2";} static String mutedWords(){return "";} static int generation=0; static int generation(){return generation;}
  static android.content.SharedPreferences prefs(){return () -> values;}
-'''+"".join(" static boolean "+name+"(){return false;}\n" for name in sorted(methods))+'''}
+'''+"".join(" static boolean "+name+"(){return Boolean.TRUE.equals(values.get(\""+name+"\"));}\n" for name in sorted(methods))+'''}
 class SettingsActivity extends android.app.Activity {static Object[][] patches(){return new Object[][]{{"Hide ads",true}};}}
 class SduiMediaDownload {static String resumedScreen(){return "";} static void offer(ProtoScanner s,String n,boolean b){}}
 class MoreMenu {static final String MORE_SCREEN="more";static void capture(byte[] b){}static boolean hideItem(String s){return false;}}
@@ -115,3 +115,4 @@ class OpenLinksDirectlyPatch {static void prefetchShortLinks(String s){}}
  def test_account_content_and_custom_preferences_never_enter_report(self):self.check("privacy")
  def test_capture_lifecycle_refresh_budget_and_disabled_state(self):self.check("capture")
  def test_component_cache_reuses_storage_without_stale_values(self):self.check("memo")
+ def test_feed_post_decision_survives_visibility_samples(self):self.check("samples")

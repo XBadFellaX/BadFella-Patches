@@ -1,25 +1,32 @@
+## 1.6.0-dev.8 (2026-11-16)
+
+- **LinkedIn:** Smoother feed scrolling. Feed filters now check each post once instead of re-reading every visible post on each scroll update.
+- **LinkedIn:** Changing a BadFella Patches setting re-checks posts with the new setting.
+
+Enable pre-releases for BadFella Patches in Morphe Manager, refresh Sources and repatch the original stock APK. Install with your existing Manager signing key to preserve app data.
+
 ## 1.6.0-dev.7 (2026-11-16)
 
-- Restore Firebase's original package and certificate headers in the normal LinkedIn patch path, including cloned builds. The correction also applies without GmsCore support.
-- Keep GmsCore support disabled to use regular Google Play services. Selecting it routes Google sign-in and push through microG RE, which must be installed and allowed to run in the background.
-- Notification permission and LinkedIn notification settings still apply. End-to-end push delivery requires device verification.
+- **LinkedIn:** Restore Firebase's original package and certificate headers in the normal LinkedIn patch path, including cloned builds. The correction also applies without GmsCore support.
+- **LinkedIn:** Keep GmsCore support disabled to use regular Google Play services. Selecting it routes Google sign-in and push through microG RE, which must be installed and allowed to run in the background.
+- **LinkedIn:** Notification permission and LinkedIn notification settings still apply. End-to-end push delivery requires device verification.
 
 Enable pre-releases for BadFella Patches in Morphe Manager, refresh Sources and repatch the original stock APK. Install with your existing Manager signing key to preserve app data.
 
 ## 1.6.0-dev.6 (2026-11-16)
 
-- Rename the Ultimea Profile entry and settings-page title to BadFella Patches. Bluetooth/device-control behavior is unchanged from dev.5.
+- **Ultimea:** Rename the Ultimea Profile entry and settings-page title to BadFella Patches. Bluetooth/device-control behavior is unchanged from dev.5.
 
 ## 1.6.0-dev.5 (2026-11-16)
 
-- Add hxreborn-derived Accent color, Disable tracking, Remove distractions and Remove popups for Ultimea 1.4.4 build 495 (ARM64).
-- Apply removal edits during patching and prepare accent colors on launch. Preserve Bluetooth/device-control implementations and Flutter library loading.
-- The existing Feedback contrast issue is unchanged. Physical startup, appearance and soundbar reconnection still require testing.
+- **Ultimea:** Add hxreborn-derived Accent color, Disable tracking, Remove distractions and Remove popups for Ultimea 1.4.4 build 495 (ARM64).
+- **Ultimea:** Apply removal edits during patching and prepare accent colors on launch. Preserve Bluetooth/device-control implementations and Flutter library loading.
+- **Ultimea:** The existing Feedback contrast issue is unchanged. Physical startup, appearance and soundbar reconnection still require testing.
 
 ## 1.6.0-dev.4 (2026-11-16)
 
-- Replace the incomplete Ultimea theme and Explorer edits with the scoped hxreborn-derived port for Ultimea 1.4.4 build 495 (ARM64 only).
-- Keep Bluetooth connection methods, device controls and Flutter engine libraries unchanged. Physical startup and soundbar reconnection remain unverified.
+- **Ultimea:** Replace the incomplete Ultimea theme and Explorer edits with the scoped hxreborn-derived port for Ultimea 1.4.4 build 495 (ARM64 only).
+- **Ultimea:** Keep Bluetooth connection methods, device controls and Flutter engine libraries unchanged. Physical startup and soundbar reconnection remain unverified.
 
 ## 1.5.0 (2026-11-16)
 

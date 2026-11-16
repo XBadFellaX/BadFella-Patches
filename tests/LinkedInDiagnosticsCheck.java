@@ -17,6 +17,7 @@ public class LinkedInDiagnosticsCheck {
     public static void main(String[] args) throws Exception {
         if (args[0].equals("privacy")) privacy(Path.of(args[1]));
         else if (args[0].equals("capture")) capture();
+        else if (args[0].equals("samples")) samples();
         else memo();
     }
 
@@ -99,6 +100,30 @@ public class LinkedInDiagnosticsCheck {
         final byte[] bytes;
         Component(int value) { bytes=new byte[]{(byte)value}; }
         public byte[] toByteArray() { serializations++; return bytes; }
+    }
+
+    public static class Tracking {
+        public String getViewName() { return "feed-full-update"; }
+    }
+
+    public static class Post extends Component {
+        Post(int value) { super(value); }
+        public boolean hasViewTracking() { return true; }
+        public Tracking getViewTracking() { return new Tracking(); }
+    }
+
+    /** Visible posts are transformed again for every visibility sample; each must be serialized only once. */
+    static void samples() {
+        Settings.values.put("hideSuggested", true);
+        Post a=new Post(1), b=new Post(2);
+        for (int sample=0; sample<5; sample++) {
+            SduiComponentFilter.shouldHide(a);
+            SduiComponentFilter.shouldHide(b);
+        }
+        check(a.serializations==1 && b.serializations==1, "Post serialized per sample: "+a.serializations+"/"+b.serializations);
+        Settings.generation++;
+        SduiComponentFilter.shouldHide(a);
+        check(a.serializations==2, "Settings change did not re-evaluate the post");
     }
 
     static void memo() throws Exception {

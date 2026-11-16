@@ -105,16 +105,23 @@ public final class SduiComponentFilter {
             // Before the transform builds this component's ClickActions, which the copy hook then replaces.
             if (copyPostText) CopyPostText.onComponent(component, viewName);
             if (expandPosts && COMMENTARY.equals(viewName)) {
-                try {
-                    byte[] bytes = payload(component);
-                    byte[] edited = bytes == null ? null : expandCommentary(bytes);
-                    if (edited != null && edited != bytes) {
-                        Object copy = component.getClass().getMethod("parseFrom", byte[].class)
-                                .invoke(null, (Object) edited);
-                        if (copy != null) component = copy;
+                Object known = cached(EXPANDED, component);
+                if (known != null) {
+                    component = known;
+                } else {
+                    Object original = component;
+                    try {
+                        byte[] bytes = payload(component);
+                        byte[] edited = bytes == null ? null : expandCommentary(bytes);
+                        if (edited != null && edited != bytes) {
+                            Object copy = component.getClass().getMethod("parseFrom", byte[].class)
+                                    .invoke(null, (Object) edited);
+                            if (copy != null) component = copy;
+                        }
+                    } catch (Throwable t) {
+                        Diagnostics.error("expand posts failed", t);
                     }
-                } catch (Throwable t) {
-                    Diagnostics.error("expand posts failed", t);
+                    cache(EXPANDED, original, component);
                 }
             }
             if (viewer && VIEWER_CONTAINER.equals(viewName)) {
@@ -178,19 +185,31 @@ public final class SduiComponentFilter {
             if (Settings.hideGames() && isGameView(viewName)) {
                 return hide(true, "games: " + viewName);
             }
-            if (Settings.hideGames() && viewName.isEmpty() && isPuzzleHeading(component)) {
-                return hide(true, "games heading");
+            if (Settings.hideGames() && viewName.isEmpty()) {
+                Object known = cached(HIDDEN, component);
+                boolean heading = known != null ? (Boolean) known : isPuzzleHeading(component);
+                if (known == null) cache(HIDDEN, component, heading);
+                if (heading) return hide(true, "games heading");
             }
 
             switch (viewName) {
                 case "feed-full-update": {
+                    Object known = cached(HIDDEN, component);
+                    if (known != null) return (Boolean) known;
                     // One serialization of the post feeds both the remember store and the filters below.
                     byte[] post = Settings.postMenu() ? payload(component) : null;
                     if (post != null) PostMenu.remember(post);
-                    return hideFeedUpdate(component, viewTracking, post);
+                    boolean hide = hideFeedUpdate(component, viewTracking, post);
+                    cache(HIDDEN, component, hide);
+                    return hide;
                 }
-                case "job-card":
-                    return hidePromotedJob(component);
+                case "job-card": {
+                    Object known = cached(HIDDEN, component);
+                    if (known != null) return (Boolean) known;
+                    boolean hide = hidePromotedJob(component);
+                    cache(HIDDEN, component, hide);
+                    return hide;
+                }
                 case "multiphoto-viewer":
                     collectMedia(component, viewName);
                     return false;
@@ -427,6 +446,45 @@ public final class SduiComponentFilter {
         if (!Settings.downloadMedia()) return;
         SduiMediaDownload.offer(ProtoScanner.scan(payload(component)), source, source.startsWith(PROFILE_MEDIA_PREFIX));
     }
+
+    // region Results across visibility samples
+
+    /**
+     * The per-component memo below lasts for one component only, but while the feed scrolls every visible post is
+     * transformed again for each visibility sample. Without this, each sample serialized every visible post's whole
+     * subtree (and parsed its strings for Hide suggested posts, which is on by default): the scroll stutter.
+     *
+     * Components are immutable protobuf messages, so a result stays valid for the same instance until a setting
+     * changes. Direct-mapped by identity with weak keys: bounded, and never keeps a post alive.
+     */
+    private static final class Entry extends java.lang.ref.WeakReference<Object> {
+        final int generation;
+        final Object value;
+
+        Entry(Object key, int generation, Object value) {
+            super(key);
+            this.generation = generation;
+            this.value = value;
+        }
+    }
+
+    private static final int CACHE_MASK = 255;
+    /** shouldHide decisions that needed the payload. */
+    private static final Entry[] HIDDEN = new Entry[CACHE_MASK + 1];
+    /** Expand posts: the original commentary component to its edited copy. */
+    private static final Entry[] EXPANDED = new Entry[CACHE_MASK + 1];
+
+    private static Object cached(Entry[] cache, Object component) {
+        Entry entry = cache[System.identityHashCode(component) & CACHE_MASK];
+        if (entry == null || entry.get() != component || entry.generation != Settings.generation()) return null;
+        return entry.value;
+    }
+
+    private static void cache(Entry[] cache, Object component, Object value) {
+        cache[System.identityHashCode(component) & CACHE_MASK] = new Entry(component, Settings.generation(), value);
+    }
+
+    // endregion
 
     // region Per-component memo
 

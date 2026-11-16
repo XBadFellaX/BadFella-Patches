@@ -272,6 +272,7 @@ public final class Settings {
             }
         }
         editor.apply();
+        generation++;
         return count;
     }
 
@@ -283,6 +284,7 @@ public final class Settings {
         SharedPreferences.Editor editor = p.edit().clear();
         if (lastSeen != null) editor.putString(LAST_SEEN_VERSION, lastSeen);
         editor.apply();
+        generation++;
     }
 
     // endregion
@@ -582,6 +584,7 @@ public final class Settings {
     static void setString(String key, String value) {
         SharedPreferences p = prefs();
         if (p != null) p.edit().putString(key, value).apply();
+        generation++;
     }
 
     static boolean get(String key, boolean def) {
@@ -592,6 +595,14 @@ public final class Settings {
     static void set(String key, boolean value) {
         SharedPreferences p = prefs();
         if (p != null) p.edit().putBoolean(key, value).apply();
+        generation++;
+    }
+
+    /** Bumped on every write, so results cached from the old settings are dropped. */
+    private static volatile int generation;
+
+    static int generation() {
+        return generation;
     }
 
     static SharedPreferences prefs() {
