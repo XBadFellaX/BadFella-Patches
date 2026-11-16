@@ -1,10 +1,22 @@
 """Unit tests for Ultimea patches and verification."""
 import json
+import re
 from pathlib import Path
 import unittest
 import zipfile
 
 class UltimeaPatchesTests(unittest.TestCase):
+    def test_menu_branding_matches_native_label_and_page_title(self):
+        root = Path(__file__).resolve().parents[1]
+        menu = (root / 'extensions/extension/src/main/java/app/hxreborn/extension/ultimea/PatchesMenu.java').read_text()
+        title = re.search(r'SETTINGS_ROW_TITLE = "([^"]+)"', menu).group(1)
+        self.assertEqual(title, 'BadFella Patches')
+        native = (root / 'patches/src/main/kotlin/app/badfella/patches/ultimea/upstream/settings/NativeCode.kt').read_text()
+        allocation = native.split('private val TITLE_ALLOCATION =', 1)[1].split('.hexToByteArray()', 1)[0]
+        payload = bytes.fromhex(''.join(re.findall(r'"([0-9a-f]+)"', allocation)))
+        self.assertEqual(payload[-16:], title.encode())
+        self.assertNotIn(b'hxreborn patches', payload)
+
     @classmethod
     def setUpClass(cls):
         cls.root = Path(__file__).resolve().parents[1]

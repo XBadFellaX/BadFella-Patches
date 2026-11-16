@@ -32,7 +32,7 @@ import app.hxreborn.extension.shared.ActivityCallbacksAdapter;
 @SuppressWarnings("unused")
 public final class PatchesMenu {
 
-    public static final String SETTINGS_ROW_TITLE = "hxreborn patches";
+    public static final String SETTINGS_ROW_TITLE = "BadFella Patches";
 
     private static WeakReference<Activity> resumedActivity = new WeakReference<>(null);
 

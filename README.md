@@ -22,11 +22,11 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 
 **Before replacing an existing installation:** verify your task backup or sync. Apps signed with different keys cannot update each other; uninstalling removes local data.
 
-## Ultimea dev.5 development preview
+## Ultimea dev.6 development preview
 
 Adds **Accent color**, **Disable tracking**, **Remove distractions** and
 **Remove popups** from hxreborn for Ultimea 1.4.4 build 495 (ARM64).
-The accent picker is in **hxreborn patches** in Profile (the former Contact Us
+The accent picker is in **BadFella Patches** in Profile (the former Contact Us
 entry). It offers presets, a custom color and Material You. Reopen the app to
 refresh all screens after a color change; wallpaper colors refresh on app launch.
 
@@ -56,7 +56,7 @@ app data. Upstream attribution is in `NOTICE`.
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.6.0-dev.5](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.5)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;53 patches total
+> **[v1.6.0-dev.6](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.6)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;53 patches total
 <details open>
 <summary>📦 Ultimea&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
 <br>

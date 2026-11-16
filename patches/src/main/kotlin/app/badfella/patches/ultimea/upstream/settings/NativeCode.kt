@@ -38,7 +38,7 @@ private const val ELF_SECTION_SIZE = 32
 private const val TITLE_FALLBACK_BRANCH = 68
 private val TITLE_ALLOCATION =
     ("402b40f9492f40f90a8000b1c20100545f0109eb820100544a2b00f9904b9cd2b000a0f2100000f9100480d2100400f9" +
-        "d0000058f1000058104401a900040091c0035fd60000001468787265626f726e2070617463686573").hexToByteArray()
+        "d0000058f1000058104401a900040091c0035fd60000001442616446656c6c612050617463686573").hexToByteArray()
 
 internal fun ByteArray.addPatchesMenu() {
     val settings = nativeMethods.single("qaa_title", "contact_us", "app_settings") { "language_english" !in it.stringLoads.values }

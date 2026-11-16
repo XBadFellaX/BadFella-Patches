@@ -1,3 +1,7 @@
+## 1.6.0-dev.6 (2026-11-16)
+
+- Rename the Ultimea Profile entry and settings-page title to BadFella Patches. Bluetooth/device-control behavior is unchanged from dev.5.
+
 ## 1.6.0-dev.5 (2026-11-16)
 
 - Add hxreborn-derived Accent color, Disable tracking, Remove distractions and Remove popups for Ultimea 1.4.4 build 495 (ARM64).
