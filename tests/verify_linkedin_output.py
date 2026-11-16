@@ -61,12 +61,17 @@ manifest = subprocess.check_output(
     text=True, encoding="utf-8", errors="replace")
 expected_package = CLONE or "com.linkedin.android"
 assert f"package: name='{expected_package}' versionCode='218000' versionName='4.1.1272'" in manifest, manifest[:400]
+tree = subprocess.check_output(
+    [str(SDK / "aapt2.exe"), "dump", "xmltree", "--file", "AndroidManifest.xml", str(APK)],
+    text=True, encoding="utf-8", errors="replace")
+gms = "GmsCore support" in applied
+push_vendor = "app.revanced" if gms else "com.google"
+assert f'"{push_vendor}.android.c2dm.intent.RECEIVE"' in tree, "Push receiver uses the wrong service"
+assert (meta_data_value(tree, "app.revanced.MICROG_PACKAGE_NAME") is not None) == gms, \
+    "microG metadata does not match the selected patches"
 if CLONE:
     assert "Install next to LinkedIn" in applied, "Clone patch not applied"
     assert f"application-label:'{args.clone_label}'" in manifest, "Clone app name missing"
-    tree = subprocess.check_output(
-        [str(SDK / "aapt2.exe"), "dump", "xmltree", "--file", "AndroidManifest.xml", str(APK)],
-        text=True, encoding="utf-8", errors="replace")
     assert f'package="{CLONE}"' in tree, "Clone package missing from the manifest"
     for authority in ("fileprovider", "androidx-startup", "meridian-provider", "appfinder.suggestions",
                       "RealTimeSystemSubscriptions", "persona.provider", "mlkitinitprovider", "firebaseinitprovider"):
@@ -78,13 +83,14 @@ if CLONE:
     assert '"cct.com.linkedin.android"' not in tree
     # microG presents the copy to Google with LinkedIn's own package and certificate, because
     # LinkedIn's OAuth client is registered for those. Renaming the spoof made Google reject sign-in.
-    spoofed_name = meta_data_value(tree, "app.revanced.android.gms.SPOOFED_PACKAGE_NAME")
-    assert spoofed_name == "com.linkedin.android", \
-        f"SPOOFED_PACKAGE_NAME is {spoofed_name!r}; Google only knows LinkedIn's own package"
-    spoofed_signature = meta_data_value(tree, "app.revanced.android.gms.SPOOFED_PACKAGE_SIGNATURE")
-    assert spoofed_signature == LINKEDIN_SIGNATURE, \
-        f"SPOOFED_PACKAGE_SIGNATURE is {spoofed_signature!r}, not LinkedIn's certificate"
-    print(f"Clone package: {CLONE}, label: {args.clone_label}, Google identity: {spoofed_name}")
+    if gms:
+        spoofed_name = meta_data_value(tree, "app.revanced.android.gms.SPOOFED_PACKAGE_NAME")
+        assert spoofed_name == "com.linkedin.android", \
+            f"SPOOFED_PACKAGE_NAME is {spoofed_name!r}; Google only knows LinkedIn's own package"
+        spoofed_signature = meta_data_value(tree, "app.revanced.android.gms.SPOOFED_PACKAGE_SIGNATURE")
+        assert spoofed_signature == LINKEDIN_SIGNATURE, \
+            f"SPOOFED_PACKAGE_SIGNATURE is {spoofed_signature!r}, not LinkedIn's certificate"
+        print(f"Clone package: {CLONE}, label: {args.clone_label}, Google identity: {spoofed_name}")
 
 
 def class_descriptors(data):
@@ -110,12 +116,15 @@ with tempfile.TemporaryDirectory() as workspace:
     root = pathlib.Path(workspace)
     classes = Counter()
     targets = {}
+    firebase_dex = []
     with zipfile.ZipFile(APK) as archive:
         dex_names = sorted(name for name in archive.namelist()
                            if re.fullmatch(r"classes\d*\.dex", name))
         assert dex_names, "Patched APK has no DEX files"
         for name in dex_names:
             data = archive.read(name)
+            if b"X-Android-Cert" in data:
+                firebase_dex.append(name)
             file = root / name
             file.write_bytes(data)
             for descriptor in class_descriptors(data):
@@ -142,6 +151,29 @@ with tempfile.TemporaryDirectory() as workspace:
         return subprocess.check_output(
             [str(SDK / "dexdump.exe"), "-d", str(root / name)],
             text=True, encoding="utf-8", errors="replace")
+
+    # Check the header's actual value register at every Firebase request call.
+    identity_headers = {"X-Android-Cert": LINKEDIN_SIGNATURE.upper(), "X-Android-Package": "com.linkedin.android"}
+    verified_headers = Counter()
+    for name in firebase_dex:
+        instructions = re.findall(r"\|[0-9a-f]+: (.+)", disassemble(name))
+        for index, instruction in enumerate(instructions):
+            header = re.match(r'const-string(?:/jumbo)? (v\d+), "(X-Android-Cert|X-Android-Package)"', instruction)
+            if not header:
+                continue
+            verified_headers[header[2]] += 1
+            calls = [(offset, re.match(
+                r'invoke-virtual \{v\d+, ' + header[1] + r', (v\d+)\}, '
+                r'Ljava/net/URLConnection;\.(?:add|set)RequestProperty:', candidate))
+                for offset, candidate in enumerate(instructions[index + 1:index + 7], index + 1)]
+            call = next(((offset, match) for offset, match in calls if match), None)
+            assert call, "Firebase identity request call not found"
+            offset, match = call
+            expected = f'const-string {match[1]}, "{identity_headers[header[2]]}"'
+            assert instructions[offset - 1].startswith(expected), \
+                f"Firebase identity header is not restored in {name}: {instructions[offset - 1]}"
+    assert verified_headers.keys() == identity_headers.keys(), "Firebase identity headers missing"
+    print(f"Firebase: {dict(verified_headers)} restored; push uses {push_vendor}")
 
     transformer = disassemble(targets[COMPONENT_TRANSFORMER])
     assert "SduiComponentFilter" in transformer, "SDUI filter class not referenced from ComponentTransformer"

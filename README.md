@@ -101,7 +101,7 @@ app data. Upstream attribution is in `NOTICE`.
 | [Expand posts](#expand-posts) | Adds an option (off by default, turned on in BadFella Patches) to show posts expanded by default. Tapping the text collapses them. |  |
 | [Feed filters](#feed-filters) | Adds optional filters (off by default, turned on in BadFella Patches): focus mode, celebrations, job cards, reposts, posts from others' activity, "Recommended for you", video posts, games, the "New posts" pill and "See translation". |  |
 | [Glass navigation bar](#glass-navigation-bar) | Draws the navigation bar as a floating, translucent capsule with a spring selection pill and no press ripple. |  |
-| [GmsCore support](#gmscore-support) | Makes "Continue with Google" work in patched LinkedIn by signing in through microG RE (GmsCore) instead of Google Play services. Needs microG RE installed and signed in to a Google account. |  |
+| [GmsCore support](#gmscore-support) | Routes Google sign-in and push notifications through microG RE instead of Google Play services. Needs microG RE installed and allowed to run in the background. Google sign-in also needs a Google account. Leave disabled to keep Google Play services. |  |
 | [Hide Premium upsells](#hide-premium-upsells) | Removes Premium and AI upsell cards and banners, including on profiles and the Me panel. |  |
 | [Hide ads](#hide-ads) | Removes promoted, boosted and sponsored posts from the feed. |  |
 | [Hide bottom tabs](#hide-bottom-tabs) | Adds switches to take My Network and Jobs out of the bottom bar. |  |
@@ -273,6 +273,15 @@ x86-64. It works with Morphe's unused-library stripping enabled. Premium purchas
 state is unchanged.
 
 [GPLv3](LICENSE) · [Copyright and license notices](NOTICE) · [Issues](https://github.com/XBadFellaX/BadFella-Patches/issues)
+
+### LinkedIn notifications
+
+The LinkedIn patches restore the original Firebase package and certificate
+headers on re-signed builds, including builds using regular Google Play services. Keep **GmsCore
+support** disabled to retain Google Play services. If selected, Google sign-in
+and push are routed through microG RE; it must be installed and allowed to run
+in the background. Notification permission and LinkedIn's notification settings
+still apply. End-to-end push delivery requires device verification.
 
 ### LinkedIn diagnostics (development preview)
 

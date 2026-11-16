@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.6.0-dev.6",
+  "version": "1.6.0-dev.7",
   "patches": [
     {
       "name": "Accent color",
@@ -935,7 +935,7 @@
     },
     {
       "name": "GmsCore support",
-      "description": "Makes \"Continue with Google\" work in patched LinkedIn by signing in through microG RE (GmsCore) instead of Google Play services. Needs microG RE installed and signed in to a Google account.",
+      "description": "Routes Google sign-in and push notifications through microG RE instead of Google Play services. Needs microG RE installed and allowed to run in the background. Google sign-in also needs a Google account. Leave disabled to keep Google Play services.",
       "default": false,
       "category": null,
       "compatiblePackages": [

@@ -5,6 +5,10 @@ import app.morphe.patcher.patch.AppTarget
 import app.morphe.patcher.patch.Compatibility
 
 object Constants {
+    const val LINKEDIN_PACKAGE = "com.linkedin.android"
+    /** Original signing certificate used for Firebase registration and microG identity. */
+    const val LINKEDIN_SIGNATURE = "443cb997718d0ac5162888bae5e4724582862676"
+
     const val EXTENSION_PACKAGE = "Lapp/badfella/extension/linkedin"
 
     val COMPATIBILITY_LINKEDIN = Compatibility(

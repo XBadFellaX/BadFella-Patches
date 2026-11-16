@@ -1,3 +1,11 @@
+## 1.6.0-dev.7 (2026-11-16)
+
+- Restore Firebase's original package and certificate headers in the normal LinkedIn patch path, including cloned builds. The correction also applies without GmsCore support.
+- Keep GmsCore support disabled to use regular Google Play services. Selecting it routes Google sign-in and push through microG RE, which must be installed and allowed to run in the background.
+- Notification permission and LinkedIn notification settings still apply. End-to-end push delivery requires device verification.
+
+Enable pre-releases for BadFella Patches in Morphe Manager, refresh Sources and repatch the original stock APK. Install with your existing Manager signing key to preserve app data.
+
 ## 1.6.0-dev.6 (2026-11-16)
 
 - Rename the Ultimea Profile entry and settings-page title to BadFella Patches. Bluetooth/device-control behavior is unchanged from dev.5.
