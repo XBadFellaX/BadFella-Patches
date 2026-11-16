@@ -51,3 +51,10 @@ c1512f414cb6701f480b260b84acc69bf920a1f8; and heyymichii/michii-patches
 d4d591e5347113e5cfc3e049e391b2fd36871469.
 Original copyright and SPDX notices are retained in the ported source files.
 No affiliation or endorsement is claimed.
+
+Ultimea's AMOLED theme and community navigation removal adapt GPL-3.0-only
+work by hxreborn from https://github.com/hxreborn/morphe-patches,
+revision 83839f596c9c7d8555c97809c34c2daabde03ec7. Original copyright,
+SPDX and additional legal notices are preserved in the ported sources.
+The port fixes theme selection to AMOLED and excludes the upstream patches
+menu and unrelated features. Both patches retain upstream's ARM64 limit.

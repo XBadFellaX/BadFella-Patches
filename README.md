@@ -22,10 +22,26 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 
 **Before replacing an existing installation:** verify your task backup or sync. Apps signed with different keys cannot update each other; uninstalling removes local data.
 
+## Ultimea development preview
+
+The `1.6.0-dev.4` preview contains exactly two Ultimea patches:
+**Ultimea Black Mode** (fixed AMOLED appearance) and **Ultimea Hide Explorer Tab**.
+They adapt hxreborn's theme and navigation code for **1.4.4, build 495, ARM64 only**.
+The input must include `lib/arm64-v8a/libapp.so`; a base-only APK is insufficient.
+
+Bluetooth discovery, pairing, permissions, device connections, equalizer controls,
+signature handling and the Flutter engine remain outside this port. The Explorer
+patch adjusts the tab bodies, selection callbacks and tab controller indexes;
+it does not intentionally change device connection behavior. Physical startup,
+appearance and soundbar connection/reconnection checks are still required.
+Enable pre-releases in the source settings in Morphe Manager, refresh Sources,
+and repatch the original ARM64 app. Keep your existing signing key to preserve
+app data. Upstream attribution is in `NOTICE`.
+
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.5.0](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.5.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;47 patches total
+> **[v1.6.0-dev.4](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.4)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;49 patches total
 <details open>
 <summary>📦 LinkedIn&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
@@ -186,6 +202,23 @@ Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
 | [Torrent Search Revolution local Pro](#torrent-search-revolution-local-pro) | Enables the local Pro/ad-free branches, including search, native and banner ads and Pro settings. Preserves startup callbacks. Reviewed on 2.3.5; changed app bytecode requires review. Does not grant a Pro Key subscription or server entitlement. |  |
+
+</details>
+
+<details open>
+<summary>📦 Ultimea&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 1.4.4 |
+| :---: |
+| Version 1.4.4, build 495. ARM64 only, matching hxreborn upstream. |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Ultimea Black Mode](#ultimea-black-mode) | Ports hxreborn's dark theme in fixed AMOLED mode, with light text, controls and artwork. ARM64 only. |  |
+| [Ultimea Hide Explorer Tab](#ultimea-hide-explorer-tab) | Ports hxreborn's community navigation removal, including tab bodies, callbacks and controller indexes. ARM64 only. |  |
 
 </details>
 

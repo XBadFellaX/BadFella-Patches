@@ -1,3 +1,8 @@
+## 1.6.0-dev.4 (2026-11-16)
+
+- Replace the incomplete Ultimea theme and Explorer edits with the scoped hxreborn-derived port for Ultimea 1.4.4 build 495 (ARM64 only).
+- Keep Bluetooth connection methods, device controls and Flutter engine libraries unchanged. Physical startup and soundbar reconnection remain unverified.
+
 ## 1.5.0 (2026-11-16)
 
 ### 🐛 Bug Fixes

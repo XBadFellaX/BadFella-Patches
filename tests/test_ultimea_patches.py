@@ -26,7 +26,7 @@ class UltimeaPatchesTests(unittest.TestCase):
         self.assertEqual(len(compat['targets']), 1)
         target = compat['targets'][0]
         self.assertEqual(target['version'], '1.4.4')
-        self.assertEqual(target['versionCodes']['ARM64_V8A'], 495)
+        self.assertEqual(target['versionCodes'], {'ARM64_V8A': 495})
         self.assertFalse(target['isExperimental'])
 
     def test_ultimea_hide_explorer_metadata(self):
@@ -36,74 +36,32 @@ class UltimeaPatchesTests(unittest.TestCase):
         self.assertEqual(len(compat['targets']), 1)
         target = compat['targets'][0]
         self.assertEqual(target['version'], '1.4.4')
-        self.assertEqual(target['versionCodes']['ARM64_V8A'], 495)
+        self.assertEqual(target['versionCodes'], {'ARM64_V8A': 495})
         self.assertFalse(target['isExperimental'])
 
-    def test_amoled_tokens_unique_in_stock_libraries(self):
-        tokens = [b'#161616', b'#191919', b'#323232', b'#333333']
+    def test_no_engine_or_connection_hooks(self):
+        source = self.root / 'patches/src/main/kotlin/app/badfella/patches/ultimea'
+        text = '\n'.join(p.read_text(encoding='utf-8') for p in source.rglob('*.kt'))
+        for symbol in ('libflutter.so', 'FlutterImageDecoder', 'FineEqualizer', 'Xupmix',
+                       'spoofSignaturePatch', 'patchesSettingsPatch', 'removeDistractionsPatch',
+                       'EqualizerConnectionPatch', 'NativeSettings', 'LoganMethodCall'):
+            self.assertNotIn(symbol, text)
 
-        arm64_apk = Path('D:/Learn_Android_Development/analysis/ultimea/device/split_config.arm64_v8a.apk')
-        if arm64_apk.is_file():
-            with zipfile.ZipFile(arm64_apk, 'r') as z:
-                libapp_a64 = z.read('lib/arm64-v8a/libapp.so')
-            for token in tokens:
-                self.assertEqual(libapp_a64.count(token), 1, f"Token {token} count mismatch in ARM64")
-
-        xapk = Path('D:/Learn_Android_Development/ultimia/ULTIMEA_1.4.4_APKPure.xapk')
-        if xapk.is_file():
-            with zipfile.ZipFile(xapk, 'r') as z:
-                with zipfile.ZipFile(z.open('config.armeabi_v7a.apk'), 'r') as v7_apk:
-                    libapp_a32 = v7_apk.read('lib/armeabi-v7a/libapp.so')
-            for token in tokens:
-                self.assertEqual(libapp_a32.count(token), 1, f"Token {token} count mismatch in ARM32")
-
-    def test_navigation_anchors_unique_in_stock_libraries(self):
-        arm64_apk = Path('D:/Learn_Android_Development/analysis/ultimea/device/split_config.arm64_v8a.apk')
-        if not arm64_apk.is_file():
-            self.skipTest('Stock ARM64 split APK not found')
-
-        with zipfile.ZipFile(arm64_apk, 'r') as z:
-            libapp_a64 = z.read('lib/arm64-v8a/libapp.so')
-
-        a64_alloc_old = bytes.fromhex('c20080d252d11294e20300aaa0035df8a2831ff840f000b8a0035cf8403001b8a0835df8407001b8')
-        a64_constructor_old = bytes.fromhex('c00080d220b000b825c00f94')
-        a64_on_tap_old = bytes.fromhex('a20b40f99f47e597403740f9002457f9')
-
-        self.assertEqual(libapp_a64.count(a64_alloc_old), 1)
-        self.assertEqual(libapp_a64.count(a64_constructor_old), 1)
-        self.assertEqual(libapp_a64.count(a64_on_tap_old), 1)
-
-        xapk = Path('D:/Learn_Android_Development/ultimia/ULTIMEA_1.4.4_APKPure.xapk')
-        if xapk.is_file():
-            with zipfile.ZipFile(xapk, 'r') as z:
-                with zipfile.ZipFile(z.open('config.armeabi_v7a.apk'), 'r') as v7_apk:
-                    libapp_a32 = v7_apk.read('lib/armeabi-v7a/libapp.so')
-            a32_alloc_old = bytes.fromhex('0610a0e3328e00eb0010a0e108001be518100be50b0081e510001be50f0081e514001be5130081e5')
-            self.assertEqual(libapp_a32.count(a32_alloc_old), 1)
-
-    def test_no_breaking_extras_in_source(self):
-        source_dir = self.root / 'patches/src/main/kotlin/app/badfella/patches/ultimea'
-        all_text = ''
-        for kt in source_dir.glob('*.kt'):
-            all_text += kt.read_text(encoding='utf-8')
-
-        breaking_symbols = [
-            'ThemeElfImage',
-            'ThemeHooks',
-            'ThemeInstructions',
-            'Arm64Registers',
-            'theme.bin',
-            'FineEqualizer',
-            'Xupmix',
-            'StopFirmwareReminders',
-            'RemovePopups',
-            'DisableTracking',
-            'PatchesSettingsActivity',
-            'FlutterImageDecoder',
-            'LoganMethodCall',
-        ]
-        for symbol in breaking_symbols:
-            self.assertNotIn(symbol, all_text)
+    def test_android_bundle(self):
+        version = next(line.split('=', 1)[1].strip() for line in
+                       (self.root / 'gradle.properties').read_text().splitlines()
+                       if line.startswith('version ='))
+        bundle = self.root / f'patches/build/libs/patches-{version}.mpp'
+        if not bundle.exists():
+            self.skipTest('Build the Android patch bundle first')
+        with zipfile.ZipFile(bundle) as archive:
+            for name in archive.namelist():
+                if name.endswith(('.class', '.dex')):
+                    for package in (b'javax/imageio/', b'java/awt/', b'javax/swing/'):
+                        self.assertNotIn(package, archive.read(name), name)
+            self.assertIn('ultimea/theme.bin', archive.namelist())
+            for icon in ('hdmi', 'usb', 'optical', 'aux', 'bluetooth'):
+                self.assertIn(f'ultimea/images/device_input_{icon}_n.png', archive.namelist())
 
 if __name__ == '__main__':
     unittest.main()
