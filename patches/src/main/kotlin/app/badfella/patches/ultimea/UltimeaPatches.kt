@@ -6,17 +6,6 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.SupportedAbi
 import app.morphe.patcher.patch.resourcePatch
 import org.w3c.dom.Element
-import java.io.File
-import javax.imageio.ImageIO
-
-private const val SECONDARY_INK = 0x00B8BCC2
-private const val AVATAR_SOURCE_INK = 194
-private const val AVATAR_SOURCE_RANGE = 255 - AVATAR_SOURCE_INK
-private const val AVATAR_BACKGROUND_CHANNEL = 36
-private const val AVATAR_BACKGROUND_BLUE = 42
-private const val AVATAR_INK_RED = 184
-private const val AVATAR_INK_GREEN = 188
-private const val AVATAR_INK_BLUE = 194
 
 private val A64_ALLOC_OLD = byteArrayOf(
     0xc2.toByte(), 0x00, 0x80.toByte(), 0xd2.toByte(), 0x52, 0xd1.toByte(), 0x12, 0x94.toByte(),
@@ -85,43 +74,6 @@ private fun replaceExactPattern(bytes: ByteArray, oldPattern: ByteArray, newPatt
     val result = bytes.copyOf()
     newPattern.copyInto(result, matchIndex)
     return result
-}
-
-private fun tintInputIcon(file: File) {
-    val img = ImageIO.read(file) ?: return
-    for (y in 0 until img.height) {
-        for (x in 0 until img.width) {
-            val pixel = img.getRGB(x, y)
-            val alpha = (pixel ushr 24) and 0xff
-            if (alpha > 0) {
-                img.setRGB(x, y, (alpha shl 24) or SECONDARY_INK)
-            }
-        }
-    }
-    ImageIO.write(img, "png", file)
-}
-
-private fun tintUserAvatar(file: File) {
-    val img = ImageIO.read(file) ?: return
-    for (y in 0 until img.height) {
-        for (x in 0 until img.width) {
-            val pixel = img.getRGB(x, y)
-            val alpha = (pixel ushr 24) and 0xff
-            if (alpha == 0) continue
-            val blue = pixel and 0xff
-            val tint = if (blue > AVATAR_SOURCE_INK) {
-                val weight = (blue - AVATAR_SOURCE_INK).toFloat() / AVATAR_SOURCE_RANGE
-                val red = (AVATAR_BACKGROUND_CHANNEL + weight * (AVATAR_INK_RED - AVATAR_BACKGROUND_CHANNEL)).toInt()
-                val green = (AVATAR_BACKGROUND_CHANNEL + weight * (AVATAR_INK_GREEN - AVATAR_BACKGROUND_CHANNEL)).toInt()
-                val b = (AVATAR_BACKGROUND_BLUE + weight * (AVATAR_INK_BLUE - AVATAR_BACKGROUND_BLUE)).toInt()
-                (alpha shl 24) or (red shl 16) or (green shl 8) or b
-            } else {
-                (alpha shl 24) or (AVATAR_BACKGROUND_CHANNEL shl 16) or (AVATAR_BACKGROUND_CHANNEL shl 8) or AVATAR_BACKGROUND_BLUE
-            }
-            img.setRGB(x, y, tint)
-        }
-    }
-    ImageIO.write(img, "png", file)
 }
 
 @Suppress("unused")
@@ -244,10 +196,18 @@ val ultimeaBlackModePatch = resourcePatch(
 
         val imagesDir = get("assets/flutter_assets/assets/images")
         if (imagesDir.exists()) {
-            for (name in listOf("hdmi", "usb", "optical", "aux", "bluetooth")) {
-                val iconFile = imagesDir.resolve("device_input_${name}_n.png")
-                if (iconFile.exists()) {
-                    tintInputIcon(iconFile)
+            listOf(
+                "device_input_hdmi_n.png",
+                "device_input_usb_n.png",
+                "device_input_optical_n.png",
+                "device_input_aux_n.png",
+                "device_input_bluetooth_n.png",
+                "mine_user_icon.png",
+            ).forEach { name ->
+                val resource = object {}.javaClass.getResourceAsStream("/ultimea/images/$name")
+                if (resource != null) {
+                    val target = imagesDir.resolve(name)
+                    resource.use { input -> target.outputStream().use { output -> input.copyTo(output) } }
                 }
             }
 
@@ -261,11 +221,6 @@ val ultimeaBlackModePatch = resourcePatch(
                             .replace("\"white\"", "\"#24242A\"")
                     )
                 }
-            }
-
-            val avatarFile = imagesDir.resolve("mine_user_icon.png")
-            if (avatarFile.exists()) {
-                tintUserAvatar(avatarFile)
             }
         }
     }
