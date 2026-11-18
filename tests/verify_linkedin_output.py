@@ -18,10 +18,16 @@ parser.add_argument(
     help="The copy's package name; verifies Install next to LinkedIn renamed the app, authorities and permissions")
 parser.add_argument("--clone-label", metavar="LABEL", default="LinkedIn Clone",
                     help="The copy's home screen name, checked with --clone-package")
+parser.add_argument("--expected-version", default="4.1.1272",
+                    help="Reviewed LinkedIn version the patched APK must report")
+parser.add_argument("--expected-build", default="218000", type=int,
+                    help="Reviewed LinkedIn versionCode the patched APK must report")
 args = parser.parse_args()
 APK = args.apk
 SDK = args.build_tools
 CLONE = args.clone_package
+VERSION = args.expected_version
+BUILD = args.expected_build
 
 SDUI_FILTER = "Lapp/badfella/extension/linkedin/SduiComponentFilter;"
 POST_MENU = "Lapp/badfella/extension/linkedin/PostMenu;"
@@ -72,7 +78,8 @@ manifest = subprocess.check_output(
     [str(SDK / "aapt2.exe"), "dump", "badging", str(APK)],
     text=True, encoding="utf-8", errors="replace")
 expected_package = CLONE or "com.linkedin.android"
-assert f"package: name='{expected_package}' versionCode='218000' versionName='4.1.1272'" in manifest, manifest[:400]
+assert f"package: name='{expected_package}' versionCode='{BUILD}' versionName='{VERSION}'" in manifest, \
+    f"expected {VERSION} build {BUILD}: " + manifest[:400]
 tree = subprocess.check_output(
     [str(SDK / "aapt2.exe"), "dump", "xmltree", "--file", "AndroidManifest.xml", str(APK)],
     text=True, encoding="utf-8", errors="replace")
@@ -305,7 +312,7 @@ with tempfile.TemporaryDirectory() as workspace:
             "appfinder_authority still names the stock suggestion provider"
 
 subprocess.run([str(SDK / "zipalign.exe"), "-c", "4", str(APK)], check=True)
-print(f"PASS: LinkedIn 4.1.1272, {len(applied)} patches, SDUI transformer hooks, "
+print(f"PASS: LinkedIn {VERSION} build {BUILD}, {len(applied)} patches, SDUI transformer hooks, "
       f"SettingsShortcut hook, sponsored/promoted/boosted filters, Pitch black resources and hooks, "
       f"floating glass navigation bar with a full-height slide, "
       f"{len(classes)} unique classes, ZIP alignment" +

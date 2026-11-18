@@ -83,9 +83,9 @@ app data. Upstream attribution is in `NOTICE`.
 
 **🎯 Supported versions:**
 
-| 4.1.1267 | 4.1.1271 | 4.1.1272 |
-| :---: | :---: | :---: |
-|  | Version 4.1.1271, build 217900. | Version 4.1.1272, build 218000. | Any version (experimental). Every patch verifies its own anchors. |
+| 4.1.1267 | 4.1.1271 | 4.1.1272 | 4.1.1275 |
+| :---: | :---: | :---: | :---: |
+|  | Version 4.1.1271, build 217900. | Version 4.1.1272, build 218000. | Version 4.1.1275 beta, build 218300. | Any version (experimental). Every patch verifies its own anchors. |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
