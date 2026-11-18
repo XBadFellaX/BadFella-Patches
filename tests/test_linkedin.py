@@ -19,6 +19,8 @@ EXPECTED_LINKEDIN_PATCHES = {
     "Customize navigation bar",
     "Dark app icon",
     "Disable double-tap like",
+    "Disable screenshot share sheet",
+    "Hide top bar buttons",
     "Download media",
     "Expand posts",
     "Feed filters",
@@ -45,9 +47,11 @@ EXPECTED_LINKEDIN_PATCHES = {
     "Swipe between feeds",
     "Swipe between tabs",
     "Tap to hide in viewers",
+    "Video tab",
 }
 
 NON_DEFAULT_PATCHES = {
+    "Video tab",
     "Dark app icon",
     "Pitch black",
     "Glass navigation bar",
@@ -68,9 +72,9 @@ class LinkedInCatalogTests(unittest.TestCase):
                    for compat in patch["compatiblePackages"] or [])
         }
 
-    def test_all_34_patches_declared(self):
+    def test_all_37_patches_declared(self):
         self.assertEqual(set(self.patches.keys()), EXPECTED_LINKEDIN_PATCHES)
-        self.assertEqual(len(self.patches), 34)
+        self.assertEqual(len(self.patches), 37)
 
     def test_reviewed_targets_and_version_agnosticism(self):
         for name, patch in self.patches.items():

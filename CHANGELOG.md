@@ -1,3 +1,13 @@
+## 1.6.0-dev.11 (2026-11-17)
+
+- **LinkedIn:** Automatically refresh the Home feed on reopen by default. If you explicitly enabled Keep feed on reopen, that choice is retained.
+- **LinkedIn:** Reorder bottom tabs, add Messaging, choose which Home top-bar buttons to show, and keep swipe gestures in the profile drawer from changing tabs.
+- **LinkedIn:** Disable the screenshot share sheet, show elapsed video time, and optionally advance to the next video. Select the Video tab patch in Morphe Manager to enable its settings.
+- **LinkedIn:** Save animated GIFs with their own file type, show a completion notification after saving a PDF when notifications are allowed, and switch post-menu copy and download actions on or off independently.
+- **LinkedIn:** Save and restore settings as a JSON file, return to the same position in the patch menu, and snooze the microG RE battery reminder.
+
+Enable pre-releases for BadFella Patches in Morphe Manager, refresh Sources, and patch the original LinkedIn APK. Install using your existing Manager signing key.
+
 ## 1.6.0-dev.10 (2026-11-16)
 
 - **LinkedIn:** Smoother feed scrolling. Feed filters no longer parse each whole post while it scrolls into view: Hide suggested posts, Hide ads labels and Hide video posts use quick checks, and the work for the post menu and short links runs in the background.

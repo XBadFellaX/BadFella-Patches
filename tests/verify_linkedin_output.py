@@ -39,6 +39,18 @@ MAIN_ACTIVITY = "Lcom/linkedin/android/infra/navigation/MainActivity;"
 NAV_PANEL_TRANSFORMER = "Lcom/linkedin/android/home/navpanel/HomeNavPanelTransformer;"
 NAV_PANEL_PRESENTER = "Lcom/linkedin/android/home/navpanel/presenter/HomeNavPanelSectionV2Presenter;"
 
+NEW_PATCH_HOOKS = {
+    "Disable screenshot share sheet": (
+        ("Lcom/linkedin/android/feed/pages/shareactions/UpdateScreenCaptureManagerImpl;", "Settings;.blockScreenshotShare:"),
+    ),
+    "Hide top bar buttons": (
+        ("Lcom/linkedin/android/home/HomeBottomNavFragment;", "HomeTopBar;.install:"),
+    ),
+    "Video tab": (
+        ("Lcom/linkedin/android/media/player/simpleplayer/SimpleMediaPlayer;", "VideoTab;.onPlayWhenReady:"),
+    ),
+}
+NEW_HOOK_CALLERS = {caller for hooks in NEW_PATCH_HOOKS.values() for caller, _ in hooks}
 LINKEDIN_SIGNATURE = "443cb997718d0ac5162888bae5e4724582862676"
 
 
@@ -129,7 +141,8 @@ with tempfile.TemporaryDirectory() as workspace:
             file.write_bytes(data)
             for descriptor in class_descriptors(data):
                 classes[descriptor] += 1
-                if descriptor in (SDUI_FILTER, POST_MENU, COMPONENT_TRANSFORMER, SETTINGS, SETTINGS_ACTIVITY,
+                if descriptor in NEW_HOOK_CALLERS or descriptor in (
+                        SDUI_FILTER, POST_MENU, COMPONENT_TRANSFORMER, SETTINGS, SETTINGS_ACTIVITY,
                                   MATERIAL_YOU, HIDE_ADS, GLASS_BAR, NAVIGATION_BAR, SLIM_BEHAVIOR,
                                   APP_COMPAT, MAIN_ACTIVITY, NAV_PANEL_TRANSFORMER, NAV_PANEL_PRESENTER) or descriptor.startswith(
                                       "Lcom/linkedin/android/home/navpanel/HomeNavPanelFeature$"):
@@ -151,6 +164,11 @@ with tempfile.TemporaryDirectory() as workspace:
         return subprocess.check_output(
             [str(SDK / "dexdump.exe"), "-d", str(root / name)],
             text=True, encoding="utf-8", errors="replace")
+
+    for patch, hooks in NEW_PATCH_HOOKS.items():
+        if patch in applied:
+            for caller, hook in hooks:
+                assert hook in disassemble(targets[caller]), f"{patch}: missing {hook}"
 
     # Check the header's actual value register at every Firebase request call.
     identity_headers = {"X-Android-Cert": LINKEDIN_SIGNATURE.upper(), "X-Android-Package": "com.linkedin.android"}

@@ -140,13 +140,13 @@ final class PostMenu {
                 post = posts.get(urn);
             }
             List<String[]> items = new ArrayList<>();
-            if (post == null || post.text != null) {
+            if (Settings.postMenuCopy() && (post == null || post.text != null)) {
                 items.add(new String[]{"copy", I18n.tr("Copy text"), "badfella-post-copy-text"});
             }
-            if (post != null && !post.media.isEmpty()) {
+            if (Settings.postMenuDownload() && post != null && !post.media.isEmpty()) {
                 items.add(new String[]{"download", I18n.tr("Download photos and videos"), "badfella-post-download"});
             }
-            if (post != null && document(post) != null) {
+            if (Settings.postMenuDownload() && post != null && document(post) != null) {
                 items.add(new String[]{"pdf", I18n.tr("Save document as PDF"), "badfella-post-pdf"});
             }
             if (items.isEmpty()) return component;
