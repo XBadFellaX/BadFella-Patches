@@ -1,3 +1,9 @@
+## 1.6.0-dev.14 (2026-11-19)
+
+- **Wanderlog:** Add support for Wanderlog 2.229, build 2026111701, retaining the existing supported versions.
+
+Enable pre-releases in Morphe Manager and refresh Sources. Repatch the original APKM and install using your existing Manager signing key.
+
 ## 1.6.0-dev.13 (2026-11-18)
 
 ## Remote for Android TV 6.1.0 (build 45)
