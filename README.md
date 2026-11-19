@@ -56,7 +56,7 @@ app data. Upstream attribution is in `NOTICE`.
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.6.0-dev.6](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.6)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;53 patches total
+> **[v1.6.0-dev.13](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.13)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;57 patches total
 <details open>
 <summary>📦 Ultimea&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
 <br>
@@ -97,7 +97,7 @@ app data. Upstream attribution is in `NOTICE`.
 | [Customize navigation bar](#customize-navigation-bar) | Takes the bottom navigation buttons you pick off the bar, such as My Network, Post, Notifications, Jobs, Video or News. Each page still opens from the Menu and from links. Restart LinkedIn after changing the selection. | • Hide My Network<br>• Hide Post<br>• Hide Notifications<br>• Hide Jobs<br>• Hide Video<br>• Hide News |
 | [Dark app icon](#dark-app-icon) | Black launcher icon with the white "in", instead of LinkedIn's blue. Chosen when patching: a launcher icon cannot switch with dark mode on its own. |  |
 | [Disable double-tap like](#disable-double-tap-like) | Stops double tapping a post or photo from liking it. |  |
-| [Disable screenshot share sheet](#disable-screenshot-share-sheet) | Keeps LinkedIn's share sheet closed when you take a screenshot of a post. |  |
+| [Disable screenshot share sheet](#disable-screenshot-share-sheet) | Stops LinkedIn from opening its share sheet when you take a screenshot of a post. |  |
 | [Download media](#download-media) | Adds a download button to the full screen photo, video and document viewer. Documents (PDFs and carousels) are saved as one PDF. |  |
 | [Expand posts](#expand-posts) | Adds an option (off by default, turned on in BadFella Patches) to show posts expanded by default. Tapping the text collapses them. |  |
 | [Feed filters](#feed-filters) | Adds optional filters (off by default, turned on in BadFella Patches): focus mode, celebrations, job cards, reposts, posts from others' activity, "Recommended for you", video posts, games, the "New posts" pill and "See translation". |  |
@@ -125,7 +125,7 @@ app data. Upstream attribution is in `NOTICE`.
 | [Swipe between feeds](#swipe-between-feeds) | Swipe left and right on the home feed to switch between For you and Network, like on X. |  |
 | [Swipe between tabs](#swipe-between-tabs) | Swipe sideways to go to the next or previous tab of the navigation bar. |  |
 | [Tap to hide in viewers](#tap-to-hide-in-viewers) | Tap a video or document in full screen to hide the caption and buttons, like photos. |  |
-| [Video tab](#video-tab) | Shows elapsed and total playback time and can advance to the next video. Select this optional patch in Morphe Manager. |  |
+| [Video tab](#video-tab) | Shows playback time and can advance to the next video when playback ends. |  |
 
 </details>
 
@@ -165,6 +165,23 @@ app data. Upstream attribution is in `NOTICE`.
 </details>
 
 <details open>
+<summary>📦 Remote for Android TV&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 6.1.0 |
+| :---: |
+| Version 6.1.0, build 45. |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Disable remote page swipes](#disable-remote-page-swipes) | Disables swiping between the D-pad or touchpad and number pad. Keeps the switch button and setup page swipes. Requires Remote ATV ad-free. Supports version 6.1.0, build 45. |  |
+| [Remote ATV ad-free](#remote-atv-ad-free) | Disables advertising, restores startup and replaces premium activation with a local ad-free status. Removes the home banner and its spacing. Does not create a server subscription. |  |
+
+</details>
+
+<details open>
 <summary>📦 Emby&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
@@ -198,22 +215,6 @@ app data. Upstream attribution is in `NOTICE`.
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
 | [Pep Talk Elite features](#pep-talk-elite-features) | Enables local Elite features, labels the profile status and silences unavailable-purchase warnings from background product lookup. Keeps authentication and purchase handling; does not grant server-side access or a subscription. |  |
-
-</details>
-
-<details open>
-<summary>📦 Remote for Android TV&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
-<br>
-
-**🎯 Supported versions:**
-
-| 6.1.0 |
-| :---: |
-| Version 6.1.0, build 45. |
-
-| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
-|----------|----------------|-----------|
-| [Remote ATV ad-free](#remote-atv-ad-free) | Disables advertising, restores startup and replaces premium activation with a local ad-free status. Removes the home banner and its spacing. Does not create a server subscription. |  |
 
 </details>
 

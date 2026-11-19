@@ -1,3 +1,11 @@
+## 1.6.0-dev.13 (2026-11-18)
+
+## Remote for Android TV 6.1.0 (build 45)
+
+- **Remote for Android TV:** Add the optional Disable remote page swipes patch. It prevents swiping between the D-pad or touchpad and number pad while retaining the switch button and setup page swipes. The patch is off by default.
+
+Enable pre-releases for BadFella Patches in Morphe Manager and refresh Sources. Select the original Remote for Android TV 6.1.0 build 45 APKM, enable Disable remote page swipes alongside Remote ATV ad-free, and repatch. Install using your existing Manager signing key.
+
 ## 1.6.0-dev.12 (2026-11-18)
 
 ## LinkedIn 4.1.1275 beta (build 218300)
