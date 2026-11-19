@@ -4,7 +4,6 @@ import app.morphe.patcher.patch.AppTarget
 import app.morphe.patcher.patch.Compatibility
 import app.morphe.patcher.patch.ApkFileType
 import app.morphe.patcher.patch.resourcePatch
-import java.security.MessageDigest
 
 @Suppress("unused")
 val remoteAtvDisablePageSwipesPatch = resourcePatch(
@@ -25,31 +24,10 @@ val remoteAtvDisablePageSwipesPatch = resourcePatch(
         check(libraries.isNotEmpty()) { "Remote ATV has no Dart snapshot" }
         libraries.forEach { name ->
             val abi = name.split('/')[1]
-            val stream = checkNotNull(object {}.javaClass.getResourceAsStream("/remoteatv/swipes-6.1.0-$abi.tsv")) {
-                "Unreviewed Remote ATV swipe architecture: $abi"
-            }
-            val lines = stream.bufferedReader().use { it.readLines() }
-                .filter { it.isNotBlank() && !it.startsWith('#') }
-            val hashes = lines.first().split('\t')
             val file = get(name)
-            val bytes = file.readBytes()
-            fun digest() = MessageDigest.getInstance("SHA-256").digest(bytes)
-                .joinToString("") { "%02x".format(it) }
-            check(digest() == hashes[0]) { "Unreviewed Remote ATV swipe snapshot: $abi" }
-            lines.drop(1).forEach { line ->
-                val (position, expected, replacement) = line.split('\t')
-                val offset = position.toInt(16)
-                fun decode(hex: String) = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-                val before = decode(expected)
-                val after = decode(replacement)
-                check(offset >= 0 && before.size == after.size && offset <= bytes.size - before.size &&
-                    bytes.copyOfRange(offset, offset + before.size).contentEquals(before)) {
-                    "Remote ATV swipe instructions changed: $abi/$position"
-                }
-                after.copyInto(bytes, offset)
-            }
-            check(digest() == hashes[1]) { "Remote ATV swipe output checksum failed: $abi" }
-            file.writeBytes(bytes)
+            file.writeBytes(applyRemoteAtvNativeEdits(
+                file.readBytes(), "/remoteatv/swipes-6.1.0-$abi.tsv", "swipe",
+            ))
         }
     }
 }
