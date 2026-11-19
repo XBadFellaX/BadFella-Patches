@@ -56,7 +56,7 @@ app data. Upstream attribution is in `NOTICE`.
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.6.0-dev.15](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.15)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;58 patches total
+> **[v1.6.0-dev.16](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.16)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;58 patches total
 <details open>
 <summary>📦 Ultimea&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
 <br>
@@ -177,7 +177,7 @@ app data. Upstream attribution is in `NOTICE`.
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
 | [Disable remote page swipes](#disable-remote-page-swipes) | Disables swiping between the D-pad or touchpad and number pad. Keeps the switch button and setup page swipes. Requires Remote ATV ad-free. Supports version 6.1.0, build 45. |  |
-| [Increase D-pad hold tolerance](#increase-d-pad-hold-tolerance) | Allows three times more finger movement while holding a D-pad arrow. Keeps release and cancel handling. Requires Disable remote page swipes and Remote ATV ad-free. Supports version 6.1.0, build 45. |  |
+| [Increase D-pad hold tolerance](#increase-d-pad-hold-tolerance) | Keeps a held D-pad arrow pressed while your finger moves. Stops on release or cancellation. Requires Disable remote page swipes and Remote ATV ad-free. Supports version 6.1.0, build 45. |  |
 | [Remote ATV ad-free](#remote-atv-ad-free) | Disables advertising, restores startup and replaces premium activation with a local ad-free status. Removes the home banner and its spacing. Does not create a server subscription. |  |
 
 </details>

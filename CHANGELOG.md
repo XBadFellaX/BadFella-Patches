@@ -1,3 +1,9 @@
+## 1.6.0-dev.16 (2026-11-19)
+
+- **Remote for Android TV:** Update the optional Increase D-pad hold tolerance patch for 6.1.0 build 45 to keep the original arrow held through finger movement until release or cancellation. Cover both ways the app repeats held arrows; dev.15 only covered one. Ordinary taps, center/select and repeat timing are unchanged.
+
+Enable pre-releases in Morphe Manager and refresh Sources. Repatch the original APKM with Increase D-pad hold tolerance enabled and install using your existing Manager signing key.
+
 ## 1.6.0-dev.15 (2026-11-19)
 
 - **Remote for Android TV:** Add the optional Increase D-pad hold tolerance patch for 6.1.0 build 45. It allows three times more finger movement after an arrow hold starts, retaining release and cancel handling. Requires the remote page swipe lock; both optional patches remain off by default.

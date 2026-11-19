@@ -8,7 +8,7 @@ import app.morphe.patcher.patch.resourcePatch
 @Suppress("unused")
 val remoteAtvDpadHoldTolerancePatch = resourcePatch(
     name = "Increase D-pad hold tolerance",
-    description = "Allows three times more finger movement while holding a D-pad arrow. Keeps release and cancel handling. Requires Disable remote page swipes and Remote ATV ad-free. Supports version 6.1.0, build 45.",
+    description = "Keeps a held D-pad arrow pressed while your finger moves. Stops on release or cancellation. Requires Disable remote page swipes and Remote ATV ad-free. Supports version 6.1.0, build 45.",
     default = false,
 ) {
     compatibleWith(Compatibility(
