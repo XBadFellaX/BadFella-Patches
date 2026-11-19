@@ -1,3 +1,11 @@
+## 1.6.0-dev.12 (2026-11-18)
+
+## LinkedIn 4.1.1275 beta (build 218300)
+
+- **LinkedIn:** Add support for version 4.1.1275 beta, build 218300, while retaining earlier supported versions.
+
+Enable pre-releases for BadFella Patches in Morphe Manager, refresh Sources, and repatch the original LinkedIn APK. Install using your existing Manager signing key.
+
 ## 1.6.0-dev.11 (2026-11-17)
 
 - **LinkedIn:** Use LinkedIn’s normal Home feed reload behavior on reopen by default. If you explicitly enabled Keep feed on reopen, that choice is retained.
