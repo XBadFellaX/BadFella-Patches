@@ -304,3 +304,11 @@ error locations. Account identity, post/message text, URLs, cookies, tokens and
 custom setting text are excluded. Nothing is uploaded automatically. Review the
 file before attaching it to a GitHub issue. Results cover the current app process
 and disappear when it ends. Capturing adds some overhead; it does not fix lag.
+
+## App update alerts
+
+A daily check posts new upstream listings to the
+[app update thread](https://github.com/XBadFellaX/BadFella-Patches/issues/12).
+Subscribe to that thread for GitHub email alerts. Beta listings are included
+where the source exposes them; unchanged checks send no alert. A new listing
+still needs patch compatibility testing.

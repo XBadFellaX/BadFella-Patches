@@ -1,6 +1,16 @@
 Morphe NOTICE
 =============
 
+App update monitor protocol references
+-------------------------------------
+APKPure request schemas were reviewed against APKUpdater (GPLv3),
+https://github.com/DmitryN71/apkupdater, revision
+3492cfba3bd84a10cff499d3c95eeecec06c1ebd. Public Google Play metadata field
+mapping follows google-play-scraper's ElementSpecs.Detail.version:
+https://github.com/JoMingyu/google-play-scraper/blob/master/google_play_scraper/constants/element.py.
+Credit belongs to those projects' contributors. The monitor uses Python's
+standard library and does not include APKUpdater's embedded service credential.
+
 7c. Project Name Restriction
 ----------------------------
 
