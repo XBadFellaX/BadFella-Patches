@@ -56,7 +56,7 @@ app data. Upstream attribution is in `NOTICE`.
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.6.0-dev.17](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.17)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;58 patches total
+> **[v1.6.0](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;58 patches total
 <details open>
 <summary>📦 Ultimea&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
 <br>
@@ -83,9 +83,9 @@ app data. Upstream attribution is in `NOTICE`.
 
 **🎯 Supported versions:**
 
-| 4.1.1267 | 4.1.1271 | 4.1.1272 | 4.1.1275 |
-| :---: | :---: | :---: | :---: |
-|  | Version 4.1.1271, build 217900. | Version 4.1.1272, build 218000. | Version 4.1.1275 beta, build 218300. | Any version (experimental). Every patch verifies its own anchors. |
+| 4.1.1267 | 4.1.1271 | 4.1.1272 | 4.1.1275 | 4.1.1276 |
+| :---: | :---: | :---: | :---: | :---: |
+|  | Version 4.1.1271, build 217900. | Version 4.1.1272, build 218000. | Version 4.1.1275 beta, build 218300. | Version 4.1.1276 beta, build 218400. | Any version (experimental). Every patch verifies its own anchors. |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
@@ -248,6 +248,12 @@ app data. Upstream attribution is in `NOTICE`.
 <details open>
 <summary>📦 Wanderlog&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
+
+**🎯 Supported versions:**
+
+| 2.227 | 2.228 | 2.229 |
+| :---: | :---: | :---: |
+| Any version (experimental). Every patch verifies its own anchors. | Version 2.227, build 2026102307 (universal). | Version 2.228, build 2026110208 (universal). | Version 2.229, build 2026111701 (universal). |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|

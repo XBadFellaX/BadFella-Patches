@@ -1,3 +1,34 @@
+## 1.6.0 (2026-11-20)
+
+### 🐛 Bug Fixes
+
+* **linkedin:** hide video carousels and report filter time per view name ae450b7
+* **linkedin:** restore Firebase identity without requiring microG 5a3f2f9
+* **linkedin:** stop re-reading visible posts on every scroll sample f710dd1
+* **linkedin:** support updated divider colors in 4.1.1276 480be6a
+* **remoteatv:** add optional D-pad hold movement tolerance a6237a0
+* **remoteatv:** guard native hold callback context tags d5e2e28
+* **remoteatv:** keep active D-pad holds through finger movement 5b1271f
+* **remoteatv:** retain holds before gesture acceptance 03d7d28
+* **ultimea:** bundle pre-rendered icons to resolve ImageIO on Android (v1.6.0-dev.2) 5cb6a46
+* **ultimea:** port scoped AMOLED and Explorer patches 3d081db
+* **ultimea:** rename settings to BadFella Patches e77b3a2
+* **ultimea:** replace complex ELF hooks with native Dart constant patching (v1.6.0-dev.3) ab811fe
+* **wanderlog:** support version 2.229 and prepare dev.14 18e04c3
+
+### ✨ New Features
+
+* add support for LinkedIn 4.1.1275 (build 218300) d4d38b2
+* **linkedin:** expand feed, navigation and download controls 65fc57e
+* **remoteatv:** add optional remote page swipe lock d8b9933
+* **ultimea:** add accent, tracking and cleanup patches 5d80b39
+* **ultimea:** add pure black AMOLED theme and hide explorer tab patches 00ee75c
+* **ultimea:** add pure black theme and hide explorer tab (v1.6.0-dev.1) c750b34
+
+### 🔧 Improvements
+
+* **linkedin:** stop parsing every feed post on the scrolling thread fc9f6f8
+
 ## 1.6.0-dev.18 (2026-11-20)
 
 - **LinkedIn:** Add support for 4.1.1276 beta (build 218400), including its updated divider colors for Remove gaps and dividers. Earlier supported versions remain available.

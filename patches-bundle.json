@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-20T16:16:18",
-  "description": "- **LinkedIn:** Add support for 4.1.1276 beta (build 218400), including its updated divider colors for Remove gaps and dividers. Earlier supported versions remain available.\n\nEnable pre-releases for BadFella Patches in Morphe Manager, refresh Sources, and repatch the original LinkedIn APK. Install using your existing Manager signing key.\n",
-  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.6.0-dev.18/patches-1.6.0-dev.18.mpp",
+  "created_at": "2026-11-20T16:27:51",
+  "description": "## 1.6.0 (2026-11-20)\n\n### 🐛 Bug Fixes\n\n* **linkedin:** hide video carousels and report filter time per view name ae450b7\n* **linkedin:** restore Firebase identity without requiring microG 5a3f2f9\n* **linkedin:** stop re-reading visible posts on every scroll sample f710dd1\n* **linkedin:** support updated divider colors in 4.1.1276 480be6a\n* **remoteatv:** add optional D-pad hold movement tolerance a6237a0\n* **remoteatv:** guard native hold callback context tags d5e2e28\n* **remoteatv:** keep active D-pad holds through finger movement 5b1271f\n* **remoteatv:** retain holds before gesture acceptance 03d7d28\n* **ultimea:** bundle pre-rendered icons to resolve ImageIO on Android (v1.6.0-dev.2) 5cb6a46\n* **ultimea:** port scoped AMOLED and Explorer patches 3d081db\n* **ultimea:** rename settings to BadFella Patches e77b3a2\n* **ultimea:** replace complex ELF hooks with native Dart constant patching (v1.6.0-dev.3) ab811fe\n* **wanderlog:** support version 2.229 and prepare dev.14 18e04c3\n\n### ✨ New Features\n\n* add support for LinkedIn 4.1.1275 (build 218300) d4d38b2\n* **linkedin:** expand feed, navigation and download controls 65fc57e\n* **remoteatv:** add optional remote page swipe lock d8b9933\n* **ultimea:** add accent, tracking and cleanup patches 5d80b39\n* **ultimea:** add pure black AMOLED theme and hide explorer tab patches 00ee75c\n* **ultimea:** add pure black theme and hide explorer tab (v1.6.0-dev.1) c750b34\n\n### 🔧 Improvements\n\n* **linkedin:** stop parsing every feed post on the scrolling thread fc9f6f8",
+  "download_url": "https://github.com/XBadFellaX/BadFella-Patches/releases/download/v1.6.0/patches-1.6.0.mpp",
   "signature_download_url": "",
-  "version": "1.6.0-dev.18"
+  "version": "1.6.0"
 }
