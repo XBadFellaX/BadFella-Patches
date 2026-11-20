@@ -25,4 +25,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           APP_UPDATE_ISSUE: ${{ vars.APP_UPDATE_ISSUE }}
-        run: python tools/app_updates.py --catalog patches-list.json
+        run: python tools/app_updates.py --catalog patches-list.json --reviewed-versions tools/app-update-versions.json

@@ -32,13 +32,19 @@ def request(url, data=None, headers=None):
         return response.read()
 
 
-def catalog_apps(catalog, catalog_name='Public'):
+def catalog_apps(catalog, catalog_name='Public', reviewed_versions=None):
+    if reviewed_versions is None:
+        reviewed_versions = {}
+    if not isinstance(reviewed_versions, dict) or any(
+            not isinstance(v, str) or not v.strip() for v in reviewed_versions.values()):
+        raise ValueError('Reviewed versions must map packages to nonempty version strings')
     apps = {}
     for patch in catalog['patches']:
         for app in patch.get('compatiblePackages') or []:
             targets = [t['version'] for t in app['targets'] if t.get('version')]
             apps[app['packageName']] = {'name': app['name'], 'catalog': catalog_name,
-                                       'supported': targets[-1] if targets else 'not version-pinned'}
+                                       'supported': reviewed_versions.get(app['packageName']) or
+                                       (targets[-1] if targets else 'version not recorded')}
     if not apps:
         raise ValueError('Catalog has no apps')
     return apps
@@ -133,18 +139,18 @@ def text(value):
 def message(apps, previous, state, changed):
     lines = ['@XBadFellaX', '', 'App update watch: ' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'), '',
              'Starting snapshot. Future alerts report new listings since this check.' if not previous else 'New listings or a change in source availability.', '',
-             '| Catalog | App | Patch target | Source listing |', '| --- | --- | --- | --- |']
+             '| Catalog | App (worked-on version) | Source listing |', '| --- | --- | --- |']
     for package in sorted(changed):
         item = state['latest'][package]
-        lines.append(f"| {text(apps[package]['catalog'])} | {text(apps[package]['name'])} | {text(apps[package]['supported'])} | "
+        lines.append(f"| {text(apps[package]['catalog'])} | {text(apps[package]['name'])} ({text(apps[package]['supported'])}) | "
                      f"[{text(item['title'])}]({item['url']}) ({item['source']}) |")
     if not changed:
-        lines.append('| | No new listings | | |')
+        lines.append('| | No new listings | |')
     if state['errors']:
         lines += ['', 'Could not check: ' + '; '.join(text(apps[p]['name']) + ' (' + e + ')' for p, e in sorted(state['errors'].items()))]
     elif previous.get('errors'):
         lines += ['', 'All sources are responding again.']
-    lines += ['', 'Listings include beta releases. Availability does not establish patch compatibility; no APKs or patches are changed.',
+    lines += ['', 'Bracketed versions identify reviewed inputs or declared patch targets, not phone-test certification. Listings include beta releases. Availability does not establish patch compatibility; no APKs or patches are changed.',
               '', MARKER + json.dumps(state, separators=(',', ':')) + '\n-->']
     return '\n'.join(lines)
 
@@ -172,9 +178,11 @@ def main():
     parser.add_argument('--dry-run', action='store_true', help='Read upstreams and print a snapshot; never access GitHub issues')
     parser.add_argument('--catalog', type=Path, default=Path('patches-list.json'), help='catalog from the repository being monitored')
     parser.add_argument('--catalog-name', choices=['Public', 'Private'], default='Public')
+    parser.add_argument('--reviewed-versions', type=Path, help='recorded app versions used for patch work; display only')
     parser.add_argument('--play-package', action='append', default=[], help='package to check through public Play metadata instead of APKPure')
     args = parser.parse_args()
-    apps = catalog_apps(json.loads(args.catalog.read_text(encoding='utf-8')), args.catalog_name)
+    reviewed = json.loads(args.reviewed_versions.read_text(encoding='utf-8')) if args.reviewed_versions else {}
+    apps = catalog_apps(json.loads(args.catalog.read_text(encoding='utf-8')), args.catalog_name, reviewed)
     issue = os.environ.get('APP_UPDATE_ISSUE')
     if not args.dry_run and (not issue or not issue.isdecimal()):
         raise ValueError('APP_UPDATE_ISSUE must identify the monitoring issue')

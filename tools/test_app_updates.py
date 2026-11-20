@@ -60,8 +60,23 @@ class UpdateTests(unittest.TestCase):
         self.assertTrue(notify)
         self.assertEqual(state['latest']['public'], previous['latest']['public'])
         body = monitor.message(apps, previous, state, changed)
-        self.assertIn('| Private | Private app | 1.0 |', body)
+        self.assertIn('| Private | Private app (1.0) |', body)
         self.assertFalse(monitor.advance(state, {'public': item(), 'private': item()}, {})[2])
+
+    def test_reviewed_version_is_display_only_and_does_not_pin_catalog(self):
+        app = {'packageName': 'app', 'name': 'App', 'targets': [{'version': None}]}
+        catalog = {'patches': [{'compatiblePackages': [app]}]}
+        apps = monitor.catalog_apps(catalog, 'Private', {'app': '2.10.3'})
+        state, changed, _ = monitor.advance({}, {'app': item()}, {})
+        body = monitor.message(apps, {}, state, changed)
+        self.assertIn('| Private | App (2.10.3) |', body)
+        self.assertNotIn('not version-pinned', body)
+        self.assertIsNone(app['targets'][0]['version'])
+        self.assertFalse(monitor.advance(state, {'app': item()}, {})[2])
+        with self.assertRaises(ValueError):
+            monitor.catalog_apps(catalog, reviewed_versions={'app': 123})
+        with self.assertRaises(ValueError):
+            monitor.catalog_apps(catalog, reviewed_versions=[])
 
     def test_public_play_metadata_is_parsed_as_json_without_execution(self):
         import json
