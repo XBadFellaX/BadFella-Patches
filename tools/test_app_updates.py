@@ -95,6 +95,7 @@ class UpdateTests(unittest.TestCase):
     def test_apkpure_maps_only_requested_apps(self, request):
         request.return_value = b'{"retcode":0,"app_update_response":[{"package_name":"app","version_name":"2.0","version_code":"123"}]}'
         self.assertEqual(monitor.pure_latest(['app'])['app']['order'], 123)
+        self.assertEqual(monitor.pure_latest(['app'])['app']['url'], 'https://apkpure.com/p/app')
         self.assertEqual(monitor.pure_latest(['different']), {})
         request.return_value = b'{"retcode":1}'
         with self.assertRaises(ValueError):

@@ -74,7 +74,7 @@ def pure_latest(packages):
     if data.get('retcode') != 0:
         raise ValueError('APKPure refused the update request')
     return {app['package_name']: {'order': int(app['version_code']), 'title': app['version_name'],
-                                 'url': 'https://apkpure.com/search?q=' + app['package_name'], 'source': 'APKPure'}
+                                 'url': 'https://apkpure.com/p/' + app['package_name'], 'source': 'APKPure'}
             for app in data['app_update_response'] if app['package_name'] in packages}
 
 
