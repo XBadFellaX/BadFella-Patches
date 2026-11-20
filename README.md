@@ -56,7 +56,7 @@ app data. Upstream attribution is in `NOTICE`.
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.6.0-dev.16](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.16)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;58 patches total
+> **[v1.6.0-dev.17](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.6.0-dev.17)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;58 patches total
 <details open>
 <summary>📦 Ultimea&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
 <br>
