@@ -1,33 +1,17 @@
 ## 1.6.0 (2026-11-20)
 
-### 🐛 Bug Fixes
+- **LinkedIn:** Support 4.1.1275 and 4.1.1276 beta, including the newer divider colors. Reduce repeated feed parsing while scrolling and hide video carousels. Normal feed reload on reopening is now the default; an explicitly enabled Keep feed on reopen setting is retained.
+- **LinkedIn:** Restore Firebase package and certificate headers for regular Google Play services and cloned builds. GmsCore support remains optional and needs microG RE when selected.
+- **LinkedIn:** Add screenshot share-sheet blocking, top-bar controls, navigation-tab ordering and Messaging in the bottom bar. Add elapsed video time and optional automatic advance, separate post-menu copy/download switches, GIF file types, PDF completion notifications, settings backup files and menu scroll restoration.
+- **Remote for Android TV:** Add optional Disable remote page swipes and Increase D-pad hold tolerance for 6.1.0 build 45. Started arrow holds continue through finger movement in both repeat modes, with normal release/cancellation handling. Both options are off by default; hold tolerance also enables swipe lock.
+- **Wanderlog:** Add support for 2.229 (build 2026111701), retaining the earlier supported versions.
+- **Ultimea:** Add Black Mode, Hide Explorer Tab, Accent color, Disable tracking, Remove distractions and Remove popups for 1.4.4 build 495, ARM64 only. The in-app settings entry uses BadFella Patches branding.
 
-* **linkedin:** hide video carousels and report filter time per view name ae450b7
-* **linkedin:** restore Firebase identity without requiring microG 5a3f2f9
-* **linkedin:** stop re-reading visible posts on every scroll sample f710dd1
-* **linkedin:** support updated divider colors in 4.1.1276 480be6a
-* **remoteatv:** add optional D-pad hold movement tolerance a6237a0
-* **remoteatv:** guard native hold callback context tags d5e2e28
-* **remoteatv:** keep active D-pad holds through finger movement 5b1271f
-* **remoteatv:** retain holds before gesture acceptance 03d7d28
-* **ultimea:** bundle pre-rendered icons to resolve ImageIO on Android (v1.6.0-dev.2) 5cb6a46
-* **ultimea:** port scoped AMOLED and Explorer patches 3d081db
-* **ultimea:** rename settings to BadFella Patches e77b3a2
-* **ultimea:** replace complex ELF hooks with native Dart constant patching (v1.6.0-dev.3) ab811fe
-* **wanderlog:** support version 2.229 and prepare dev.14 18e04c3
+Refresh BadFella Patches in Morphe Manager, repatch the original supported app APK/APKM and install using your existing Manager signing key. Select optional patches explicitly. Existing app data and signing keys should be retained.
 
-### ✨ New Features
+LinkedIn feed behavior and push delivery can still depend on account, server and device settings. GmsCore support routes Google sign-in and push through microG RE; leave it unselected to use regular Google Play services. Ultimea startup and soundbar reconnection have not been verified on physical hardware.
 
-* add support for LinkedIn 4.1.1275 (build 218300) d4d38b2
-* **linkedin:** expand feed, navigation and download controls 65fc57e
-* **remoteatv:** add optional remote page swipe lock d8b9933
-* **ultimea:** add accent, tracking and cleanup patches 5d80b39
-* **ultimea:** add pure black AMOLED theme and hide explorer tab patches 00ee75c
-* **ultimea:** add pure black theme and hide explorer tab (v1.6.0-dev.1) c750b34
-
-### 🔧 Improvements
-
-* **linkedin:** stop parsing every feed post on the scrolling thread fc9f6f8
+Thanks to the upstream authors lokesh-sparrow, amfakh, heyymichii and hxreborn, and to the contributors and reporters who helped test these changes.
 
 ## 1.6.0-dev.18 (2026-11-20)
 
