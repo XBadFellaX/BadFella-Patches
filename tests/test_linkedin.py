@@ -79,7 +79,7 @@ class LinkedInCatalogTests(unittest.TestCase):
     def test_reviewed_targets_and_version_agnosticism(self):
         for name, patch in self.patches.items():
             targets = patch["compatiblePackages"][0]["targets"]
-            self.assertEqual(len(targets), 5, f"{name} should have 5 targets")
+            self.assertEqual(len(targets), 6, f"{name} should have 6 targets")
             self.assertEqual(targets[0]["version"], "4.1.1267")
             self.assertEqual(targets[1]["version"], "4.1.1271")
             self.assertEqual(set(targets[1]["versionCodes"].values()), {217900})
@@ -90,9 +90,12 @@ class LinkedInCatalogTests(unittest.TestCase):
             self.assertEqual(targets[3]["version"], "4.1.1275")
             self.assertEqual(set(targets[3]["versionCodes"].values()), {218300})
             self.assertFalse(targets[3]["isExperimental"])
+            self.assertEqual(targets[4]["version"], "4.1.1276")
+            self.assertEqual(set(targets[4]["versionCodes"].values()), {218400})
+            self.assertFalse(targets[4]["isExperimental"])
             # The last target is the experimental wildcard for future version support.
-            self.assertIsNone(targets[4]["version"])
-            self.assertTrue(targets[4]["isExperimental"])
+            self.assertIsNone(targets[5]["version"])
+            self.assertTrue(targets[5]["isExperimental"])
 
     def test_default_patches(self):
         for name, patch in self.patches.items():

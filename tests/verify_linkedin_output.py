@@ -44,6 +44,10 @@ APP_COMPAT = "Landroidx/appcompat/app/AppCompatActivity;"
 MAIN_ACTIVITY = "Lcom/linkedin/android/infra/navigation/MainActivity;"
 NAV_PANEL_TRANSFORMER = "Lcom/linkedin/android/home/navpanel/HomeNavPanelTransformer;"
 NAV_PANEL_PRESENTER = "Lcom/linkedin/android/home/navpanel/presenter/HomeNavPanelSectionV2Presenter;"
+DIVIDER_CLASSES = (
+    "Lcom/linkedin/android/infra/sdui/components/DividerKt;",
+    "Lcom/linkedin/android/infra/sdui/components/LazyColumnItemsKt;",
+)
 
 NEW_PATCH_HOOKS = {
     "Disable screenshot share sheet": (
@@ -148,7 +152,7 @@ with tempfile.TemporaryDirectory() as workspace:
             file.write_bytes(data)
             for descriptor in class_descriptors(data):
                 classes[descriptor] += 1
-                if descriptor in NEW_HOOK_CALLERS or descriptor in (
+                if descriptor in NEW_HOOK_CALLERS or descriptor in DIVIDER_CLASSES or descriptor in (
                         SDUI_FILTER, POST_MENU, COMPONENT_TRANSFORMER, SETTINGS, SETTINGS_ACTIVITY,
                                   MATERIAL_YOU, HIDE_ADS, GLASS_BAR, NAVIGATION_BAR, SLIM_BEHAVIOR,
                                   APP_COMPAT, MAIN_ACTIVITY, NAV_PANEL_TRANSFORMER, NAV_PANEL_PRESENTER) or descriptor.startswith(
@@ -176,6 +180,14 @@ with tempfile.TemporaryDirectory() as workspace:
         if patch in applied:
             for caller, hook in hooks:
                 assert hook in disassemble(targets[caller]), f"{patch}: missing {hook}"
+
+    if "Remove gaps and dividers" in applied:
+        for caller in DIVIDER_CLASSES:
+            dex = disassemble(targets[caller])
+            section = next(block for block in re.split(r"\nClass #", dex)
+                           if re.search(r"Class descriptor\s+: '" + re.escape(caller) + "'", block))
+            assert "MaterialYou;.flatDivider:" in section, f"Missing divider hook in {caller}"
+        print("Divider hooks present in both SDUI components")
 
     # Check the header's actual value register at every Firebase request call.
     identity_headers = {"X-Android-Cert": LINKEDIN_SIGNATURE.upper(), "X-Android-Package": "com.linkedin.android"}

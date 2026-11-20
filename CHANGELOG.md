@@ -1,3 +1,9 @@
+## 1.6.0-dev.18 (2026-11-20)
+
+- **LinkedIn:** Add support for 4.1.1276 beta (build 218400), including its updated divider colors for Remove gaps and dividers. Earlier supported versions remain available.
+
+Enable pre-releases for BadFella Patches in Morphe Manager, refresh Sources, and repatch the original LinkedIn APK. Install using your existing Manager signing key.
+
 ## 1.6.0-dev.17 (2026-11-19)
 
 - **Remote for Android TV:** Fix another movement-cancellation path in Increase D-pad hold tolerance. Started arrow holds now use the same protection before and after gesture acceptance, in both repeat modes. Ordinary taps, center/select, repeat timing and release/cancel handlers remain unchanged. The patch stays optional and off by default for 6.1.0 build 45.

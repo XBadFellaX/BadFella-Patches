@@ -48,7 +48,8 @@ LinkedIn patches adapt GPLv3 work from lokesh-sparrow/loki-patches
 8083636450; amfakh/fakh-patches
 (https://github.com/amfakh/fakh-patches), revision
 c1512f414cb6701f480b260b84acc69bf920a1f8 and
-b4168d2f4203b16c52190f03fd7d9c2e683d3051; and heyymichii/michii-patches
+b4168d2f4203b16c52190f03fd7d9c2e683d3051 and
+5c5f5d0e416e0aa4b14cdf81de8fd840bb8d2535; and heyymichii/michii-patches
 (https://github.com/heyymichii/michii-patches), revision
 d4d591e5347113e5cfc3e049e391b2fd36871469.
 Original copyright and SPDX notices are retained in the ported source files.

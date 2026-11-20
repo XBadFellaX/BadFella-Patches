@@ -37,6 +37,11 @@ object Constants {
                 versionCode = 218300,
                 description = "Version 4.1.1275 beta, build 218300.",
             ),
+            AppTarget(
+                version = "4.1.1276",
+                versionCode = 218400,
+                description = "Version 4.1.1276 beta, build 218400.",
+            ),
             // Every patch resolves its targets by class, method and instruction shape rather than by
             // offsets or a version pin, so later LinkedIn builds can be patched without a code change.
             // Morphe flags this target as experimental and still checks each patch's own anchors.
