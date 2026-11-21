@@ -1,5 +1,6 @@
 """Compare stock Ultimate USB 12.5.0 APKS with real patched output."""
 import argparse
+import hashlib
 import io
 import os
 from pathlib import Path
@@ -14,6 +15,20 @@ def run(*args):
     if result.returncode:
         raise RuntimeError(result.stdout)
     return result.stdout
+
+
+def verify_native(stock, output):
+    assert hashlib.sha256(stock).hexdigest() == "0d8ddb95ca3df6eea13a4537c4b4848973298933e7719a90a8e5c4d7c9615824", "Unreviewed native driver"
+    expected = bytearray(stock)
+    for offset, before, after in (
+        (0x3cc97c, "684a43b9", "29008052"),
+        (0x3cc984, "1fcd0ab9", "09cd0ab9"),
+        (0x3cc994, "1fd10ab9", "09d10ab9"),
+        (0x3cc9a4, "1fd50ab9", "09d50ab9"),
+    ):
+        assert stock[offset:offset + 4] == bytes.fromhex(before), "Unexpected native instruction"
+        expected[offset:offset + 4] = bytes.fromhex(after)
+    assert output == expected, "Native integrity edits missing or unrelated driver bytes changed"
 
 
 def verify(args):
@@ -40,10 +55,13 @@ def verify(args):
                 with zipfile.ZipFile(io.BytesIO(bundle.read(name))) as split:
                     for native in split.namelist():
                         if native.startswith("lib/") and not native.endswith("/"):
-                            assert split.read(native) == output.read(native), "Native library changed: " + native
+                            if native == "lib/arm64-v8a/libmixapplications.so":
+                                verify_native(split.read(native), output.read(native))
+                            else:
+                                assert split.read(native) == output.read(native), "Native library changed: " + native
     badging = run(args.aapt2, "dump", "badging", args.output)
     assert "package: name='com.mixapplications.ultimateusb'" in badging and "versionName='12.5.0'" in badging
-    print("PASS: package/version, all DEX entries, assets and original native libraries retained")
+    print("PASS: package/version, all DEX entries, assets; four native integrity instructions and every other driver byte verified")
 
 
 if __name__ == "__main__":

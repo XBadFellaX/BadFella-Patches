@@ -1,3 +1,7 @@
+## 1.7.0-dev.2 (2026-11-21)
+
+- **Ultimate USB:** Correct native integrity state blocking USB access after local patching and re-signing in 12.5.0 build 1205000 (ARM64 APKS). Retain USB permissions, transfer error handling, filesystem operations and confirmation dialogs.
+
 ## 1.7.0-dev.1 (2026-11-21)
 
 - **Ultimate USB:** Add local Pro support for 12.5.0 build 1205000 (ARM64 APKS). Preserve operation confirmations and USB/filesystem drivers. Changed bytecode is rejected for review.

@@ -17,11 +17,13 @@ import com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstructio
 import com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction21c
 import com.android.tools.smali.dexlib2.immutable.reference.ImmutableFieldReference
 import java.security.MessageDigest
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 @Suppress("unused")
 val ultimateUsbProPatch = resourcePatch(
     name = "Ultimate USB local Pro",
-    description = "Enables local Pro checks and skips the cached-purchase validator. Retains operation confirmations, USB/filesystem code and native libraries. Reviewed on 12.5.0 build 1205000; changed bytecode requires review. Does not create a Google Play purchase.",
+    description = "Enables local Pro checks, skips the cached-purchase validator and permits local bytecode/signing changes in the native integrity state. Retains operation confirmations and USB/filesystem operations. Reviewed on 12.5.0 build 1205000 ARM64; changed bytecode or native drivers require review. Does not create a Google Play purchase.",
 ) {
     compatibleWith(Compatibility(
         name = "Ultimate USB", packageName = "com.mixapplications.ultimateusb",
@@ -33,6 +35,24 @@ val ultimateUsbProPatch = resourcePatch(
         val actual = MessageDigest.getInstance("SHA-256").digest(get("classes5.dex").readBytes())
             .joinToString("") { "%02x".format(it) }
         check(actual == "fb443ec0fbf1e2966779ea507b26ff158d2159810762d259e738edce135ea436") { "Ultimate USB classes5.dex changed; this APK needs review" }
+        val nativeFile = get("lib/arm64-v8a/libmixapplications.so")
+        val native = nativeFile.readBytes()
+        val nativeHash = MessageDigest.getInstance("SHA-256").digest(native)
+            .joinToString("") { "%02x".format(it) }
+        check(nativeHash == "0d8ddb95ca3df6eea13a4537c4b4848973298933e7719a90a8e5c4d7c9615824") {
+            "Ultimate USB ARM64 native driver changed; this APK needs review"
+        }
+        val image = ByteBuffer.wrap(native).order(ByteOrder.LITTLE_ENDIAN)
+        // Re-signing and DEX edits must not leave the three shared integrity flags blocking USB/filesystem calls.
+        for ((offset, before, after) in listOf(
+            Triple(0x3cc97c, 0xb9434a68.toInt(), 0x52800029),
+            Triple(0x3cc984, 0xb90acd1f.toInt(), 0xb90acd09.toInt()),
+            Triple(0x3cc994, 0xb90ad11f.toInt(), 0xb90ad109.toInt()),
+            Triple(0x3cc9a4, 0xb90ad51f.toInt(), 0xb90ad509.toInt()),
+        )) {
+            check(image.getInt(offset) == before) { "Unexpected Ultimate USB native instruction at $offset" }
+            image.putInt(offset, after)
+        }
         val dexes = loadDexHandles(this)
         val (handle, owner) = dexes.resolveUniqueClass("Lc81;")
         var changed = 0
@@ -64,5 +84,6 @@ val ultimateUsbProPatch = resourcePatch(
         handle.replaceClass(owner, ImmutableClassDef(owner.type, owner.accessFlags, owner.superclass,
             owner.interfaces, owner.sourceFile, owner.annotations, owner.fields, methods))
         dexes.commitAll()
+        nativeFile.writeBytes(native)
     }
 }
