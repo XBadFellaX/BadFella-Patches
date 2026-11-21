@@ -1,3 +1,7 @@
+## 1.7.0-dev.1 (2026-11-21)
+
+- **Ultimate USB:** Add local Pro support for 12.5.0 build 1205000 (ARM64 APKS). Preserve operation confirmations and USB/filesystem drivers. Changed bytecode is rejected for review.
+
 ## 1.6.0 (2026-11-20)
 
 - **LinkedIn:** Support 4.1.1275 and 4.1.1276 beta, including the newer divider colors. Reduce repeated feed parsing while scrolling and hide video carousels. Normal feed reload on reopening is now the default; an explicitly enabled Keep feed on reopen setting is retained.
