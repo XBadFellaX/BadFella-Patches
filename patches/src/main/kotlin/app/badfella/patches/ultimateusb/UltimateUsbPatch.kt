@@ -43,8 +43,9 @@ val ultimateUsbProPatch = resourcePatch(
             "Ultimate USB ARM64 native driver changed; this APK needs review"
         }
         val image = ByteBuffer.wrap(native).order(ByteOrder.LITTLE_ENDIAN)
-        // Re-signing and DEX edits must not leave the three shared integrity flags blocking USB/filesystem calls.
+        // Re-signing and DEX edits must not leave the native USB initialisation or shared integrity flags blocking USB/filesystem calls.
         for ((offset, before, after) in listOf(
+            Triple(0x10c294, 0xf90033e8.toInt(), 0x14000700),
             Triple(0x3cc97c, 0xb9434a68.toInt(), 0x52800029),
             Triple(0x3cc984, 0xb90acd1f.toInt(), 0xb90acd09.toInt()),
             Triple(0x3cc994, 0xb90ad11f.toInt(), 0xb90ad109.toInt()),

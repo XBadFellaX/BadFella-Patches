@@ -1,3 +1,7 @@
+## 1.7.0-dev.3 (2026-11-21)
+
+- **Ultimate USB:** Fix native USB initialization failure after patching 12.5.0 build 1205000 (ARM64 APKS). Skip integrity abort in usbNativeInit so physical OTG storage drives are detected and mounted cleanly. Retain USB permissions, transfer error handling, filesystem operations and confirmation dialogs.
+
 ## 1.7.0-dev.2 (2026-11-21)
 
 - **Ultimate USB:** Correct native integrity state blocking USB access after local patching and re-signing in 12.5.0 build 1205000 (ARM64 APKS). Retain USB permissions, transfer error handling, filesystem operations and confirmation dialogs.

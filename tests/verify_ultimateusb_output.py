@@ -21,6 +21,7 @@ def verify_native(stock, output):
     assert hashlib.sha256(stock).hexdigest() == "0d8ddb95ca3df6eea13a4537c4b4848973298933e7719a90a8e5c4d7c9615824", "Unreviewed native driver"
     expected = bytearray(stock)
     for offset, before, after in (
+        (0x10c294, "e83300f9", "00070014"),
         (0x3cc97c, "684a43b9", "29008052"),
         (0x3cc984, "1fcd0ab9", "09cd0ab9"),
         (0x3cc994, "1fd10ab9", "09d10ab9"),
@@ -61,7 +62,7 @@ def verify(args):
                                 assert split.read(native) == output.read(native), "Native library changed: " + native
     badging = run(args.aapt2, "dump", "badging", args.output)
     assert "package: name='com.mixapplications.ultimateusb'" in badging and "versionName='12.5.0'" in badging
-    print("PASS: package/version, all DEX entries, assets; four native integrity instructions and every other driver byte verified")
+    print("PASS: package/version, all DEX entries, assets; five native integrity instructions and every other driver byte verified")
 
 
 if __name__ == "__main__":
