@@ -1,3 +1,7 @@
+## 1.7.0-dev.4 (2026-11-21)
+
+- **Ultimate USB:** Prevent native integrity tripwires from zeroing the shared configuration struct and initialize the filesystem anti-tamper canary string for 12.5.0 build 1205000 (ARM64 APKS). Resolves "No Partitions Found!" in USB File Manager and fixes FAT32 formatting crash (IllegalStateException in NativeWinBoot.mssysPayload). Retains USB permissions, transfer error handling, filesystem operations and confirmation dialogs.
+
 ## 1.7.0-dev.3 (2026-11-21)
 
 - **Ultimate USB:** Fix native USB initialization failure after patching 12.5.0 build 1205000 (ARM64 APKS). Skip integrity abort in usbNativeInit so physical OTG storage drives are detected and mounted cleanly. Retain USB permissions, transfer error handling, filesystem operations and confirmation dialogs.

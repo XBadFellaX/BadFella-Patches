@@ -48,8 +48,16 @@ val ultimateUsbProPatch = resourcePatch(
             Triple(0x10c294, 0xf90033e8.toInt(), 0x14000700),
             Triple(0x3cc97c, 0xb9434a68.toInt(), 0x52800029),
             Triple(0x3cc984, 0xb90acd1f.toInt(), 0xb90acd09.toInt()),
-            Triple(0x3cc994, 0xb90ad11f.toInt(), 0xb90ad109.toInt()),
-            Triple(0x3cc9a4, 0xb90ad51f.toInt(), 0xb90ad509.toInt()),
+            Triple(0x3cc988, 0xb9435a68.toInt(), 0xb90ad109.toInt()),
+            Triple(0x3cc98c, 0xb9434a68.toInt(), 0xb90ad509.toInt()),
+            Triple(0x3cc990, 0xf0000ee8.toInt(), 0xf945410a.toInt()),
+            Triple(0x3cc994, 0xb90ad11f.toInt(), 0x90000ecb.toInt()),
+            Triple(0x3cc998, 0xb9435a68.toInt(), 0x910fad6b.toInt()),
+            Triple(0x3cc99c, 0xb9434a68.toInt(), 0xf902514b.toInt()),
+            Triple(0x3cc9a0, 0xf0000ee8.toInt(), 0xd503201f.toInt()),
+            Triple(0x3cc9a4, 0xb90ad51f.toInt(), 0xd503201f.toInt()),
+            Triple(0x3f89f4, 0x9405f89b.toInt(), 0xd503201f.toInt()),
+            Triple(0x3fa0dc, 0x9405f2e1.toInt(), 0xd503201f.toInt()),
         )) {
             check(image.getInt(offset) == before) { "Unexpected Ultimate USB native instruction at $offset" }
             image.putInt(offset, after)
