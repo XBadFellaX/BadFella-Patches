@@ -21,19 +21,9 @@ def verify_native(stock, output):
     assert hashlib.sha256(stock).hexdigest() == "0d8ddb95ca3df6eea13a4537c4b4848973298933e7719a90a8e5c4d7c9615824", "Unreviewed native driver"
     expected = bytearray(stock)
     for offset, before, after in (
-        (0x10c294, "e83300f9", "00070014"),
-        (0x3cc97c, "684a43b9", "29008052"),
-        (0x3cc984, "1fcd0ab9", "09cd0ab9"),
-        (0x3cc988, "685a43b9", "09d10ab9"),
-        (0x3cc98c, "684a43b9", "09d50ab9"),
-        (0x3cc990, "e80e00f0", "0a4145f9"),
-        (0x3cc994, "1fd10ab9", "cb0e0090"),
-        (0x3cc998, "685a43b9", "6bad0f91"),
-        (0x3cc99c, "684a43b9", "4b5102f9"),
-        (0x3cc9a0, "e80e00f0", "1f2003d5"),
-        (0x3cc9a4, "1fd50ab9", "1f2003d5"),
-        (0x3f89f4, "9bf80594", "1f2003d5"),
-        (0x3fa0dc, "e1f20594", "1f2003d5"),
+        (0x3cf9b8, "07000014", "56000014"),
+        (0x3d4a44, "41500054", "1f2003d5"),
+        (0x576c60, "5f2403d5", "c0035fd6"),
     ):
         assert stock[offset:offset + 4] == bytes.fromhex(before), "Unexpected native instruction"
         expected[offset:offset + 4] = bytes.fromhex(after)
@@ -70,7 +60,7 @@ def verify(args):
                                 assert split.read(native) == output.read(native), "Native library changed: " + native
     badging = run(args.aapt2, "dump", "badging", args.output)
     assert "package: name='com.mixapplications.ultimateusb'" in badging and "versionName='12.5.0'" in badging
-    print("PASS: package/version, all DEX entries, assets; 13 native integrity instructions and every other driver byte verified")
+    print("PASS: package/version, all DEX entries, assets; 3 native integrity instructions and every other driver byte verified")
 
 
 if __name__ == "__main__":
