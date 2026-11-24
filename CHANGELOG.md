@@ -1,3 +1,16 @@
+## 1.7.0 (2026-11-24)
+
+### 🐛 Bug Fixes
+
+* **ultimateusb:** bypass native integrity check in usbNativeInit 597f336
+* **ultimateusb:** neutralize native tripwire function to retain partition scanning and format payload 07c4acf
+* **ultimateusb:** retain native access after local patching 436e901
+* **ultimateusb:** retain native config pointer and satisfy filesystem canary integrity f223562
+
+### ✨ New Features
+
+* **ultimateusb:** add local Pro patch and development preview f530ffa
+
 ## 1.7.0-dev.5 (2026-11-23)
 
 - **Ultimate USB:** Neutralize the native atomic swap tripwire (__aarch64_swp8_acq_rel at 0x576c60) across libmixapplications.so for 12.5.0 build 1205000 (ARM64 APKS). Prevents the global security configuration pointer from being zeroed, enabling partition detection in USB File Manager and fixing the FAT32 formatting crash (IllegalStateException in NativeWinBoot.mssysPayload). Retains USB permissions, SCSI inquiry, transfer error handling, filesystem operations and confirmation dialogs.

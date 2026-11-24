@@ -64,7 +64,7 @@ app data. Upstream attribution is in `NOTICE`.
 ## Patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.7.0-dev.1](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.7.0-dev.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;59 patches total
+> **[v1.7.0](https://github.com/XBadFellaX/BadFella-Patches/releases/tag/v1.7.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;59 patches total
 <details open>
 <summary>📦 Ultimea&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
 <br>
@@ -264,7 +264,7 @@ app data. Upstream attribution is in `NOTICE`.
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
-| [Ultimate USB local Pro](#ultimate-usb-local-pro) | Enables local Pro checks and skips the cached-purchase validator. Retains operation confirmations, USB/filesystem code and native libraries. Reviewed on 12.5.0 build 1205000; changed bytecode requires review. Does not create a Google Play purchase. |  |
+| [Ultimate USB local Pro](#ultimate-usb-local-pro) | Enables local Pro checks, skips the cached-purchase validator and permits local bytecode/signing changes in the native integrity state. Retains operation confirmations and USB/filesystem operations. Reviewed on 12.5.0 build 1205000 ARM64; changed bytecode or native drivers require review. Does not create a Google Play purchase. |  |
 
 </details>
 
