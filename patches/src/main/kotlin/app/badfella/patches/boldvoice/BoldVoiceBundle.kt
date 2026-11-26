@@ -6,37 +6,85 @@ import java.security.MessageDigest
 private const val MAGIC = 0x1f1903c103bc1fc6L
 private const val EXPECTED_VERSION = 99
 
-// Target 1: hasClientPremiumAccess (offset 0x1a6b1ad, 72 bytes)
-internal const val T1_OFFSET = 0x1a6b1ad
-internal const val T1_SIZE = 72
-internal val T1_BEFORE = hexBytes("8902014503020080b3130003130000b10f0045030201c3cb130103130001b128004505020253619401160105019302b1110144040503e690032c746e020405031301021300017600")
-internal val T1_AFTER = hexBytes("9500" + "7600".repeat(35))
+private data class Gate(
+    val offset: Int,
+    val size: Int,
+    val before: ByteArray,
+    val after: ByteArray,
+)
 
-// Target 2: selectIsSubscriber (offset 0x1b07808, 16 bytes)
-internal const val T2_OFFSET = 0x1b07808
-internal const val T2_SIZE = 16
-internal val T2_BEFORE = hexBytes("89000144000000f94500000180b37600")
-internal val T2_AFTER = hexBytes("9500" + "7600".repeat(7))
+private data class BundleProfile(
+    val label: String,
+    val gates: List<Gate>,
+)
 
-// Target 3: selectIsProSubscriber (offset 0x1b1c281, 16 bytes)
-internal const val T3_OFFSET = 0x1b1c281
-internal const val T3_SIZE = 16
-internal val T3_BEFORE = hexBytes("89000144000000f9450000011be67600")
-internal val T3_AFTER = hexBytes("9500" + "7600".repeat(7))
+// BoldVoice 5.1.3 (build 470)
+private val PROFILE_470 = BundleProfile(
+    label = "5.1.3",
+    gates = listOf(
+        Gate(
+            0x1a6b1ad, 72,
+            hexBytes("8902014503020080b3130003130000b10f0045030201c3cb130103130001b128004505020253619401160105019302b1110144040503e690032c746e020405031301021300017600"),
+            hexBytes("9500" + "7600".repeat(35)),
+        ),
+        Gate(0x1b07808, 16, hexBytes("89000144000000f94500000180b37600"), hexBytes("9500" + "7600".repeat(7))),
+        Gate(0x1b1c281, 16, hexBytes("89000144000000f9450000011be67600"), hexBytes("9500" + "7600".repeat(7))),
+    ),
+)
+
+// BoldVoice 5.3.6 (build 499): subscription gates + RootContainer force-update bypass
+private val PROFILE_499 = BundleProfile(
+    label = "5.3.6",
+    gates = listOf(
+        Gate(
+            0x1ba5747, 72,
+            hexBytes("890201450302009f8d130003130000b10f00450302019593130103130001b128004505020298649401160105019302b1110144040503e5900393776e020405031301021300017600"),
+            hexBytes("9500" + "7600".repeat(35)),
+        ),
+        Gate(0x1c3901c, 16, hexBytes("89000144000000f9450000019f8d7600"), hexBytes("9500" + "7600".repeat(7))),
+        Gate(0x1c49532, 16, hexBytes("89000144000000f94500000159f07600"), hexBytes("9500" + "7600".repeat(7))),
+        Gate(
+            0x1567368, 92,
+            hexBytes("5e080b416e080c000845080821c351b309084508180e6a49b315083b1905176c19190045191922fb7919081903b32f083b1905206c191900442319037d452123233d8c44191810da3b1805176c18180045181822fb796f0821231918"),
+            hexBytes("96084b58" + "7600".repeat(44)),
+        ),
+    ),
+)
+
+internal val T1_OFFSET = PROFILE_470.gates[0].offset
+internal val T1_SIZE = PROFILE_470.gates[0].size
+internal val T1_BEFORE = PROFILE_470.gates[0].before
+internal val T1_AFTER = PROFILE_470.gates[0].after
+
+internal val T2_OFFSET = PROFILE_470.gates[1].offset
+internal val T2_SIZE = PROFILE_470.gates[1].size
+internal val T2_BEFORE = PROFILE_470.gates[1].before
+internal val T2_AFTER = PROFILE_470.gates[1].after
+
+internal val T3_OFFSET = PROFILE_470.gates[2].offset
+internal val T3_SIZE = PROFILE_470.gates[2].size
+internal val T3_BEFORE = PROFILE_470.gates[2].before
+internal val T3_AFTER = PROFILE_470.gates[2].after
+
+internal val T4_OFFSET = PROFILE_499.gates[3].offset
+internal val T4_SIZE = PROFILE_499.gates[3].size
+internal val T4_BEFORE = PROFILE_499.gates[3].before
+internal val T4_AFTER = PROFILE_499.gates[3].after
+
+private fun selectProfile(stock: ByteArray): BundleProfile {
+  for (profile in listOf(PROFILE_499, PROFILE_470)) {
+        if (profile.gates.all { gate ->
+                stock.copyOfRange(gate.offset, gate.offset + gate.size).contentEquals(gate.before)
+            }) {
+            return profile
+        }
+    }
+    error("BoldVoice Hermes gates changed; this app needs review")
+}
 
 /**
- * Patches the Hermes 99 JavaScript bytecode bundle for BoldVoice 5.1.3 (build 470).
- *
- * Targets reviewed:
- * 1. hasClientPremiumAccess (72 bytes at offset 0x1a6b1ad): checks isSubscriber, unlockAll, and
- *    role.startsWith("admin"). Replaced with LoadConstTrue r0 followed by Ret r0 to grant client-side
- *    premium feature checks and lesson materials.
- * 2. selectIsSubscriber selector body (16 bytes at offset 0x1b07808): reads state.userState.isSubscriber.
- *    Replaced with LoadConstTrue r0 and Ret r0 to report subscriber state as true.
- * 3. selectIsProSubscriber selector body (16 bytes at offset 0x1b1c281): reads state.userState.isProSubscriber.
- *    Replaced with LoadConstTrue r0 and Ret r0 to report pro subscriber state as true.
- *
- * Reseals the trailing 20-byte SHA-1 footer.
+ * Patches the Hermes 99 bundle for BoldVoice 5.1.3 (470) or 5.3.6 (499).
+ * 5.3.6 adds a RootContainer gate bypass so the client force-update screen is not shown.
  */
 internal fun patchBoldVoiceBundle(stock: ByteArray): ByteArray {
     check(stock.size in 148..(128 * 1024 * 1024)) { "Hermes bundle size is invalid or exceeds 128 MiB" }
@@ -49,26 +97,18 @@ internal fun patchBoldVoiceBundle(stock: ByteArray): ByteArray {
         "Hermes bytecode footer checksum is invalid"
     }
 
-    check(T1_OFFSET + T1_SIZE <= footer) { "Target 1 is out of bounds" }
-    check(stock.copyOfRange(T1_OFFSET, T1_OFFSET + T1_SIZE).contentEquals(T1_BEFORE)) {
-        "BoldVoice hasClientPremiumAccess anchor changed"
-    }
-
-    check(T2_OFFSET + T2_SIZE <= footer) { "Target 2 is out of bounds" }
-    check(stock.copyOfRange(T2_OFFSET, T2_OFFSET + T2_SIZE).contentEquals(T2_BEFORE)) {
-        "BoldVoice selectIsSubscriber anchor changed"
-    }
-
-    check(T3_OFFSET + T3_SIZE <= footer) { "Target 3 is out of bounds" }
-    check(stock.copyOfRange(T3_OFFSET, T3_OFFSET + T3_SIZE).contentEquals(T3_BEFORE)) {
-        "BoldVoice selectIsProSubscriber anchor changed"
+    val profile = selectProfile(stock)
+    for (gate in profile.gates) {
+        check(gate.offset + gate.size <= footer) { "Hermes gate at ${gate.offset.toString(16)} is out of bounds" }
+        check(stock.copyOfRange(gate.offset, gate.offset + gate.size).contentEquals(gate.before)) {
+            "BoldVoice Hermes anchor at ${gate.offset.toString(16)} changed (${profile.label})"
+        }
     }
 
     val result = stock.copyOf()
-    T1_AFTER.copyInto(result, T1_OFFSET)
-    T2_AFTER.copyInto(result, T2_OFFSET)
-    T3_AFTER.copyInto(result, T3_OFFSET)
-
+    for (gate in profile.gates) {
+        gate.after.copyInto(result, gate.offset)
+    }
     sha1(result, 0, footer).copyInto(result, footer)
     return result
 }
