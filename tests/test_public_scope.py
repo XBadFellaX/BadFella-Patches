@@ -11,7 +11,7 @@ class PublicScopeTests(unittest.TestCase):
                          {'ticktick', 'emby', 'remoteatv', 'peptalk', 'wanderlog', 'linkedin',
                           'util', 'revolution', 'chatgpt', 'sciencenews', 'boldvoice', 'ultimea', 'ultimateusb'})
         catalog = json.loads((root / 'patches-list.json').read_text())
-        self.assertEqual(len(catalog['patches']), 59)
+        self.assertEqual(len(catalog['patches']), 60)
         self.assertEqual({c['packageName'] for p in catalog['patches'] for c in p['compatiblePackages']},
                          {'com.ticktick.task', 'com.mb.android', 'tech.simha.androidtvremote',
                           'com.peptalk.app', 'com.wanderlog.android', 'com.linkedin.android',

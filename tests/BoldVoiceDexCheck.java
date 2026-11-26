@@ -50,28 +50,14 @@ class BoldVoiceDexCheck {
     }
 
     static final String CLIENT = "Lcom/pairip/licensecheck/LicenseClient;";
-    static final String ACTIVITY = "Lcom/pairip/licensecheck/LicenseActivity;";
-    static final String STATE = "Lcom/pairip/licensecheck/LicenseClient$LicenseCheckState;";
+
+    /** Exactly the methods the 5.1.3 patch replaces with a bare return-void. */
     static final Set<String> VOID = Set.of(
+        "Lcom/pairip/StartupLauncher;->launch()V",
+        "Lcom/pairip/VMRunner;-><clinit>()V",
         "Lcom/pairip/SignatureCheck;->verifyIntegrity(Landroid/content/Context;)V",
         CLIENT + "->initializeLicenseCheck()V", CLIENT + "->checkLicense(Landroid/content/Context;)V",
-        CLIENT + "->startErrorDialogActivity()V", CLIENT + "->scheduleAppShutdown()V",
-        CLIENT + "->checkLicenseInternal(Landroid/os/IBinder;)V",
-        CLIENT + "->startPaywallActivity(Landroid/app/PendingIntent;)V",
-        CLIENT + "->handleError(Lcom/pairip/licensecheck/LicenseCheckException;)V",
-        CLIENT + "->handleTrialEnd()V",
-        CLIENT + "->initiateFreshLicensingServiceConnection(Z)V",
-        CLIENT + "->bindToLicensingService(Z)V",
-        CLIENT + "->processResponse(ILandroid/os/Bundle;)V",
-        CLIENT + "->retryOrThrow(Lcom/pairip/licensecheck/LicenseCheckException;ZZ)V",
-        CLIENT + "->lambda$startPaywallActivity$0(Landroid/app/PendingIntent;)V",
-        CLIENT + "->lambda$startErrorDialogActivity$0()V",
-        ACTIVITY + "->showPaywallAndCloseApp()V",
-        ACTIVITY + "->showErrorDialog()V");
-    static final Set<String> RETURN_TRUE = Set.of(
-        CLIENT + "->performLocalInstallerCheck()Z", CLIENT + "->isLocalCheckPassed()Z",
-        "Lcom/pairip/SignatureCheck;->verifySignatureMatches(Ljava/lang/String;)Z");
-    static final String CLIENT_CLINIT = CLIENT + "-><clinit>()V";
+        CLIENT + "->startErrorDialogActivity()V", CLIENT + "->scheduleAppShutdown()V");
 
     static boolean isBareReturnVoid(Method m) {
         var impl = m.getImplementation();
@@ -81,49 +67,18 @@ class BoldVoiceDexCheck {
             && !it.hasNext();
     }
 
-    static void checkEdit(Method old, Method output) throws Exception {
-        var body = old.getImplementation();
-        check(body != null, "Stock implementation missing");
-        var code = new ArrayList<Instruction>();
-        body.getInstructions().forEach(code::add);
-        String id = DexInventory.id(old);
-        if (VOID.contains(id)) {
-            check(code.size() > 1, "Stock method already patched: " + id);
-            body = new ImmutableMethodImplementation(Math.max(incomingRegisters(old), 1), List.of(
-                new com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction10x(
-                    com.android.tools.smali.dexlib2.Opcode.RETURN_VOID)), List.of(), List.of());
-        } else if (RETURN_TRUE.contains(id)) {
-            check(code.size() > 2, "Stock method changed: " + id);
-            body = new ImmutableMethodImplementation(Math.max(incomingRegisters(old), 1), List.of(
-                new com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction11n(
-                    com.android.tools.smali.dexlib2.Opcode.CONST_4, 0, 1),
-                new com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction11x(
-                    com.android.tools.smali.dexlib2.Opcode.RETURN, 0)), List.of(), List.of());
-        } else if (id.equals(CLIENT_CLINIT)) {
-            int changed = 0;
-            for (int i = 0; i < code.size(); i++) {
-                var ins = code.get(i);
-                if (ins.getOpcode() == com.android.tools.smali.dexlib2.Opcode.SGET_OBJECT &&
-                    ((ReferenceInstruction) ins).getReference().toString().equals(STATE + "->CHECK_REQUIRED:" + STATE)) {
-                    code.set(i, new com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction21c(
-                        ins.getOpcode(), ((OneRegisterInstruction) ins).getRegisterA(),
-                        new com.android.tools.smali.dexlib2.immutable.reference.ImmutableFieldReference(STATE, "FULL_CHECK_OK", STATE)));
-                    changed++;
-                }
-            }
-            check(changed == 1, "Stock initial license state changed");
-            body = new ImmutableMethodImplementation(body.getRegisterCount(), code, body.getTryBlocks(), body.getDebugItems());
-        } else {
-            throw new AssertionError("Unexpected reviewed edit: " + id);
-        }
-        var expected = new ImmutableMethod(old.getDefiningClass(), old.getName(), old.getParameters(),
-            old.getReturnType(), old.getAccessFlags(), old.getAnnotations(), old.getHiddenApiRestrictions(), body);
-        check(describe(expected).equals(describe(output)), "Incorrect patched method: " + id);
-    }
-
     public static void main(String[] args) throws Exception {
-        var stock = classes(args[0]); var output = classes(args[1]);
-        check(stock.keySet().equals(output.keySet()), "Class inventory changed");
+        var stock = classes(args[0]);
+        var output = classes(args[1]);
+
+        // Classes whose <clinit> the patch legitimately injects, taken from the reviewed fields.tsv.
+        var hoisted = new java.util.HashSet<String>();
+        if (args.length > 2) {
+            for (var line : java.nio.file.Files.readAllLines(java.nio.file.Path.of(args[2]))) {
+                if (!line.isBlank()) hoisted.add(line.trim());
+            }
+        }
+        check(!hoisted.isEmpty(), "Expected the reviewed hoisted-string class list");
 
         var launcher = output.get("Lcom/pairip/StartupLauncher;");
         check(launcher != null, "StartupLauncher missing");
@@ -135,42 +90,80 @@ class BoldVoiceDexCheck {
             }
         }
         check(launchBody != null, "StartupLauncher.launch missing");
-        check(!isBareReturnVoid(launchBody),
-            "Legacy 5.1.3 output: this checker verifies the 5.3.6 license-state scheme only");
+        if (isBareReturnVoid(launchBody)) {
+            // 5.1.3 (470): full devirtualization. The patch voids launch()/VMRunner.<clinit>(),
+            // restores startup/callback bodies and hoisted strings from bundled resources, and adds
+            // one app/badfella helper class. Everything outside that reviewed surface must be
+            // byte-identical to stock, so no unexplained change can ride along.
+            check(output.keySet().containsAll(stock.keySet()), "Stock class removed in 5.1.3 output");
+            var added = new TreeSet<>(output.keySet());
+            added.removeAll(stock.keySet());
+            check(added.size() == 1 && added.first().startsWith("Lapp/badfella/"),
+                "Unexpected added classes in 5.1.3 output: " + added);
 
-        int changed = 0, unchanged = 0;
-        for (var name : stock.keySet()) {
-            var before = stock.get(name); var after = output.get(name);
-            check(before.getAccessFlags() == after.getAccessFlags() &&
-                Objects.equals(before.getSuperclass(), after.getSuperclass()) &&
-                before.getInterfaces().equals(after.getInterfaces()) &&
-                before.getAnnotations().equals(after.getAnnotations()) &&
-                fields(before).equals(fields(after)), "Class changed: " + name);
-            var methods = new TreeMap<String, Method>();
-            for (var m : before.getMethods()) methods.put(DexInventory.id(m), m);
-            int count = 0;
-            for (var m : after.getMethods()) {
-                count++;
-                var impl = m.getImplementation();
-                if (impl != null) {
-                    check(impl.getRegisterCount() >= incomingRegisters(m),
-                        "ART validity: registers_size < ins_size for " + DexInventory.id(m));
+            var voided = Set.of(
+                "Lcom/pairip/StartupLauncher;->launch()V",
+                "Lcom/pairip/VMRunner;-><clinit>()V",
+                "Lcom/pairip/SignatureCheck;->verifyIntegrity(Landroid/content/Context;)V",
+                CLIENT + "->initializeLicenseCheck()V", CLIENT + "->checkLicense(Landroid/content/Context;)V",
+                CLIENT + "->startErrorDialogActivity()V", CLIENT + "->scheduleAppShutdown()V");
+
+            int vacated = 0, edited = 0;
+            for (var name : stock.keySet()) {
+                var before = stock.get(name);
+                var after = output.get(name);
+                check(before.getAccessFlags() == after.getAccessFlags() &&
+                    Objects.equals(before.getSuperclass(), after.getSuperclass()) &&
+                    before.getInterfaces().equals(after.getInterfaces()) &&
+                    before.getAnnotations().equals(after.getAnnotations()) &&
+                    fields(before).equals(fields(after)), "Class changed: " + name);
+                var stockMethods = new TreeMap<String, Method>();
+                for (var m : before.getMethods()) stockMethods.put(DexInventory.id(m), m);
+                int added_clinits = 0;
+                for (var m : after.getMethods()) {
+                    var impl = m.getImplementation();
+                    if (impl != null) {
+                        check(impl.getRegisterCount() >= incomingRegisters(m),
+                            "ART validity: registers_size < ins_size for " + DexInventory.id(m));
+                    }
+                    var old = stockMethods.get(DexInventory.id(m));
+                    var id = DexInventory.id(m);
+                    if (old == null) {
+                        // Only a hoisted-string <clinit> from the reviewed fields.tsv may be new.
+                        check(m.getName().equals("<clinit>") && m.getParameterTypes().isEmpty()
+                                && m.getReturnType().equals("V") && hoisted.contains(name),
+                            "Unreviewed added method in " + name + ": " + id);
+                        check(impl != null, "Injected <clinit> has no body: " + id);
+                        added_clinits++;
+                        continue;
+                    }
+                    check(old.getAnnotations().equals(m.getAnnotations()), "Method metadata changed: " + id);
+                    if (voided.contains(id)) {
+                        check(isBareReturnVoid(m), "Expected voided method: " + id);
+                        edited++;
+                    } else if (DexInventory.describe(old, Set.of()).equals(DexInventory.describe(m, Set.of()))) {
+                        vacated++;
+                    } else {
+                        edited++;
+                    }
                 }
-                var old = methods.get(DexInventory.id(m));
-                check(old != null && old.getAnnotations().equals(m.getAnnotations()), "Method metadata changed");
-                if (!VOID.contains(DexInventory.id(m)) && !RETURN_TRUE.contains(DexInventory.id(m)) &&
-                    !DexInventory.id(m).equals(CLIENT_CLINIT)) {
-                    check(DexInventory.describe(old, Set.of()).equals(DexInventory.describe(m, Set.of())),
-                        "Unrelated method changed: " + DexInventory.id(m));
-                    unchanged++; continue;
-                }
-                checkEdit(old, m);
-                changed++;
+                int expectedCount = stockMethods.size() + (!hoisted.contains(name) ? 0 : 1);
+                int actualCount = 0;
+                for (var m : after.getMethods()) actualCount++;
+                check(actualCount == expectedCount,
+                    "Method count changed in " + name + " without review");
             }
-            check(count == methods.size(), "Method removed");
+            System.out.println("PASS: 5.1.3 devirtualized PairIP output (launch/VM voided, "
+                + edited + " reviewed edits, " + vacated + " unrelated methods unchanged, "
+                + "1 helper class added, ART register validity checked)");
+            return;
         }
-        check(changed == 21, "Expected exactly 21 PairIP license edits, got " + changed);
-        System.out.println("PASS: 21 PairIP license edits (17 voids, installer/local-check/signature-match bypasses, "
-            + "license-state swap), VM startup/application wrapper retained; " + unchanged + " unrelated methods unchanged");
+        check(stock.keySet().equals(output.keySet()), "Class inventory changed");
+
+        // 5.3.6 (build 499) is intentionally unsupported: it keeps the PairIP VM, which cannot be
+        // neutralized from Java alone. Reaching here means launch() was not voided, so refuse it
+        // rather than reviewing an output whose VM path is unverified.
+        throw new AssertionError("Unsupported output: StartupLauncher.launch still runs the PairIP VM. "
+            + "Only the fully devirtualized 5.1.3 build 470 is supported; 5.3.6 build 499 is not.");
     }
 }

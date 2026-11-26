@@ -19,15 +19,6 @@ private val PROFILE_470 = NativeProfile(
     ),
 )
 
-private val PROFILE_499 = NativeProfile(
-    label = "5.3.6",
-    before = mapOf(
-        "libreactnative" to "ba65eed79234f9fbee31b263d3274b44c48c8380f0ae9c354c82a0adca5c084b",
-        "libonnxruntime" to "6c37edac04f25aaea779a593be1bdef9897d144ee5a0fa733bb56f5f4c4ad497",
-        "libavformat" to "e918bcdb365dbac554f3d116f35e0dce2d22b17ec9c234639b62b47eedc39e3c",
-    ),
-)
-
 private val EXPECTED_AFTER_HASHES = mapOf(
     "libreactnative" to "0a108cd36ab33974758ff4a1391cb278ceb8e1ed3710abb0a873271120fff52b",
     "libonnxruntime" to "4d2318b3849abb8862133d3068fc7e807ed8b2671cc6d83657fff2fcb9e1caad",
@@ -42,7 +33,6 @@ private fun selectProfile(arm64Dir: File): NativeProfile {
     check(react.exists()) { "Missing libreactnative.so in arm64-v8a" }
     val hash = nativeHash(react.readBytes())
     return when (hash) {
-        PROFILE_499.before["libreactnative"] -> PROFILE_499
         PROFILE_470.before["libreactnative"] -> PROFILE_470
         else -> error("Unreviewed BoldVoice libreactnative in arm64-v8a")
     }

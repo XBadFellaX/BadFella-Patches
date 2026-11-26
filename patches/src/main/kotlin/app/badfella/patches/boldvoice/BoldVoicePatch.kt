@@ -52,45 +52,11 @@ private val VOID_TARGETS_PAIRIP_VM = setOf(
     "Lcom/pairip/VMRunner;-><clinit>()V",
 )
 
-/**
- * 5.3.6 keeps the PairIP VM for hoisted strings, so the license, paywall, and error entry points
- * the VM program can reach directly are neutralized as well, and the local license state reads as
- * already verified (FULL_CHECK_OK) with the installer and local-check predicates reporting success.
- */
-private val VOID_TARGETS_VM_ACTIVE = setOf(
-    "Lcom/pairip/licensecheck/LicenseClient;->checkLicenseInternal(Landroid/os/IBinder;)V",
-    "Lcom/pairip/licensecheck/LicenseClient;->startPaywallActivity(Landroid/app/PendingIntent;)V",
-    "Lcom/pairip/licensecheck/LicenseClient;->handleError(Lcom/pairip/licensecheck/LicenseCheckException;)V",
-    "Lcom/pairip/licensecheck/LicenseClient;->handleTrialEnd()V",
-    "Lcom/pairip/licensecheck/LicenseClient;->initiateFreshLicensingServiceConnection(Z)V",
-    "Lcom/pairip/licensecheck/LicenseClient;->bindToLicensingService(Z)V",
-    "Lcom/pairip/licensecheck/LicenseClient;->processResponse(ILandroid/os/Bundle;)V",
-    "Lcom/pairip/licensecheck/LicenseClient;->retryOrThrow(Lcom/pairip/licensecheck/LicenseCheckException;ZZ)V",
-    "Lcom/pairip/licensecheck/LicenseClient;->lambda${'$'}startPaywallActivity${'$'}0(Landroid/app/PendingIntent;)V",
-    "Lcom/pairip/licensecheck/LicenseClient;->lambda${'$'}startErrorDialogActivity${'$'}0()V",
-    "Lcom/pairip/licensecheck/LicenseActivity;->showPaywallAndCloseApp()V",
-    "Lcom/pairip/licensecheck/LicenseActivity;->showErrorDialog()V",
-)
-
-private const val INSTALLER_CHECK = "Lcom/pairip/licensecheck/LicenseClient;->performLocalInstallerCheck()Z"
-private const val LOCAL_CHECK_PASSED = "Lcom/pairip/licensecheck/LicenseClient;->isLocalCheckPassed()Z"
-private const val SIGNATURE_MATCHES = "Lcom/pairip/SignatureCheck;->verifySignatureMatches(Ljava/lang/String;)Z"
-private const val LICENSE_CLIENT_CLINIT = "Lcom/pairip/licensecheck/LicenseClient;-><clinit>()V"
-private const val LICENSE_STATE = "Lcom/pairip/licensecheck/LicenseClient${'$'}LicenseCheckState;"
-
 /** Minimal neutralized body with enough registers for the method's incoming arguments
  *  (ART rejects the whole dex when registers_size < ins_size). */
-private fun patchedBody(method: Method, returnsTrue: Boolean): ImmutableMethodImplementation {
-    val incoming = incomingRegisters(method)
-    val instructions: List<Instruction> = if (returnsTrue) {
-        listOf(
-            ImmutableInstruction11n(Opcode.CONST_4, 0, 1),
-            ImmutableInstruction11x(Opcode.RETURN, 0),
-        )
-    } else {
-        listOf(ImmutableInstruction10x(Opcode.RETURN_VOID))
-    }
-    return ImmutableMethodImplementation(maxOf(incoming, 1), instructions, emptyList(), emptyList())
+private fun patchedBody(method: Method): ImmutableMethodImplementation {
+    val instructions: List<Instruction> = listOf(ImmutableInstruction10x(Opcode.RETURN_VOID))
+    return ImmutableMethodImplementation(maxOf(incomingRegisters(method), 1), instructions, emptyList(), emptyList())
 }
 
 /** Wide types (J/D) take two registers; arrays and references take one. */
@@ -113,7 +79,7 @@ private fun methodId(m: MethodReference): String =
 @Suppress("unused")
 val boldVoiceSubscriptionPatch = resourcePatch(
     name = "BoldVoice subscription features",
-    description = "Enables client-side subscriber features and lessons in BoldVoice 5.1.3 and 5.3.6. For 5.1.3, restores devirtualized startup lifecycle methods, hoisted strings, and notification callbacks. For 5.3.6, keeps PairIP string runtime while bypassing licensing, subscription gates, and the in-app force-update screen; the remaining license, paywall, and error entry points are voided and the local license state reads as verified. Restores pristine ARM64 native libraries and disables Expo OTA bundle replacement.",
+    description = "Enables client-side subscriber features and lessons in BoldVoice 5.1.3. Restores devirtualized startup lifecycle methods, hoisted strings, and notification callbacks; neutralizes PairIP VM and licensing checks; restores pristine ARM64 native libraries; disables Expo OTA bundle replacement. Server-controlled features retain their existing requirements.",
 ) {
     compatibleWith(Compatibility(
         name = "BoldVoice",
@@ -125,11 +91,6 @@ val boldVoiceSubscriptionPatch = resourcePatch(
                 versionCodes = mapOf(SupportedAbi.ARM64_V8A to 470),
                 description = "Version 5.1.3, build 470 (ARM64 split).",
             ),
-            AppTarget(
-                version = "5.3.6",
-                versionCodes = mapOf(SupportedAbi.ARM64_V8A to 499),
-                description = "Version 5.3.6, build 499 (ARM64 split).",
-            ),
         ),
     ))
     execute {
@@ -137,12 +98,10 @@ val boldVoiceSubscriptionPatch = resourcePatch(
         document("AndroidManifest.xml").use { doc ->
             versionCode = doc.documentElement.getAttributeNS(ANDROID, "versionCode").toIntOrNull() ?: -1
         }
-        val useLegacyPairIp = versionCode == 470
-        val voidTargets = if (useLegacyPairIp) {
-            VOID_TARGETS_LICENSE + VOID_TARGETS_PAIRIP_VM
-        } else {
-            VOID_TARGETS_LICENSE + VOID_TARGETS_VM_ACTIVE
+        check(versionCode == 470) {
+            "BoldVoice $versionCode has no devirtualization resources; only 5.1.3 build 470 is supported"
         }
+        val voidTargets = VOID_TARGETS_LICENSE + VOID_TARGETS_PAIRIP_VM
         // --- 1. Native libraries: restore pristine ARM64 libraries via BFP ---
         val arm64Dir = get("lib/arm64-v8a")
         if (arm64Dir.exists() && arm64Dir.isDirectory) {
@@ -168,13 +127,6 @@ val boldVoiceSubscriptionPatch = resourcePatch(
         val extraClasses = mutableListOf<ClassDef>()
         val fieldValues = mutableMapOf<String, MutableMap<String, String>>()
 
-        if (!useLegacyPairIp) {
-            check(versionCode == 499) {
-                "BoldVoice $versionCode is supported only with the 5.3.6 PairIP runtime path or the 5.1.3 devirtualization resources"
-            }
-        }
-
-        if (useLegacyPairIp) {
         // A. Load startup.dex from resource to restore the 5 startup lifecycle methods
         val startupTemp = Files.createTempFile("bv-startup", ".dex").toFile()
         try {
@@ -279,13 +231,10 @@ val boldVoiceSubscriptionPatch = resourcePatch(
             }
         }
         check(totalFields == 1417) { "Expected 1417 hoisted fields, got $totalFields" }
-        }
 
         // D. Apply method restorations, string <clinit> injection, and PairIP neutralization
         var stringsInitialized = 0
         var voidMethodsNeutralized = 0
-        var clinitStateSwapped = 0
-        var localChecksPatched = 0
 
         for (dex in dexes) {
             val isClassesDex = dex.name == "classes.dex"
@@ -309,49 +258,7 @@ val boldVoiceSubscriptionPatch = resourcePatch(
                             ImmutableMethod(
                                 method.definingClass, method.name, method.parameters, method.returnType,
                                 method.accessFlags, method.annotations, method.hiddenApiRestrictions,
-                                patchedBody(method, returnsTrue = false),
-                            )
-                        }
-                        !useLegacyPairIp && id == LICENSE_CLIENT_CLINIT -> {
-                            classEdited = true
-                            clinitStateSwapped++
-                            val body = checkNotNull(method.implementation) {
-                                "LicenseClient <clinit> missing implementation"
-                            }
-                            var swapped = 0
-                            val code = body.instructions.map { ins ->
-                                val field = (ins as? ReferenceInstruction)?.reference as? FieldReference
-                                if (ins.opcode == Opcode.SGET_OBJECT && field != null &&
-                                    field.definingClass == LICENSE_STATE && field.name == "CHECK_REQUIRED"
-                                ) {
-                                    swapped++
-                                    ImmutableInstruction21c(
-                                        Opcode.SGET_OBJECT,
-                                        (ins as OneRegisterInstruction).registerA,
-                                        ImmutableFieldReference(LICENSE_STATE, "FULL_CHECK_OK", LICENSE_STATE),
-                                    )
-                                } else {
-                                    ins
-                                }
-                            }
-                            check(swapped == 1) {
-                                "Expected exactly one CHECK_REQUIRED read in LicenseClient <clinit>, got $swapped"
-                            }
-                            ImmutableMethod(
-                                method.definingClass, method.name, method.parameters, method.returnType,
-                                method.accessFlags, method.annotations, method.hiddenApiRestrictions,
-                                ImmutableMethodImplementation(
-                                    body.registerCount, code, body.tryBlocks, body.debugItems,
-                                ),
-                            )
-                        }
-                        !useLegacyPairIp && (id == INSTALLER_CHECK || id == LOCAL_CHECK_PASSED || id == SIGNATURE_MATCHES) -> {
-                            classEdited = true
-                            localChecksPatched++
-                            ImmutableMethod(
-                                method.definingClass, method.name, method.parameters, method.returnType,
-                                method.accessFlags, method.annotations, method.hiddenApiRestrictions,
-                                patchedBody(method, returnsTrue = true),
+                                patchedBody(method),
                             )
                         }
                         else -> method
@@ -402,23 +309,7 @@ val boldVoiceSubscriptionPatch = resourcePatch(
             }
         }
 
-        if (useLegacyPairIp) {
-            check(stringsInitialized == 1417) { "Expected 1417 strings initialized, got $stringsInitialized" }
-            check(clinitStateSwapped == 0 && localChecksPatched == 0) {
-                "License-state edits must not apply to the devirtualized build $versionCode"
-            }
-        } else {
-            check(stringsInitialized == 0) { "Unexpected hoisted string injection on build $versionCode" }
-            check(methodRestorations.isEmpty() && extraClasses.isEmpty()) {
-                "PairIP devirtualization resources must not apply to build $versionCode"
-            }
-            check(clinitStateSwapped == 1) {
-                "Expected the LicenseClient license-state swap on build $versionCode"
-            }
-            check(localChecksPatched == 3) {
-                "Expected the installer, local-check, and signature-match bypasses on build $versionCode"
-            }
-        }
+        check(stringsInitialized == 1417) { "Expected 1417 strings initialized, got $stringsInitialized" }
         check(voidMethodsNeutralized == voidTargets.size) {
             "Expected ${voidTargets.size} void methods neutralized, got $voidMethodsNeutralized"
         }
@@ -459,5 +350,29 @@ val boldVoiceSubscriptionPatch = resourcePatch(
                 updateUrl.setAttributeNS(ANDROID, "android:value", "")
             }
         }
+    }
+}
+
+/** Disables the RootContainer force-update screen so older supported builds keep running. */
+@Suppress("unused")
+val boldVoiceDisableUpgradeNudgesPatch = resourcePatch(
+    name = "Disable upgrade nudges",
+    description = "Disables the BoldVoice in-app force-update screen in 5.1.3 so the current installed version keeps working.",
+) {
+    compatibleWith(Compatibility(
+        name = "BoldVoice",
+        packageName = "com.wellocution.androidapp",
+        apkFileType = ApkFileType.APKS,
+        targets = listOf(
+            AppTarget(
+                version = "5.1.3",
+                versionCodes = mapOf(SupportedAbi.ARM64_V8A to 470),
+                description = "Version 5.1.3, build 470 (ARM64 split).",
+            ),
+        ),
+    ))
+    execute {
+        val bundle = get("assets/index.android.bundle")
+        bundle.writeBytes(patchBoldVoiceForceUpdate(bundle.readBytes()))
     }
 }

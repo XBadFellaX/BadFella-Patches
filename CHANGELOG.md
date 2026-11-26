@@ -1,3 +1,7 @@
+## 1.8.0-dev.6 (2026-11-26)
+
+- **BoldVoice:** Restrict support to 5.1.3 build 470 (ARM64 APKS) and drop the 5.3.6 build 499 target from both patches. 5.3.6 keeps the PairIP native VM running for its hoisted strings, so the license and Play Store screen cannot be neutralized from Java alone; it now reports as incompatible instead of producing a build that crashes on launch. Add a new `Disable upgrade nudges` patch (enabled by default) that bypasses the `RootContainer` force-update gate so 5.1.3 installs keep working without the forced-update lockout screen.
+
 ## 1.8.0-dev.5 (2026-11-26)
 
 - **BoldVoice:** Harden 5.3.6 PairIP license and signature neutralization (ARM64 APKS): also make SignatureCheck.verifySignatureMatches return true and void the remaining LicenseClient Play Store binding/response/trial-end/retry/lambda entry points and LicenseActivity paywall/error methods so sideloaded installs cannot trigger the Play Store screen or ActivityNotFoundException crashes. Keeps the 5.1.3 build 470 devirtualization path unchanged.

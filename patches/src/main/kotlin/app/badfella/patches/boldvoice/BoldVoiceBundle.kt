@@ -32,20 +32,13 @@ private val PROFILE_470 = BundleProfile(
     ),
 )
 
-// BoldVoice 5.3.6 (build 499): subscription gates + RootContainer force-update bypass
-private val PROFILE_499 = BundleProfile(
-    label = "5.3.6",
+// RootContainer force-update gate (5.1.3 build 470)
+private val FORCE_UPDATE_470 = BundleProfile(
+    label = "5.1.3",
     gates = listOf(
         Gate(
-            0x1ba5747, 72,
-            hexBytes("890201450302009f8d130003130000b10f00450302019593130103130001b128004505020298649401160105019302b1110144040503e5900393776e020405031301021300017600"),
-            hexBytes("9500" + "7600".repeat(35)),
-        ),
-        Gate(0x1c3901c, 16, hexBytes("89000144000000f9450000019f8d7600"), hexBytes("9500" + "7600".repeat(7))),
-        Gate(0x1c49532, 16, hexBytes("89000144000000f94500000159f07600"), hexBytes("9500" + "7600".repeat(7))),
-        Gate(
-            0x1567368, 92,
-            hexBytes("5e080b416e080c000845080821c351b309084508180e6a49b315083b1905176c19190045191922fb7919081903b32f083b1905206c191900442319037d452123233d8c44191810da3b1805176c18180045181822fb796f0821231918"),
+            0x147a32c, 92,
+            hexBytes("5e080b416e080c00084508081fdc4ab309084508170c0b47b315083b1805176c18180045181820e7f519081803b32f083b1805206c18180044221803854520222144884418170edb3b1705176c17170045171720e7f56f0820221817"),
             hexBytes("96084b58" + "7600".repeat(44)),
         ),
     ),
@@ -66,13 +59,13 @@ internal val T3_SIZE = PROFILE_470.gates[2].size
 internal val T3_BEFORE = PROFILE_470.gates[2].before
 internal val T3_AFTER = PROFILE_470.gates[2].after
 
-internal val T4_OFFSET = PROFILE_499.gates[3].offset
-internal val T4_SIZE = PROFILE_499.gates[3].size
-internal val T4_BEFORE = PROFILE_499.gates[3].before
-internal val T4_AFTER = PROFILE_499.gates[3].after
+internal val T4_OFFSET = FORCE_UPDATE_470.gates[0].offset
+internal val T4_SIZE = FORCE_UPDATE_470.gates[0].size
+internal val T4_BEFORE = FORCE_UPDATE_470.gates[0].before
+internal val T4_AFTER = FORCE_UPDATE_470.gates[0].after
 
-private fun selectProfile(stock: ByteArray): BundleProfile {
-  for (profile in listOf(PROFILE_499, PROFILE_470)) {
+private fun selectProfile(stock: ByteArray, profiles: List<BundleProfile>): BundleProfile {
+    for (profile in profiles) {
         if (profile.gates.all { gate ->
                 stock.copyOfRange(gate.offset, gate.offset + gate.size).contentEquals(gate.before)
             }) {
@@ -82,11 +75,7 @@ private fun selectProfile(stock: ByteArray): BundleProfile {
     error("BoldVoice Hermes gates changed; this app needs review")
 }
 
-/**
- * Patches the Hermes 99 bundle for BoldVoice 5.1.3 (470) or 5.3.6 (499).
- * 5.3.6 adds a RootContainer gate bypass so the client force-update screen is not shown.
- */
-internal fun patchBoldVoiceBundle(stock: ByteArray): ByteArray {
+private fun applyBundleProfile(stock: ByteArray, profiles: List<BundleProfile>): ByteArray {
     check(stock.size in 148..(128 * 1024 * 1024)) { "Hermes bundle size is invalid or exceeds 128 MiB" }
     check(longAt(stock, 0) == MAGIC) { "Hermes bytecode magic changed" }
     check(intAt(stock, 8) == EXPECTED_VERSION) { "Hermes bytecode version changed; this app needs review" }
@@ -97,7 +86,7 @@ internal fun patchBoldVoiceBundle(stock: ByteArray): ByteArray {
         "Hermes bytecode footer checksum is invalid"
     }
 
-    val profile = selectProfile(stock)
+    val profile = selectProfile(stock, profiles)
     for (gate in profile.gates) {
         check(gate.offset + gate.size <= footer) { "Hermes gate at ${gate.offset.toString(16)} is out of bounds" }
         check(stock.copyOfRange(gate.offset, gate.offset + gate.size).contentEquals(gate.before)) {
@@ -112,6 +101,18 @@ internal fun patchBoldVoiceBundle(stock: ByteArray): ByteArray {
     sha1(result, 0, footer).copyInto(result, footer)
     return result
 }
+
+/**
+ * Patches the Hermes 99 subscription gates for BoldVoice 5.1.3 (470).
+ */
+internal fun patchBoldVoiceBundle(stock: ByteArray): ByteArray =
+    applyBundleProfile(stock, listOf(PROFILE_470))
+
+/**
+ * Disables the RootContainer force-update screen in BoldVoice 5.1.3 (470).
+ */
+internal fun patchBoldVoiceForceUpdate(stock: ByteArray): ByteArray =
+    applyBundleProfile(stock, listOf(FORCE_UPDATE_470))
 
 private fun intAt(bytes: ByteArray, offset: Int): Int {
     check(offset >= 0 && offset + 4 <= bytes.size) { "Hermes read is out of bounds" }

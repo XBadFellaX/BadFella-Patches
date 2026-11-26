@@ -19,13 +19,7 @@ PROFILE_470 = (
     (0x1A6B1AD, 72, bytes.fromhex("8902014503020080b3130003130000b10f0045030201c3cb130103130001b128004505020253619401160105019302b1110144040503e690032c746e020405031301021300017600"), GATE_TRUE_RET_LONG),
     (0x1B07808, 16, bytes.fromhex("89000144000000f94500000180b37600"), GATE_TRUE_RET),
     (0x1B1C281, 16, bytes.fromhex("89000144000000f9450000011be67600"), GATE_TRUE_RET),
-)
-
-PROFILE_499 = (
-    (0x1BA5747, 72, bytes.fromhex("890201450302009f8d130003130000b10f00450302019593130103130001b128004505020298649401160105019302b1110144040503e5900393776e020405031301021300017600"), GATE_TRUE_RET_LONG),
-    (0x1C3901C, 16, bytes.fromhex("89000144000000f9450000019f8d7600"), GATE_TRUE_RET),
-    (0x1C49532, 16, bytes.fromhex("89000144000000f94500000159f07600"), GATE_TRUE_RET),
-    (0x1567368, 92, bytes.fromhex("5e080b416e080c000845080821c351b309084508180e6a49b315083b1905176c19190045191922fb7919081903b32f083b1905206c191900442319037d452123233d8c44191810da3b1805176c18180045181822fb796f0821231918"), bytes.fromhex("96084b58" + "7600" * 44)),
+    (0x147A32C, 92, bytes.fromhex("5e080b416e080c00084508081fdc4ab309084508170c0b47b315083b1805176c18180045181820e7f519081803b32f083b1805206c18180044221803854520222144884418170edb3b1705176c17170045171720e7f56f0820221817"), bytes.fromhex("96084b58" + "7600" * 44)),
 )
 
 def sha1(data):
@@ -42,16 +36,12 @@ def expected_bundle(stock):
     assert length == len(stock), "Hermes bundle length mismatch"
     assert sha1(stock[:-20]) == stock[-20:], "Stock Hermes footer invalid"
 
-    profile = None
-    for candidate in (PROFILE_499, PROFILE_470):
-        if all(stock[offset : offset + size] == before for offset, size, before, _after in candidate):
-            profile = candidate
-            break
-    assert profile is not None, "BoldVoice Hermes gate anchors changed"
+    profile = PROFILE_470
+    assert all(stock[offset : offset + size] == before for offset, size, before, _after in profile), \
+        "BoldVoice Hermes gate anchors changed"
 
     expected = bytearray(stock)
     for offset, size, _before, after in profile:
-        assert stock[offset : offset + size] == _before
         expected[offset : offset + size] = after
     expected[-20:] = sha1(bytes(expected[:-20]))
     return bytes(expected)
@@ -77,12 +67,24 @@ def verify(args):
                 stock_apk = work / "stock.apk"
                 stock_apk.write_bytes(stock.read("base.apk"))
                 root = Path(__file__).resolve().parents[1]
+                # The hoisted-string <clinit> methods the patch injects are defined by fields.tsv,
+                # so the checker derives its expected-edit set from that same reviewed file.
+                hoisted_classes = work / "hoisted-classes.txt"
+                hoisted = []
+                with (root / "patches/src/main/resources/boldvoice/fields.tsv").open(encoding="utf-8") as tsv:
+                    for line in tsv:
+                        if line.strip():
+                            cls = line.split("\t", 1)[0]
+                            if cls not in hoisted:
+                                hoisted.append(cls)
+                hoisted_classes.write_text("\n".join(hoisted) + "\n", encoding="utf-8")
                 javac = args.java.with_name("javac.exe" if args.java.suffix == ".exe" else "javac")
                 subprocess.run([str(javac), "-cp", str(args.dexlib_jar), "-d", str(work),
                                 str(root / "tools/DexInventory.java"), str(root / "tests/RemoteAtvDexCheck.java"),
                                 str(root / "tests/BoldVoiceDexCheck.java")], check=True)
                 subprocess.run([str(args.java), "-Xmx3g", "-cp", str(work) + os.pathsep + str(args.dexlib_jar),
-                                "BoldVoiceDexCheck", str(stock_apk), str(args.output)], check=True)
+                                "BoldVoiceDexCheck", str(stock_apk), str(args.output),
+                                str(hoisted_classes)], check=True)
 
             # 2. DEX inventory: same set of DEX files (contents changed by PairIP neutralization).
             dex = {n for n in base.namelist() if re.fullmatch(r"classes\d*\.dex", n)}
