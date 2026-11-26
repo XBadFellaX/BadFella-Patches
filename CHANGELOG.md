@@ -1,3 +1,7 @@
+## 1.7.0-dev.6 (2026-11-25)
+
+- **BoldVoice:** Add support for 5.3.6 build 499 (ARM64 APKS). Hermes 99 gates unlock client subscriber state, bypass the in-app force-update screen, restore native ARM64 libraries via the existing BFP payloads, and disable Expo OTA. PairIP VM remains active for hoisted strings on 5.3.6 until full devirtualization assets land; 5.1.3 build 470 retains the previous startup, callback, and fields.tsv restoration path.
+
 ## 1.7.0 (2026-11-24)
 
 ### 🐛 Bug Fixes
