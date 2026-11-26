@@ -81,8 +81,8 @@ val boldVoiceSubscriptionPatch = resourcePatch(
     ))
     execute {
         var versionCode = -1
-        document("AndroidManifest.xml").use { manifest ->
-            versionCode = manifest.getAttributeNS(ANDROID, "versionCode").toIntOrNull() ?: -1
+        document("AndroidManifest.xml").use { doc ->
+            versionCode = doc.documentElement.getAttributeNS(ANDROID, "versionCode").toIntOrNull() ?: -1
         }
         val useLegacyPairIp = versionCode == 470
         val voidTargets = if (useLegacyPairIp) {
@@ -322,7 +322,7 @@ val boldVoiceSubscriptionPatch = resourcePatch(
         // --- 4. Manifest: retain Application wrapper; remove license UI and stamps; disable Expo OTA ---
         document("AndroidManifest.xml").use { manifest ->
             if (versionCode < 0) {
-                versionCode = manifest.getAttributeNS(ANDROID, "versionCode").toIntOrNull() ?: -1
+                versionCode = manifest.documentElement.getAttributeNS(ANDROID, "versionCode").toIntOrNull() ?: -1
             }
             val app = manifest.getElementsByTagName("application").item(0) as Element
             check(app.getAttributeNS(ANDROID, "name") == "com.pairip.application.Application") {
