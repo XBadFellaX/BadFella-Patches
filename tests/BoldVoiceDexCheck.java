@@ -50,6 +50,7 @@ class BoldVoiceDexCheck {
     }
 
     static final String CLIENT = "Lcom/pairip/licensecheck/LicenseClient;";
+    static final String ACTIVITY = "Lcom/pairip/licensecheck/LicenseActivity;";
     static final String STATE = "Lcom/pairip/licensecheck/LicenseClient$LicenseCheckState;";
     static final Set<String> VOID = Set.of(
         "Lcom/pairip/SignatureCheck;->verifyIntegrity(Landroid/content/Context;)V",
@@ -57,9 +58,19 @@ class BoldVoiceDexCheck {
         CLIENT + "->startErrorDialogActivity()V", CLIENT + "->scheduleAppShutdown()V",
         CLIENT + "->checkLicenseInternal(Landroid/os/IBinder;)V",
         CLIENT + "->startPaywallActivity(Landroid/app/PendingIntent;)V",
-        CLIENT + "->handleError(Lcom/pairip/licensecheck/LicenseCheckException;)V");
+        CLIENT + "->handleError(Lcom/pairip/licensecheck/LicenseCheckException;)V",
+        CLIENT + "->handleTrialEnd()V",
+        CLIENT + "->initiateFreshLicensingServiceConnection(Z)V",
+        CLIENT + "->bindToLicensingService(Z)V",
+        CLIENT + "->processResponse(ILandroid/os/Bundle;)V",
+        CLIENT + "->retryOrThrow(Lcom/pairip/licensecheck/LicenseCheckException;ZZ)V",
+        CLIENT + "->lambda$startPaywallActivity$0(Landroid/app/PendingIntent;)V",
+        CLIENT + "->lambda$startErrorDialogActivity$0()V",
+        ACTIVITY + "->showPaywallAndCloseApp()V",
+        ACTIVITY + "->showErrorDialog()V");
     static final Set<String> RETURN_TRUE = Set.of(
-        CLIENT + "->performLocalInstallerCheck()Z", CLIENT + "->isLocalCheckPassed()Z");
+        CLIENT + "->performLocalInstallerCheck()Z", CLIENT + "->isLocalCheckPassed()Z",
+        "Lcom/pairip/SignatureCheck;->verifySignatureMatches(Ljava/lang/String;)Z");
     static final String CLIENT_CLINIT = CLIENT + "-><clinit>()V";
 
     static boolean isBareReturnVoid(Method m) {
@@ -158,8 +169,8 @@ class BoldVoiceDexCheck {
             }
             check(count == methods.size(), "Method removed");
         }
-        check(changed == 11, "Expected exactly eleven PairIP license edits, got " + changed);
-        System.out.println("PASS: eleven PairIP license edits (eight voids, installer/local-check bypasses, "
+        check(changed == 21, "Expected exactly 21 PairIP license edits, got " + changed);
+        System.out.println("PASS: 21 PairIP license edits (17 voids, installer/local-check/signature-match bypasses, "
             + "license-state swap), VM startup/application wrapper retained; " + unchanged + " unrelated methods unchanged");
     }
 }

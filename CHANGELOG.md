@@ -1,3 +1,7 @@
+## 1.8.0-dev.5 (2026-11-26)
+
+- **BoldVoice:** Harden 5.3.6 PairIP license and signature neutralization (ARM64 APKS): also make SignatureCheck.verifySignatureMatches return true and void the remaining LicenseClient Play Store binding/response/trial-end/retry/lambda entry points and LicenseActivity paywall/error methods so sideloaded installs cannot trigger the Play Store screen or ActivityNotFoundException crashes. Keeps the 5.1.3 build 470 devirtualization path unchanged.
+
 ## 1.8.0-dev.4 (2026-11-26)
 
 - **BoldVoice:** Fix the 5.3.6 launch crash in the license neutralization (ARM64 APKS): replacement bodies for the voided license, paywall, and error entry points now size their register counts from each method's incoming arguments, so the patched dex passes ART verification and the app starts. Keeps the completed local license state from 1.8.0-dev.3; the PairIP VM remains active for hoisted strings and the 5.1.3 build 470 devirtualization path is unchanged.

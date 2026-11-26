@@ -61,10 +61,20 @@ private val VOID_TARGETS_VM_ACTIVE = setOf(
     "Lcom/pairip/licensecheck/LicenseClient;->checkLicenseInternal(Landroid/os/IBinder;)V",
     "Lcom/pairip/licensecheck/LicenseClient;->startPaywallActivity(Landroid/app/PendingIntent;)V",
     "Lcom/pairip/licensecheck/LicenseClient;->handleError(Lcom/pairip/licensecheck/LicenseCheckException;)V",
+    "Lcom/pairip/licensecheck/LicenseClient;->handleTrialEnd()V",
+    "Lcom/pairip/licensecheck/LicenseClient;->initiateFreshLicensingServiceConnection(Z)V",
+    "Lcom/pairip/licensecheck/LicenseClient;->bindToLicensingService(Z)V",
+    "Lcom/pairip/licensecheck/LicenseClient;->processResponse(ILandroid/os/Bundle;)V",
+    "Lcom/pairip/licensecheck/LicenseClient;->retryOrThrow(Lcom/pairip/licensecheck/LicenseCheckException;ZZ)V",
+    "Lcom/pairip/licensecheck/LicenseClient;->lambda${'$'}startPaywallActivity${'$'}0(Landroid/app/PendingIntent;)V",
+    "Lcom/pairip/licensecheck/LicenseClient;->lambda${'$'}startErrorDialogActivity${'$'}0()V",
+    "Lcom/pairip/licensecheck/LicenseActivity;->showPaywallAndCloseApp()V",
+    "Lcom/pairip/licensecheck/LicenseActivity;->showErrorDialog()V",
 )
 
 private const val INSTALLER_CHECK = "Lcom/pairip/licensecheck/LicenseClient;->performLocalInstallerCheck()Z"
 private const val LOCAL_CHECK_PASSED = "Lcom/pairip/licensecheck/LicenseClient;->isLocalCheckPassed()Z"
+private const val SIGNATURE_MATCHES = "Lcom/pairip/SignatureCheck;->verifySignatureMatches(Ljava/lang/String;)Z"
 private const val LICENSE_CLIENT_CLINIT = "Lcom/pairip/licensecheck/LicenseClient;-><clinit>()V"
 private const val LICENSE_STATE = "Lcom/pairip/licensecheck/LicenseClient${'$'}LicenseCheckState;"
 
@@ -335,7 +345,7 @@ val boldVoiceSubscriptionPatch = resourcePatch(
                                 ),
                             )
                         }
-                        !useLegacyPairIp && (id == INSTALLER_CHECK || id == LOCAL_CHECK_PASSED) -> {
+                        !useLegacyPairIp && (id == INSTALLER_CHECK || id == LOCAL_CHECK_PASSED || id == SIGNATURE_MATCHES) -> {
                             classEdited = true
                             localChecksPatched++
                             ImmutableMethod(
@@ -405,8 +415,8 @@ val boldVoiceSubscriptionPatch = resourcePatch(
             check(clinitStateSwapped == 1) {
                 "Expected the LicenseClient license-state swap on build $versionCode"
             }
-            check(localChecksPatched == 2) {
-                "Expected the installer and local-check bypasses on build $versionCode"
+            check(localChecksPatched == 3) {
+                "Expected the installer, local-check, and signature-match bypasses on build $versionCode"
             }
         }
         check(voidMethodsNeutralized == voidTargets.size) {
