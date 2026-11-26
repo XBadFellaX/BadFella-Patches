@@ -106,7 +106,9 @@ def verify(args):
                     continue
                 assert base.read(name) == output.read(name), f"Original payload changed: {name}"
 
-        # 5. Native libraries from splits must be preserved exactly.
+        # 5. Native libraries from splits must be preserved exactly, except the three
+        # PairIP-hooked libraries the patch restores to pristine builds; their content is
+        # pinned independently by the patch's BFP after-hash checks and re-verified here.
         natives = {}
         for name in stock.namelist():
             if not name.endswith(".apk"):
@@ -116,7 +118,15 @@ def verify(args):
                     if item.filename.startswith("lib/") and not item.is_dir():
                         natives[item.filename] = (split.read(item), item.compress_type)
         assert set(natives) == {n for n in output_names if n.startswith("lib/") and not n.endswith("/")}, "Native libs mismatch"
+        restored_native_hashes = {
+            "lib/arm64-v8a/libreactnative.so": "0a108cd36ab33974758ff4a1391cb278ceb8e1ed3710abb0a873271120fff52b",
+            "lib/arm64-v8a/libonnxruntime.so": "4d2318b3849abb8862133d3068fc7e807ed8b2671cc6d83657fff2fcb9e1caad",
+            "lib/arm64-v8a/libavformat.so": "205043c0bf7e70ab05ba562aea6d0f813a79c624fea37b2e119c94f667d49429",
+        }
         for name, (data, compression) in natives.items():
+            if name in restored_native_hashes:
+                assert hashlib.sha256(output.read(name)).hexdigest() == restored_native_hashes[name], f"Restored native payload changed: {name}"
+                continue
             assert output.read(name) == data and output.getinfo(name).compress_type == compression, f"Native payload changed: {name}"
 
     # 6. Manifest checks via aapt2.
@@ -134,8 +144,9 @@ def verify(args):
     assert re.search(r'expo\.modules\.updates\.ENABLED[^\n]*\n[^\n]*=false', manifest), "Expo OTA updates still enabled"
     assert re.search(r'expo\.modules\.updates\.EXPO_UPDATE_URL[^\n]*\n[^\n]*=""', manifest), "Expo update URL still present"
 
-    print("PASS: BoldVoice Hermes99 edits/footer, license PairIP edits, "
-          "unrelated DEX and assets retained, VM application wrapper retained, OTA disabled")
+    print("PASS: BoldVoice Hermes99 edits/footer, PairIP license edits, "
+          "unrelated DEX and assets retained, pristine native libraries, "
+          "VM application wrapper retained, OTA disabled")
 
 
 if __name__ == "__main__":

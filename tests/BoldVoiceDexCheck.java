@@ -4,7 +4,15 @@ import com.android.tools.smali.dexlib2.iface.*;
 import com.android.tools.smali.dexlib2.iface.instruction.*;
 import com.android.tools.smali.dexlib2.immutable.*;
 
-/** Compare the real patched APK against stock, accepting only the six reviewed PairIP edits. */
+/**
+ * Compare the real patched APK against stock, accepting only the reviewed PairIP license edits.
+ *
+ * 5.1.3 (build 470) devirtualizes the PairIP VM entirely and restores startup/callback methods and
+ * hoisted strings from bundled resources; that surface is not re-verified here. This checker
+ * verifies the 5.3.6 (build 499) scheme: eight voided license/paywall/error entry points, the
+ * installer and local-check predicates forced to true, and LicenseClient starting at FULL_CHECK_OK,
+ * with every other method byte-identical to stock.
+ */
 class BoldVoiceDexCheck {
     static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }
 
@@ -34,8 +42,22 @@ class BoldVoiceDexCheck {
     static final String STATE = "Lcom/pairip/licensecheck/LicenseClient$LicenseCheckState;";
     static final Set<String> VOID = Set.of(
         "Lcom/pairip/SignatureCheck;->verifyIntegrity(Landroid/content/Context;)V",
-        CLIENT + "->initializeLicenseCheck()V", CLIENT + "->startErrorDialogActivity()V",
-        CLIENT + "->scheduleAppShutdown()V");
+        CLIENT + "->initializeLicenseCheck()V", CLIENT + "->checkLicense(Landroid/content/Context;)V",
+        CLIENT + "->startErrorDialogActivity()V", CLIENT + "->scheduleAppShutdown()V",
+        CLIENT + "->checkLicenseInternal(Landroid/os/IBinder;)V",
+        CLIENT + "->startPaywallActivity(Landroid/app/PendingIntent;)V",
+        CLIENT + "->handleError(Lcom/pairip/licensecheck/LicenseCheckException;)V");
+    static final Set<String> RETURN_TRUE = Set.of(
+        CLIENT + "->performLocalInstallerCheck()Z", CLIENT + "->isLocalCheckPassed()Z");
+    static final String CLIENT_CLINIT = CLIENT + "-><clinit>()V";
+
+    static boolean isBareReturnVoid(Method m) {
+        var impl = m.getImplementation();
+        if (impl == null) return false;
+        var it = impl.getInstructions().iterator();
+        return it.hasNext() && it.next().getOpcode() == com.android.tools.smali.dexlib2.Opcode.RETURN_VOID
+            && !it.hasNext();
+    }
 
     static void checkEdit(Method old, Method output) throws Exception {
         var body = old.getImplementation();
@@ -48,14 +70,14 @@ class BoldVoiceDexCheck {
             body = new ImmutableMethodImplementation(1, List.of(
                 new com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction10x(
                     com.android.tools.smali.dexlib2.Opcode.RETURN_VOID)), List.of(), List.of());
-        } else if (id.equals(CLIENT + "->performLocalInstallerCheck()Z")) {
-            check(code.size() > 2, "Stock installer check changed");
+        } else if (RETURN_TRUE.contains(id)) {
+            check(code.size() > 2, "Stock method changed: " + id);
             body = new ImmutableMethodImplementation(1, List.of(
                 new com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction11n(
                     com.android.tools.smali.dexlib2.Opcode.CONST_4, 0, 1),
                 new com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction11x(
                     com.android.tools.smali.dexlib2.Opcode.RETURN, 0)), List.of(), List.of());
-        } else {
+        } else if (id.equals(CLIENT_CLINIT)) {
             int changed = 0;
             for (int i = 0; i < code.size(); i++) {
                 var ins = code.get(i);
@@ -69,6 +91,8 @@ class BoldVoiceDexCheck {
             }
             check(changed == 1, "Stock initial license state changed");
             body = new ImmutableMethodImplementation(body.getRegisterCount(), code, body.getTryBlocks(), body.getDebugItems());
+        } else {
+            throw new AssertionError("Unexpected reviewed edit: " + id);
         }
         var expected = new ImmutableMethod(old.getDefiningClass(), old.getName(), old.getParameters(),
             old.getReturnType(), old.getAccessFlags(), old.getAnnotations(), old.getHiddenApiRestrictions(), body);
@@ -78,6 +102,20 @@ class BoldVoiceDexCheck {
     public static void main(String[] args) throws Exception {
         var stock = classes(args[0]); var output = classes(args[1]);
         check(stock.keySet().equals(output.keySet()), "Class inventory changed");
+
+        var launcher = output.get("Lcom/pairip/StartupLauncher;");
+        check(launcher != null, "StartupLauncher missing");
+        Method launchBody = null;
+        for (var m : launcher.getMethods()) {
+            if (m.getName().equals("launch") && m.getParameterTypes().isEmpty() && m.getReturnType().equals("V")) {
+                launchBody = m;
+                break;
+            }
+        }
+        check(launchBody != null, "StartupLauncher.launch missing");
+        check(!isBareReturnVoid(launchBody),
+            "Legacy 5.1.3 output: this checker verifies the 5.3.6 license-state scheme only");
+
         int changed = 0, unchanged = 0;
         for (var name : stock.keySet()) {
             var before = stock.get(name); var after = output.get(name);
@@ -93,8 +131,8 @@ class BoldVoiceDexCheck {
                 count++;
                 var old = methods.get(DexInventory.id(m));
                 check(old != null && old.getAnnotations().equals(m.getAnnotations()), "Method metadata changed");
-                if (!VOID.contains(DexInventory.id(m)) &&
-                    !Set.of(CLIENT + "-><clinit>()V", CLIENT + "->performLocalInstallerCheck()Z").contains(DexInventory.id(m))) {
+                if (!VOID.contains(DexInventory.id(m)) && !RETURN_TRUE.contains(DexInventory.id(m)) &&
+                    !DexInventory.id(m).equals(CLIENT_CLINIT)) {
                     check(DexInventory.describe(old, Set.of()).equals(DexInventory.describe(m, Set.of())),
                         "Unrelated method changed: " + DexInventory.id(m));
                     unchanged++; continue;
@@ -104,10 +142,8 @@ class BoldVoiceDexCheck {
             }
             check(count == methods.size(), "Method removed");
         }
-        check(changed == 6, "Expected exactly six PairIP method edits");
-        System.out.println("PASS: six PairIP edits, successful license state, VM startup/application wrapper retained; " + unchanged + " unrelated methods unchanged");
+        check(changed == 11, "Expected exactly eleven PairIP license edits, got " + changed);
+        System.out.println("PASS: eleven PairIP license edits (eight voids, installer/local-check bypasses, "
+            + "license-state swap), VM startup/application wrapper retained; " + unchanged + " unrelated methods unchanged");
     }
 }
-
-
-

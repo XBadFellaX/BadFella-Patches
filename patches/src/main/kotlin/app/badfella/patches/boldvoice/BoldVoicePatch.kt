@@ -15,13 +15,17 @@ import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.MethodImplementation
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.Instruction
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.RegisterRangeInstruction
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableClassDef
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodImplementation
 import com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction10x
+import com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction11n
+import com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction11x
 import com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction21c
 import com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction31c
 import com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction35c
@@ -48,9 +52,33 @@ private val VOID_TARGETS_PAIRIP_VM = setOf(
     "Lcom/pairip/VMRunner;-><clinit>()V",
 )
 
+/**
+ * 5.3.6 keeps the PairIP VM for hoisted strings, so the license, paywall, and error entry points
+ * the VM program can reach directly are neutralized as well, and the local license state reads as
+ * already verified (FULL_CHECK_OK) with the installer and local-check predicates reporting success.
+ */
+private val VOID_TARGETS_VM_ACTIVE = setOf(
+    "Lcom/pairip/licensecheck/LicenseClient;->checkLicenseInternal(Landroid/os/IBinder;)V",
+    "Lcom/pairip/licensecheck/LicenseClient;->startPaywallActivity(Landroid/app/PendingIntent;)V",
+    "Lcom/pairip/licensecheck/LicenseClient;->handleError(Lcom/pairip/licensecheck/LicenseCheckException;)V",
+)
+
+private const val INSTALLER_CHECK = "Lcom/pairip/licensecheck/LicenseClient;->performLocalInstallerCheck()Z"
+private const val LOCAL_CHECK_PASSED = "Lcom/pairip/licensecheck/LicenseClient;->isLocalCheckPassed()Z"
+private const val LICENSE_CLIENT_CLINIT = "Lcom/pairip/licensecheck/LicenseClient;-><clinit>()V"
+private const val LICENSE_STATE = "Lcom/pairip/licensecheck/LicenseClient${'$'}LicenseCheckState;"
+
 /** Minimal method body: single return-void instruction with 1 register. */
 private val RETURN_VOID_IMPL = ImmutableMethodImplementation(
     1, listOf(ImmutableInstruction10x(Opcode.RETURN_VOID)), emptyList(), emptyList(),
+)
+
+/** Minimal boolean-true body: const-4 v0, 1 / return v0 with 1 register. */
+private val RETURN_TRUE_IMPL = ImmutableMethodImplementation(
+    1, listOf(
+        ImmutableInstruction11n(Opcode.CONST_4, 0, 1),
+        ImmutableInstruction11x(Opcode.RETURN, 0),
+    ), emptyList(), emptyList(),
 )
 
 private fun methodId(m: MethodReference): String =
@@ -60,7 +88,7 @@ private fun methodId(m: MethodReference): String =
 @Suppress("unused")
 val boldVoiceSubscriptionPatch = resourcePatch(
     name = "BoldVoice subscription features",
-    description = "Enables client-side subscriber features and lessons in BoldVoice 5.1.3 and 5.3.6. For 5.1.3, restores devirtualized startup lifecycle methods, hoisted strings, and notification callbacks. For 5.3.6, keeps PairIP string runtime while bypassing licensing, subscription gates, and the in-app force-update screen. Restores pristine ARM64 native libraries and disables Expo OTA bundle replacement.",
+    description = "Enables client-side subscriber features and lessons in BoldVoice 5.1.3 and 5.3.6. For 5.1.3, restores devirtualized startup lifecycle methods, hoisted strings, and notification callbacks. For 5.3.6, keeps PairIP string runtime while bypassing licensing, subscription gates, and the in-app force-update screen; the remaining license, paywall, and error entry points are voided and the local license state reads as verified. Restores pristine ARM64 native libraries and disables Expo OTA bundle replacement.",
 ) {
     compatibleWith(Compatibility(
         name = "BoldVoice",
@@ -88,7 +116,7 @@ val boldVoiceSubscriptionPatch = resourcePatch(
         val voidTargets = if (useLegacyPairIp) {
             VOID_TARGETS_LICENSE + VOID_TARGETS_PAIRIP_VM
         } else {
-            VOID_TARGETS_LICENSE
+            VOID_TARGETS_LICENSE + VOID_TARGETS_VM_ACTIVE
         }
         // --- 1. Native libraries: restore pristine ARM64 libraries via BFP ---
         val arm64Dir = get("lib/arm64-v8a")
@@ -231,6 +259,8 @@ val boldVoiceSubscriptionPatch = resourcePatch(
         // D. Apply method restorations, string <clinit> injection, and PairIP neutralization
         var stringsInitialized = 0
         var voidMethodsNeutralized = 0
+        var clinitStateSwapped = 0
+        var localChecksPatched = 0
 
         for (dex in dexes) {
             val isClassesDex = dex.name == "classes.dex"
@@ -255,6 +285,48 @@ val boldVoiceSubscriptionPatch = resourcePatch(
                                 method.definingClass, method.name, method.parameters, method.returnType,
                                 method.accessFlags, method.annotations, method.hiddenApiRestrictions,
                                 RETURN_VOID_IMPL,
+                            )
+                        }
+                        !useLegacyPairIp && id == LICENSE_CLIENT_CLINIT -> {
+                            classEdited = true
+                            clinitStateSwapped++
+                            val body = checkNotNull(method.implementation) {
+                                "LicenseClient <clinit> missing implementation"
+                            }
+                            var swapped = 0
+                            val code = body.instructions.map { ins ->
+                                val field = (ins as? ReferenceInstruction)?.reference as? FieldReference
+                                if (ins.opcode == Opcode.SGET_OBJECT && field != null &&
+                                    field.definingClass == LICENSE_STATE && field.name == "CHECK_REQUIRED"
+                                ) {
+                                    swapped++
+                                    ImmutableInstruction21c(
+                                        Opcode.SGET_OBJECT,
+                                        (ins as OneRegisterInstruction).registerA,
+                                        ImmutableFieldReference(LICENSE_STATE, "FULL_CHECK_OK", LICENSE_STATE),
+                                    )
+                                } else {
+                                    ins
+                                }
+                            }
+                            check(swapped == 1) {
+                                "Expected exactly one CHECK_REQUIRED read in LicenseClient <clinit>, got $swapped"
+                            }
+                            ImmutableMethod(
+                                method.definingClass, method.name, method.parameters, method.returnType,
+                                method.accessFlags, method.annotations, method.hiddenApiRestrictions,
+                                ImmutableMethodImplementation(
+                                    body.registerCount, code, body.tryBlocks, body.debugItems,
+                                ),
+                            )
+                        }
+                        !useLegacyPairIp && (id == INSTALLER_CHECK || id == LOCAL_CHECK_PASSED) -> {
+                            classEdited = true
+                            localChecksPatched++
+                            ImmutableMethod(
+                                method.definingClass, method.name, method.parameters, method.returnType,
+                                method.accessFlags, method.annotations, method.hiddenApiRestrictions,
+                                RETURN_TRUE_IMPL,
                             )
                         }
                         else -> method
@@ -307,10 +379,19 @@ val boldVoiceSubscriptionPatch = resourcePatch(
 
         if (useLegacyPairIp) {
             check(stringsInitialized == 1417) { "Expected 1417 strings initialized, got $stringsInitialized" }
+            check(clinitStateSwapped == 0 && localChecksPatched == 0) {
+                "License-state edits must not apply to the devirtualized build $versionCode"
+            }
         } else {
             check(stringsInitialized == 0) { "Unexpected hoisted string injection on build $versionCode" }
             check(methodRestorations.isEmpty() && extraClasses.isEmpty()) {
                 "PairIP devirtualization resources must not apply to build $versionCode"
+            }
+            check(clinitStateSwapped == 1) {
+                "Expected the LicenseClient license-state swap on build $versionCode"
+            }
+            check(localChecksPatched == 2) {
+                "Expected the installer and local-check bypasses on build $versionCode"
             }
         }
         check(voidMethodsNeutralized == voidTargets.size) {

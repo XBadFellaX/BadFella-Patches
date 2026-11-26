@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.8.0-dev.2",
+  "version": "1.8.0-dev.3",
   "patches": [
     {
       "name": "Accent color",
@@ -315,7 +315,7 @@
     },
     {
       "name": "BoldVoice subscription features",
-      "description": "Enables client-side subscriber features and lessons in BoldVoice 5.1.3 and 5.3.6. For 5.1.3, restores devirtualized startup lifecycle methods, hoisted strings, and notification callbacks. For 5.3.6, keeps PairIP string runtime while bypassing licensing, subscription gates, and the in-app force-update screen. Restores pristine ARM64 native libraries and disables Expo OTA bundle replacement.",
+      "description": "Enables client-side subscriber features and lessons in BoldVoice 5.1.3 and 5.3.6. For 5.1.3, restores devirtualized startup lifecycle methods, hoisted strings, and notification callbacks. For 5.3.6, keeps PairIP string runtime while bypassing licensing, subscription gates, and the in-app force-update screen; the remaining license, paywall, and error entry points are voided and the local license state reads as verified. Restores pristine ARM64 native libraries and disables Expo OTA bundle replacement.",
       "default": true,
       "category": null,
       "compatiblePackages": [
@@ -342,9 +342,9 @@
               "versionCodes": {
                 "ARM64_V8A": 499
               },
-              "isExperimental": true,
+              "isExperimental": false,
               "minSdk": null,
-              "description": "Version 5.3.6, build 499 (ARM64 split). PairIP string devirtualization pending."
+              "description": "Version 5.3.6, build 499 (ARM64 split)."
             }
           ]
         }
