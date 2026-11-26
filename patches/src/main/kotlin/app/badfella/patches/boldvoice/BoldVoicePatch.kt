@@ -35,14 +35,17 @@ import java.util.Base64
 
 private const val ANDROID = "http://schemas.android.com/apk/res/android"
 
-private val VOID_TARGETS = setOf(
-    "Lcom/pairip/StartupLauncher;->launch()V",
-    "Lcom/pairip/VMRunner;-><clinit>()V",
+private val VOID_TARGETS_LICENSE = setOf(
     "Lcom/pairip/SignatureCheck;->verifyIntegrity(Landroid/content/Context;)V",
     "Lcom/pairip/licensecheck/LicenseClient;->initializeLicenseCheck()V",
     "Lcom/pairip/licensecheck/LicenseClient;->checkLicense(Landroid/content/Context;)V",
     "Lcom/pairip/licensecheck/LicenseClient;->startErrorDialogActivity()V",
     "Lcom/pairip/licensecheck/LicenseClient;->scheduleAppShutdown()V",
+)
+
+private val VOID_TARGETS_PAIRIP_VM = setOf(
+    "Lcom/pairip/StartupLauncher;->launch()V",
+    "Lcom/pairip/VMRunner;-><clinit>()V",
 )
 
 /** Minimal method body: single return-void instruction with 1 register. */
@@ -57,7 +60,7 @@ private fun methodId(m: MethodReference): String =
 @Suppress("unused")
 val boldVoiceSubscriptionPatch = resourcePatch(
     name = "BoldVoice subscription features",
-    description = "Enables client-side subscriber features and lessons in BoldVoice 5.1.3. Restores devirtualized startup lifecycle methods, hoisted strings, and notification callbacks; neutralizes PairIP VM and licensing checks; restores pristine ARM64 native libraries; disables Expo OTA bundle replacement. Server-controlled features retain their existing requirements.",
+    description = "Enables client-side subscriber features and lessons in BoldVoice 5.1.3 and 5.3.6. For 5.1.3, restores devirtualized startup lifecycle methods, hoisted strings, and notification callbacks. For 5.3.6, keeps PairIP string runtime while bypassing licensing, subscription gates, and the in-app force-update screen. Restores pristine ARM64 native libraries and disables Expo OTA bundle replacement.",
 ) {
     compatibleWith(Compatibility(
         name = "BoldVoice",
@@ -69,9 +72,24 @@ val boldVoiceSubscriptionPatch = resourcePatch(
                 versionCodes = mapOf(SupportedAbi.ARM64_V8A to 470),
                 description = "Version 5.1.3, build 470 (ARM64 split).",
             ),
+            AppTarget(
+                version = "5.3.6",
+                versionCodes = mapOf(SupportedAbi.ARM64_V8A to 499),
+                description = "Version 5.3.6, build 499 (ARM64 split).",
+            ),
         ),
     ))
     execute {
+        var versionCode = -1
+        document("AndroidManifest.xml").use { manifest ->
+            versionCode = manifest.getAttributeNS(ANDROID, "versionCode").toIntOrNull() ?: -1
+        }
+        val useLegacyPairIp = versionCode == 470
+        val voidTargets = if (useLegacyPairIp) {
+            VOID_TARGETS_LICENSE + VOID_TARGETS_PAIRIP_VM
+        } else {
+            VOID_TARGETS_LICENSE
+        }
         // --- 1. Native libraries: restore pristine ARM64 libraries via BFP ---
         val arm64Dir = get("lib/arm64-v8a")
         if (arm64Dir.exists() && arm64Dir.isDirectory) {
@@ -93,8 +111,18 @@ val boldVoiceSubscriptionPatch = resourcePatch(
             }
         }
 
-        // A. Load startup.dex from resource to restore the 5 startup lifecycle methods
         val methodRestorations = mutableMapOf<String, MethodImplementation>()
+        val extraClasses = mutableListOf<ClassDef>()
+        val fieldValues = mutableMapOf<String, MutableMap<String, String>>()
+
+        if (!useLegacyPairIp) {
+            check(versionCode == 499) {
+                "BoldVoice $versionCode is supported only with the 5.3.6 PairIP runtime path or the 5.1.3 devirtualization resources"
+            }
+        }
+
+        if (useLegacyPairIp) {
+        // A. Load startup.dex from resource to restore the 5 startup lifecycle methods
         val startupTemp = Files.createTempFile("bv-startup", ".dex").toFile()
         try {
             val startupStream = checkNotNull(object {}.javaClass.getResourceAsStream("/boldvoice/startup.dex")) {
@@ -155,7 +183,6 @@ val boldVoiceSubscriptionPatch = resourcePatch(
         }
 
         // B. Load callbacks.dex from resource: extra class NotificationTask + 2 callback methods
-        val extraClasses = mutableListOf<ClassDef>()
         val callbacksTemp = Files.createTempFile("bv-callbacks", ".dex").toFile()
         try {
             val callbacksStream = checkNotNull(object {}.javaClass.getResourceAsStream("/boldvoice/callbacks.dex")) {
@@ -184,7 +211,6 @@ val boldVoiceSubscriptionPatch = resourcePatch(
         }
 
         // C. Parse fields.tsv (1,417 hoisted static strings)
-        val fieldValues = mutableMapOf<String, MutableMap<String, String>>()
         val fieldsStream = checkNotNull(object {}.javaClass.getResourceAsStream("/boldvoice/fields.tsv")) {
             "Missing /boldvoice/fields.tsv resource"
         }
@@ -200,6 +226,7 @@ val boldVoiceSubscriptionPatch = resourcePatch(
             }
         }
         check(totalFields == 1417) { "Expected 1417 hoisted fields, got $totalFields" }
+        }
 
         // D. Apply method restorations, string <clinit> injection, and PairIP neutralization
         var stringsInitialized = 0
@@ -221,7 +248,7 @@ val boldVoiceSubscriptionPatch = resourcePatch(
                                 restoredImpl,
                             )
                         }
-                        id in VOID_TARGETS -> {
+                        id in voidTargets -> {
                             classEdited = true
                             voidMethodsNeutralized++
                             ImmutableMethod(
@@ -278,15 +305,25 @@ val boldVoiceSubscriptionPatch = resourcePatch(
             }
         }
 
-        check(stringsInitialized == 1417) { "Expected 1417 strings initialized, got $stringsInitialized" }
-        check(voidMethodsNeutralized == VOID_TARGETS.size) {
-            "Expected ${VOID_TARGETS.size} void methods neutralized, got $voidMethodsNeutralized"
+        if (useLegacyPairIp) {
+            check(stringsInitialized == 1417) { "Expected 1417 strings initialized, got $stringsInitialized" }
+        } else {
+            check(stringsInitialized == 0) { "Unexpected hoisted string injection on build $versionCode" }
+            check(methodRestorations.isEmpty() && extraClasses.isEmpty()) {
+                "PairIP devirtualization resources must not apply to build $versionCode"
+            }
+        }
+        check(voidMethodsNeutralized == voidTargets.size) {
+            "Expected ${voidTargets.size} void methods neutralized, got $voidMethodsNeutralized"
         }
 
         dexes.commitAll()
 
         // --- 4. Manifest: retain Application wrapper; remove license UI and stamps; disable Expo OTA ---
         document("AndroidManifest.xml").use { manifest ->
+            if (versionCode < 0) {
+                versionCode = manifest.getAttributeNS(ANDROID, "versionCode").toIntOrNull() ?: -1
+            }
             val app = manifest.getElementsByTagName("application").item(0) as Element
             check(app.getAttributeNS(ANDROID, "name") == "com.pairip.application.Application") {
                 "BoldVoice application wrapper changed; this app needs review"

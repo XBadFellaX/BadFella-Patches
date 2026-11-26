@@ -5,10 +5,27 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 
-private val EXPECTED_BEFORE_HASHES = mapOf(
-    "libreactnative" to "1a7c61701196ee4f116c35645fe7baf0ae937f7f2832fcc706cb322eb860d831",
-    "libonnxruntime" to "124a3a26373d32ff2c76557ec88962330ea1893927bc19333c8ba113cff91a8f",
-    "libavformat" to "a07b51aa0e70422cf011fa1f03cd75abdd569f84386703019f62714e39620761",
+private data class NativeProfile(
+    val label: String,
+    val before: Map<String, String>,
+)
+
+private val PROFILE_470 = NativeProfile(
+    label = "5.1.3",
+    before = mapOf(
+        "libreactnative" to "1a7c61701196ee4f116c35645fe7baf0ae937f7f2832fcc706cb322eb860d831",
+        "libonnxruntime" to "124a3a26373d32ff2c76557ec88962330ea1893927bc19333c8ba113cff91a8f",
+        "libavformat" to "a07b51aa0e70422cf011fa1f03cd75abdd569f84386703019f62714e39620761",
+    ),
+)
+
+private val PROFILE_499 = NativeProfile(
+    label = "5.3.6",
+    before = mapOf(
+        "libreactnative" to "ba65eed79234f9fbee31b263d3274b44c48c8380f0ae9c354c82a0adca5c084b",
+        "libonnxruntime" to "6c37edac04f25aaea779a593be1bdef9897d144ee5a0fa733bb56f5f4c4ad497",
+        "libavformat" to "e918bcdb365dbac554f3d116f35e0dce2d22b17ec9c234639b62b47eedc39e3c",
+    ),
 )
 
 private val EXPECTED_AFTER_HASHES = mapOf(
@@ -20,13 +37,27 @@ private val EXPECTED_AFTER_HASHES = mapOf(
 private fun nativeHash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256")
     .digest(bytes).joinToString("") { "%02x".format(it) }
 
+private fun selectProfile(arm64Dir: File): NativeProfile {
+    val react = arm64Dir.resolve("libreactnative.so")
+    check(react.exists()) { "Missing libreactnative.so in arm64-v8a" }
+    val hash = nativeHash(react.readBytes())
+    return when (hash) {
+        PROFILE_499.before["libreactnative"] -> PROFILE_499
+        PROFILE_470.before["libreactnative"] -> PROFILE_470
+        else -> error("Unreviewed BoldVoice libreactnative in arm64-v8a")
+    }
+}
+
 internal fun restoreBoldVoiceNative(arm64Dir: File) {
+    val profile = selectProfile(arm64Dir)
     for (lib in listOf("libreactnative", "libonnxruntime", "libavformat")) {
         val file = arm64Dir.resolve("$lib.so")
         if (!file.exists()) continue
         val original = file.readBytes()
-        val expectedBefore = EXPECTED_BEFORE_HASHES[lib]
-        check(nativeHash(original) == expectedBefore) { "Unreviewed BoldVoice $lib library in arm64-v8a" }
+        val expectedBefore = checkNotNull(profile.before[lib]) { "Missing before hash for $lib" }
+        check(nativeHash(original) == expectedBefore) {
+            "Unreviewed BoldVoice $lib library in arm64-v8a (${profile.label})"
+        }
         val resource = checkNotNull(object {}.javaClass.getResourceAsStream("/boldvoice/$lib-arm64-v8a.bfp.gz")) {
             "Missing /boldvoice/$lib-arm64-v8a.bfp.gz resource"
         }

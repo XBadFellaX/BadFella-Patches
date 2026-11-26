@@ -12,20 +12,21 @@ import zipfile
 MAGIC = 0x1F1903C103BC1FC6
 EXPECTED_VERSION = 99
 
-T1_OFFSET = 0x1A6B1AD
-T1_SIZE = 72
-T1_BEFORE = bytes.fromhex("8902014503020080b3130003130000b10f0045030201c3cb130103130001b128004505020253619401160105019302b1110144040503e690032c746e020405031301021300017600")
-T1_AFTER = bytes.fromhex("9500" + "7600" * 35)
+GATE_TRUE_RET = bytes.fromhex("9500" + "7600" * 7)
+GATE_TRUE_RET_LONG = bytes.fromhex("9500" + "7600" * 35)
 
-T2_OFFSET = 0x1B07808
-T2_SIZE = 16
-T2_BEFORE = bytes.fromhex("89000144000000f94500000180b37600")
-T2_AFTER = bytes.fromhex("9500" + "7600" * 7)
+PROFILE_470 = (
+    (0x1A6B1AD, 72, bytes.fromhex("8902014503020080b3130003130000b10f0045030201c3cb130103130001b128004505020253619401160105019302b1110144040503e690032c746e020405031301021300017600"), GATE_TRUE_RET_LONG),
+    (0x1B07808, 16, bytes.fromhex("89000144000000f94500000180b37600"), GATE_TRUE_RET),
+    (0x1B1C281, 16, bytes.fromhex("89000144000000f9450000011be67600"), GATE_TRUE_RET),
+)
 
-T3_OFFSET = 0x1B1C281
-T3_SIZE = 16
-T3_BEFORE = bytes.fromhex("89000144000000f9450000011be67600")
-T3_AFTER = bytes.fromhex("9500" + "7600" * 7)
+PROFILE_499 = (
+    (0x1BA5747, 72, bytes.fromhex("890201450302009f8d130003130000b10f00450302019593130103130001b128004505020298649401160105019302b1110144040503e5900393776e020405031301021300017600"), GATE_TRUE_RET_LONG),
+    (0x1C3901C, 16, bytes.fromhex("89000144000000f9450000019f8d7600"), GATE_TRUE_RET),
+    (0x1C49532, 16, bytes.fromhex("89000144000000f94500000159f07600"), GATE_TRUE_RET),
+    (0x1567368, 92, bytes.fromhex("5e080b416e080c000845080821c351b309084508180e6a49b315083b1905176c19190045191922fb7919081903b32f083b1905206c191900442319037d452123233d8c44191810da3b1805176c18180045181822fb796f0821231918"), bytes.fromhex("96084b58" + "7600" * 44)),
+)
 
 def sha1(data):
     return hashlib.sha1(data).digest()
@@ -41,14 +42,17 @@ def expected_bundle(stock):
     assert length == len(stock), "Hermes bundle length mismatch"
     assert sha1(stock[:-20]) == stock[-20:], "Stock Hermes footer invalid"
 
-    assert stock[T1_OFFSET : T1_OFFSET + T1_SIZE] == T1_BEFORE, "Target 1 anchor mismatch"
-    assert stock[T2_OFFSET : T2_OFFSET + T2_SIZE] == T2_BEFORE, "Target 2 anchor mismatch"
-    assert stock[T3_OFFSET : T3_OFFSET + T3_SIZE] == T3_BEFORE, "Target 3 anchor mismatch"
+    profile = None
+    for candidate in (PROFILE_499, PROFILE_470):
+        if all(stock[offset : offset + size] == before for offset, size, before, _after in candidate):
+            profile = candidate
+            break
+    assert profile is not None, "BoldVoice Hermes gate anchors changed"
 
     expected = bytearray(stock)
-    expected[T1_OFFSET : T1_OFFSET + T1_SIZE] = T1_AFTER
-    expected[T2_OFFSET : T2_OFFSET + T2_SIZE] = T2_AFTER
-    expected[T3_OFFSET : T3_OFFSET + T3_SIZE] = T3_AFTER
+    for offset, size, _before, after in profile:
+        assert stock[offset : offset + size] == _before
+        expected[offset : offset + size] = after
     expected[-20:] = sha1(bytes(expected[:-20]))
     return bytes(expected)
 
@@ -130,8 +134,8 @@ def verify(args):
     assert re.search(r'expo\.modules\.updates\.ENABLED[^\n]*\n[^\n]*=false', manifest), "Expo OTA updates still enabled"
     assert re.search(r'expo\.modules\.updates\.EXPO_UPDATE_URL[^\n]*\n[^\n]*=""', manifest), "Expo update URL still present"
 
-    print("PASS: BoldVoice 5.1.3: exact Hermes99 edits/footer, six PairIP method edits, "
-          "unrelated DEX and assets retained, VM application wrapper retained, OTA disabled, native payloads unchanged")
+    print("PASS: BoldVoice Hermes99 edits/footer, license PairIP edits, "
+          "unrelated DEX and assets retained, VM application wrapper retained, OTA disabled")
 
 
 if __name__ == "__main__":
