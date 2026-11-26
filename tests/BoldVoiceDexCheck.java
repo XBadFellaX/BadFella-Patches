@@ -38,6 +38,17 @@ class BoldVoiceDexCheck {
         return result;
     }
 
+    /** ART requires registers_size >= ins_size; wide types (J/D) take two registers. */
+    static int incomingRegisters(Method m) {
+        int count = (m.getAccessFlags() & 0x0008) == 0 ? 1 : 0;
+        for (var type : m.getParameterTypes()) {
+            int i = 0;
+            while (i < type.length() && type.charAt(i) == '[') i++;
+            count += i > 0 ? 1 : (type.equals("J") || type.equals("D")) ? 2 : 1;
+        }
+        return count;
+    }
+
     static final String CLIENT = "Lcom/pairip/licensecheck/LicenseClient;";
     static final String STATE = "Lcom/pairip/licensecheck/LicenseClient$LicenseCheckState;";
     static final Set<String> VOID = Set.of(
@@ -67,12 +78,12 @@ class BoldVoiceDexCheck {
         String id = DexInventory.id(old);
         if (VOID.contains(id)) {
             check(code.size() > 1, "Stock method already patched: " + id);
-            body = new ImmutableMethodImplementation(1, List.of(
+            body = new ImmutableMethodImplementation(Math.max(incomingRegisters(old), 1), List.of(
                 new com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction10x(
                     com.android.tools.smali.dexlib2.Opcode.RETURN_VOID)), List.of(), List.of());
         } else if (RETURN_TRUE.contains(id)) {
             check(code.size() > 2, "Stock method changed: " + id);
-            body = new ImmutableMethodImplementation(1, List.of(
+            body = new ImmutableMethodImplementation(Math.max(incomingRegisters(old), 1), List.of(
                 new com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction11n(
                     com.android.tools.smali.dexlib2.Opcode.CONST_4, 0, 1),
                 new com.android.tools.smali.dexlib2.immutable.instruction.ImmutableInstruction11x(
@@ -129,6 +140,11 @@ class BoldVoiceDexCheck {
             int count = 0;
             for (var m : after.getMethods()) {
                 count++;
+                var impl = m.getImplementation();
+                if (impl != null) {
+                    check(impl.getRegisterCount() >= incomingRegisters(m),
+                        "ART validity: registers_size < ins_size for " + DexInventory.id(m));
+                }
                 var old = methods.get(DexInventory.id(m));
                 check(old != null && old.getAnnotations().equals(m.getAnnotations()), "Method metadata changed");
                 if (!VOID.contains(DexInventory.id(m)) && !RETURN_TRUE.contains(DexInventory.id(m)) &&

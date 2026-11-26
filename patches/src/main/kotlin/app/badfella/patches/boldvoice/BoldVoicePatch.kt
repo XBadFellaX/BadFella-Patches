@@ -68,18 +68,33 @@ private const val LOCAL_CHECK_PASSED = "Lcom/pairip/licensecheck/LicenseClient;-
 private const val LICENSE_CLIENT_CLINIT = "Lcom/pairip/licensecheck/LicenseClient;-><clinit>()V"
 private const val LICENSE_STATE = "Lcom/pairip/licensecheck/LicenseClient${'$'}LicenseCheckState;"
 
-/** Minimal method body: single return-void instruction with 1 register. */
-private val RETURN_VOID_IMPL = ImmutableMethodImplementation(
-    1, listOf(ImmutableInstruction10x(Opcode.RETURN_VOID)), emptyList(), emptyList(),
-)
+/** Minimal neutralized body with enough registers for the method's incoming arguments
+ *  (ART rejects the whole dex when registers_size < ins_size). */
+private fun patchedBody(method: Method, returnsTrue: Boolean): ImmutableMethodImplementation {
+    val incoming = incomingRegisters(method)
+    val instructions: List<Instruction> = if (returnsTrue) {
+        listOf(
+            ImmutableInstruction11n(Opcode.CONST_4, 0, 1),
+            ImmutableInstruction11x(Opcode.RETURN, 0),
+        )
+    } else {
+        listOf(ImmutableInstruction10x(Opcode.RETURN_VOID))
+    }
+    return ImmutableMethodImplementation(maxOf(incoming, 1), instructions, emptyList(), emptyList())
+}
 
-/** Minimal boolean-true body: const-4 v0, 1 / return v0 with 1 register. */
-private val RETURN_TRUE_IMPL = ImmutableMethodImplementation(
-    1, listOf(
-        ImmutableInstruction11n(Opcode.CONST_4, 0, 1),
-        ImmutableInstruction11x(Opcode.RETURN, 0),
-    ), emptyList(), emptyList(),
-)
+/** Wide types (J/D) take two registers; arrays and references take one. */
+private fun incomingRegisters(method: Method): Int {
+    var count = if (method.accessFlags and AccessFlags.STATIC.value != 0) 0 else 1
+    for (type in method.parameterTypes) {
+        count += when {
+            type.startsWith("[") -> 1
+            type == "J" || type == "D" -> 2
+            else -> 1
+        }
+    }
+    return count
+}
 
 private fun methodId(m: MethodReference): String =
     m.definingClass + "->" + m.name + "(" + m.parameterTypes.joinToString("") + ")" + m.returnType
@@ -284,7 +299,7 @@ val boldVoiceSubscriptionPatch = resourcePatch(
                             ImmutableMethod(
                                 method.definingClass, method.name, method.parameters, method.returnType,
                                 method.accessFlags, method.annotations, method.hiddenApiRestrictions,
-                                RETURN_VOID_IMPL,
+                                patchedBody(method, returnsTrue = false),
                             )
                         }
                         !useLegacyPairIp && id == LICENSE_CLIENT_CLINIT -> {
@@ -326,7 +341,7 @@ val boldVoiceSubscriptionPatch = resourcePatch(
                             ImmutableMethod(
                                 method.definingClass, method.name, method.parameters, method.returnType,
                                 method.accessFlags, method.annotations, method.hiddenApiRestrictions,
-                                RETURN_TRUE_IMPL,
+                                patchedBody(method, returnsTrue = true),
                             )
                         }
                         else -> method
