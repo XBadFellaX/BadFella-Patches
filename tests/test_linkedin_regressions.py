@@ -125,3 +125,55 @@ public class NavigationCaller {
 
     def test_later_failed_slice_removes_previous_and_current_files(self):
         self.check_java('2')
+
+    def test_expand_post_state_swaps_collapsed_only_when_enabled(self):
+        with tempfile.TemporaryDirectory(prefix='linkedin-expand-posts-') as directory:
+            work = Path(directory)
+            boundaries = work / 'Boundaries.java'
+            boundaries.write_text('''package app.badfella.extension.linkedin;
+class Settings {
+ static boolean expand = false;
+ static boolean expandPosts() { return expand; }
+ static boolean keepFeed() { return false; }
+ static boolean hideTabNetwork() { return false; }
+ static boolean hideTabJobs() { return false; }
+ static boolean anonymousProfileViewing() { return false; }
+ static boolean debug() { return false; }
+ static void debugLog(String message) {}
+}
+class Diagnostics { static void error(String message, Throwable failure) {} }
+class SduiMediaDownload { static String resumedScreen() { return ""; } }
+''', encoding='utf-8')
+            check = work / 'ExpandCheck.java'
+            check.write_text('''package app.badfella.extension.linkedin;
+public class ExpandCheck {
+ public enum ExpansionBehaviorState { COLLAPSED, EXPANDED }
+ public static void main(String[] args) {
+  Settings.expand = false;
+  if (LinkedInHooks.expandPostState(ExpansionBehaviorState.COLLAPSED) != ExpansionBehaviorState.COLLAPSED)
+   throw new AssertionError("Expanded while disabled");
+  Settings.expand = true;
+  if (LinkedInHooks.expandPostState(ExpansionBehaviorState.COLLAPSED) != ExpansionBehaviorState.EXPANDED)
+   throw new AssertionError("Did not expand while enabled");
+  if (LinkedInHooks.expandPostState(null) != null)
+   throw new AssertionError("Null state changed");
+ }
+}
+''', encoding='utf-8')
+            javac = self.java.with_name('javac.exe' if os.name == 'nt' else 'javac')
+            compiled = subprocess.run(
+                [str(javac), '-cp', str(self.android), '-d', str(work),
+                 str(SOURCE / 'LinkedInHooks.java'), str(boundaries), str(check)],
+                capture_output=True, text=True, timeout=30)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+            ran = subprocess.run(
+                [str(self.java), '-cp', str(work) + os.pathsep + str(self.android),
+                 'app.badfella.extension.linkedin.ExpandCheck'],
+                capture_output=True, text=True, timeout=30)
+            self.assertEqual(ran.returncode, 0, ran.stdout + ran.stderr)
+
+    def test_hide_games_leaves_more_page_intact(self):
+        sdui_src = (SOURCE / 'SduiComponentFilter.java').read_text(encoding='utf-8')
+        self.assertIn('boolean onMorePage = MoreMenu.MORE_SCREEN.equals(screen) || screen.contains("flagshipnav.more");', sdui_src)
+        self.assertIn('if (Settings.hideGames() && !onMorePage && isGameView(viewName))', sdui_src)
+        self.assertIn('if (Settings.hideGames() && !onMorePage && viewName.isEmpty() && isPuzzleHeading(component))', sdui_src)

@@ -7,6 +7,20 @@ public final class LinkedInHooks {
     }
 
     /**
+     * Injection point, at the start of ExpandableTextState.&lt;init&gt;: swaps COLLAPSED for EXPANDED when
+     * Expand posts is enabled, so tapping the text still collapses the post.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static Object expandPostState(Object state) {
+        if (state == null || !Settings.expandPosts() || !(state instanceof Enum)) return state;
+        try {
+            return Enum.valueOf(((Enum) state).getDeclaringClass(), "EXPANDED");
+        } catch (Throwable t) {
+            return state;
+        }
+    }
+
+    /**
      * Injection point, where the feeds read when the app last went to the background. With Keep feed on reopen
      * the answer is "just now", so neither the server driven feed's rule nor the classic 7 minute rule reloads it.
      */

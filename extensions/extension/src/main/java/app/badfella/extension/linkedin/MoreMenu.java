@@ -4,6 +4,10 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.res.Configuration;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.view.View;
 import android.view.ViewGroup;
@@ -60,7 +64,33 @@ public final class MoreMenu {
             new Item("newsletters", "Newsletters", "https://www.linkedin.com/mynetwork/network-manager/newsletters/"),
     };
 
+    private static final class SavedStyle {
+        final int marginStart, marginEnd, topMargin, bottomMargin, width;
+        final int padLeft, padTop, padRight, padBottom;
+        final Drawable background;
+        final int textColor;
+        final Typeface typeface;
+        final int chevronVisibility;
+
+        SavedStyle(View root, ViewGroup.MarginLayoutParams params, TextView title, View chevron) {
+            this.marginStart = params != null ? params.getMarginStart() : 0;
+            this.marginEnd = params != null ? params.getMarginEnd() : 0;
+            this.topMargin = params != null ? params.topMargin : 0;
+            this.bottomMargin = params != null ? params.bottomMargin : 0;
+            this.width = params != null ? params.width : ViewGroup.LayoutParams.MATCH_PARENT;
+            this.padLeft = root.getPaddingLeft();
+            this.padTop = root.getPaddingTop();
+            this.padRight = root.getPaddingRight();
+            this.padBottom = root.getPaddingBottom();
+            this.background = root.getBackground();
+            this.textColor = title != null ? title.getCurrentTextColor() : 0;
+            this.typeface = title != null ? title.getTypeface() : null;
+            this.chevronVisibility = chevron != null ? chevron.getVisibility() : View.VISIBLE;
+        }
+    }
+
     private static final Map<View, int[]> ORIGINAL_MARGINS = new WeakHashMap<>();
+    private static final Map<View, SavedStyle> SAVED_PILL_STYLES = new WeakHashMap<>();
 
     static final Item PATCHES = new Item("badfella-patches", "BadFella Patches", null);
 
@@ -87,20 +117,12 @@ public final class MoreMenu {
         return items;
     }
 
-    /** Settings follows the visible Groups card, or the other shortcuts when Groups is absent. */
+    /** More-tab shortcut cards shown above the footer divider. */
     static List<Item> shownItems() {
         List<Item> shown = new ArrayList<>();
         if (Settings.moveMoreItems()) {
             for (Item item : items()) if (Settings.get(item.key(), true)) shown.add(item);
         }
-        int position = shown.size();
-        for (int i = 0; i < shown.size(); i++) {
-            if ("groups".equals(shown.get(i).id)) {
-                position = i + 1;
-                break;
-            }
-        }
-        shown.add(position, PATCHES);
         return shown;
     }
 
@@ -154,11 +176,11 @@ public final class MoreMenu {
 
     /**
      * Injected after HomeNavPanelFeature puts the divider in the list at the bottom of the Me panel (the divider,
-     * then "Settings & Privacy"): adds the shortcut cards and settings above the divider.
+     * then "Settings & Privacy"): adds shortcut cards above the divider and the BadFella Patches button at the bottom.
      */
     public static void addToFooter(Object list) {
+        if (list == null) return;
         List<Item> shown = shownItems();
-        if (list == null || shown.isEmpty()) return;
         try {
             Class<?> viewData = Class.forName(PACKAGE + "HomeNavPanelSectionV2ViewData");
             Object savedPosts = Class.forName(PACKAGE + "SectionType").getField("SAVED_POSTS").get(null);
@@ -167,9 +189,33 @@ public final class MoreMenu {
             for (int i = 0; i < shown.size(); i++) {
                 addItem.invoke(list, i, newSection(viewData, shown.get(i).label, savedPosts, chevronRight));
             }
+            Object patchesSection = newSection(viewData, PATCHES.label, savedPosts, chevronRight);
+            appendItem(list, addItem, patchesSection, shown.size());
         } catch (Throwable t) {
             Diagnostics.error("addToFooter failed", t);
         }
+    }
+
+    private static void appendItem(Object list, Method addItemAt, Object item, int fallbackIndex) throws Exception {
+        try {
+            Method append = list.getClass().getMethod("addItem", Object.class);
+            append.invoke(list, item);
+            return;
+        } catch (NoSuchMethodException ignored) {
+        }
+        int end = footerSize(list, fallbackIndex);
+        addItemAt.invoke(list, end, item);
+    }
+
+    private static int footerSize(Object list, int fallback) {
+        for (String name : new String[]{"getItemCount", "size"}) {
+            try {
+                Object result = list.getClass().getMethod(name).invoke(list);
+                if (result instanceof Integer) return (Integer) result;
+            } catch (Throwable ignored) {
+            }
+        }
+        return fallback;
     }
 
     /**
@@ -206,10 +252,19 @@ public final class MoreMenu {
             String title = String.valueOf(Reflect.get(viewData, "title"));
             Object root = binding.getClass().getMethod("getRoot").invoke(binding);
             Item match = null;
-            for (Item item : shownItems()) if (item.label.equals(title)) match = item;
-            // Section views are recycled, so a view that showed an item's icon gets it cleared.
-            if (root instanceof View) setIcon((View) root, match);
-            if (root instanceof View) setMargins((View) root, match != null);
+            if (PATCHES.label.equals(title)) match = PATCHES;
+            else for (Item item : shownItems()) if (item.label.equals(title)) match = item;
+            // Section views are recycled, so a view that showed a styled button or card restores its original look.
+            if (root instanceof View) {
+                View rootView = (View) root;
+                if (match == PATCHES) {
+                    stylePatchesButton(rootView);
+                } else {
+                    restorePatchesButton(rootView);
+                    setIcon(rootView, match);
+                    setMargins(rootView, match != null);
+                }
+            }
             if (match == null) return;
             Item item = match;
             View.OnClickListener open = v -> {
@@ -223,12 +278,88 @@ public final class MoreMenu {
         }
     }
 
+    private static void stylePatchesButton(View root) {
+        TextView title = findTitle(root);
+        View chevron = findView(root, "chevron");
+        ViewGroup.MarginLayoutParams params = root.getLayoutParams() instanceof ViewGroup.MarginLayoutParams
+                ? (ViewGroup.MarginLayoutParams) root.getLayoutParams() : null;
+        if (!SAVED_PILL_STYLES.containsKey(root)) {
+            SAVED_PILL_STYLES.put(root, new SavedStyle(root, params, title, chevron));
+        }
+        float density = root.getResources().getDisplayMetrics().density;
+        boolean dark = (root.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
+        int accent = MaterialYou.settingsAccent(dark,
+                dark ? SettingsActivity.ACCENT_DARK : SettingsActivity.ACCENT_LIGHT);
+
+        GradientDrawable pill = new GradientDrawable();
+        pill.setColor((accent & 0x00FFFFFF) | (dark ? 0x2E000000 : 0x1F000000));
+        pill.setCornerRadius(24f * density);
+        pill.setStroke(Math.max(1, Math.round(density)), (accent & 0x00FFFFFF) | 0x4D000000);
+        root.setBackground(pill);
+        root.setPadding(Math.round(16 * density), Math.round(10 * density),
+                Math.round(18 * density), Math.round(10 * density));
+        if (params != null) {
+            params.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+            int side = Math.round(17 * density);
+            params.setMarginStart(side);
+            params.setMarginEnd(side);
+            params.topMargin = Math.round(8 * density);
+            params.bottomMargin = Math.round(16 * density);
+            root.setLayoutParams(params);
+        }
+        if (chevron != null) chevron.setVisibility(View.GONE);
+        if (title != null) {
+            IconDrawable icon = new IconDrawable(IconDrawable.APPS, accent);
+            int size = Math.round(20 * density);
+            icon.setBounds(0, 0, size, size);
+            title.setCompoundDrawablesRelative(icon, null, null, null);
+            title.setCompoundDrawablePadding(Math.round(10 * density));
+            title.setTextColor(accent);
+            title.setTypeface(Typeface.DEFAULT_BOLD);
+        }
+    }
+
+    private static void restorePatchesButton(View root) {
+        SavedStyle saved = SAVED_PILL_STYLES.remove(root);
+        if (saved == null) return;
+        root.setBackground(saved.background);
+        root.setPadding(saved.padLeft, saved.padTop, saved.padRight, saved.padBottom);
+        if (root.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) root.getLayoutParams();
+            params.width = saved.width;
+            params.setMarginStart(saved.marginStart);
+            params.setMarginEnd(saved.marginEnd);
+            params.topMargin = saved.topMargin;
+            params.bottomMargin = saved.bottomMargin;
+            root.setLayoutParams(params);
+        }
+        View chevron = findView(root, "chevron");
+        if (chevron != null) chevron.setVisibility(saved.chevronVisibility);
+        TextView title = findTitle(root);
+        if (title != null) {
+            title.setTextColor(saved.textColor);
+            title.setTypeface(saved.typeface);
+            if (title.getCompoundDrawablesRelative()[0] instanceof IconDrawable) {
+                title.setCompoundDrawablesRelative(null, null, null, null);
+            }
+        }
+    }
+
+    private static TextView findTitle(View root) {
+        View view = findView(root, "title");
+        return view instanceof TextView ? (TextView) view : null;
+    }
+
+    private static View findView(View root, String name) {
+        int id = root.getResources().getIdentifier(name, "id", root.getContext().getPackageName());
+        return id == 0 ? null : root.findViewById(id);
+    }
+
     /** Draws the item's icon at the start of its title, in the title's color; null removes an icon set before. */
     private static void setIcon(View root, Item item) {
-        int id = root.getResources().getIdentifier("title", "id", root.getContext().getPackageName());
-        View view = id == 0 ? null : root.findViewById(id);
-        if (!(view instanceof TextView)) return;
-        TextView title = (TextView) view;
+        TextView title = findTitle(root);
+        if (title == null) return;
         if (item == null) {
             if (title.getCompoundDrawablesRelative()[0] instanceof IconDrawable) {
                 title.setCompoundDrawablesRelative(null, null, null, null);

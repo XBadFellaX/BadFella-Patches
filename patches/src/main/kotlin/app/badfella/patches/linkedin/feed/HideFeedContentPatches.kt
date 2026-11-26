@@ -37,6 +37,14 @@ val hidePromotedJobsPatch = bytecodePatch(
     execute { markIncluded("isHidePromotedJobsIncluded") }
 }
 
+private const val EXPANSION_BEHAVIOR_STATE = "Lcom/linkedin/sdui/viewdata/text/ExpansionBehaviorState;"
+
+private object ExpandableTextStateFingerprint : Fingerprint(
+    definingClass = "Lcom/linkedin/android/infra/sdui/components/text/expandableText/ExpandableTextState;",
+    name = "<init>",
+    custom = { method, _ -> method.parameterTypes.lastOrNull()?.toString() == EXPANSION_BEHAVIOR_STATE },
+)
+
 @Suppress("unused")
 val expandPostsPatch = bytecodePatch(
     name = "Expand posts",
@@ -46,7 +54,21 @@ val expandPostsPatch = bytecodePatch(
 ) {
     compatibleWith(COMPATIBILITY_LINKEDIN)
     dependsOn(sduiComponentFilterPatch)
-    execute { markIncluded("isExpandPostsIncluded") }
+    execute {
+        markIncluded("isExpandPostsIncluded")
+
+        ExpandableTextStateFingerprint.method.apply {
+            val stateParam = parameters.size
+            addInstructions(
+                0,
+                """
+                    invoke-static/range { p$stateParam .. p$stateParam }, $EXTENSION_PACKAGE/LinkedInHooks;->expandPostState(Ljava/lang/Object;)Ljava/lang/Object;
+                    move-result-object p$stateParam
+                    check-cast p$stateParam, $EXPANSION_BEHAVIOR_STATE
+                """
+            )
+        }
+    }
 }
 
 @Suppress("unused")

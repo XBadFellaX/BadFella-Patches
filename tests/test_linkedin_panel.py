@@ -13,33 +13,50 @@ STUBS = {
 'android/content/ContextWrapper.java': 'package android.content; public class ContextWrapper extends Context { private final Context base; public ContextWrapper(Context c){base=c;} public Context getBaseContext(){return base;} }',
 'android/app/Activity.java': 'package android.app; public class Activity extends android.content.ContextWrapper { public Activity(){super(null);} }',
 'android/util/DisplayMetrics.java': 'package android.util; public class DisplayMetrics { public float density=2; }',
-'android/content/res/Resources.java': 'package android.content.res; public class Resources { public int getIdentifier(String n,String t,String p){return 1;} public android.util.DisplayMetrics getDisplayMetrics(){return new android.util.DisplayMetrics();} }',
+'android/content/res/Configuration.java': 'package android.content.res; public class Configuration { public static final int UI_MODE_NIGHT_MASK=0x30, UI_MODE_NIGHT_YES=0x20; public int uiMode=0; }',
+'android/content/res/Resources.java': 'package android.content.res; public class Resources { public int getIdentifier(String n,String t,String p){return "chevron".equals(n)?2:1;} public android.util.DisplayMetrics getDisplayMetrics(){return new android.util.DisplayMetrics();} public Configuration getConfiguration(){return new Configuration();} }',
+'android/graphics/Typeface.java': 'package android.graphics; public class Typeface { public static final Typeface DEFAULT_BOLD = new Typeface(); }',
 'android/graphics/drawable/Drawable.java': 'package android.graphics.drawable; public abstract class Drawable { public void setBounds(int a,int b,int c,int d){} }',
+'android/graphics/drawable/GradientDrawable.java': 'package android.graphics.drawable; public class GradientDrawable extends Drawable { public int color,strokeColor,strokeWidth; public float radius; public void setColor(int c){color=c;} public void setCornerRadius(float r){radius=r;} public void setStroke(int w,int c){strokeWidth=w;strokeColor=c;} }',
 'android/view/View.java': r'''package android.view;
 public class View {
+ public static final int VISIBLE=0, GONE=8;
  public interface OnClickListener { void onClick(View v); }
  public android.content.Context context=new android.app.Activity();
  public android.widget.TextView title;
+ public View chevron;
  public ViewGroup.LayoutParams params=new ViewGroup.MarginLayoutParams();
+ public android.graphics.drawable.Drawable background;
+ public int padLeft,padTop,padRight,padBottom,visibility=VISIBLE;
  public android.content.Context getContext(){return context;}
  public android.content.res.Resources getResources(){return new android.content.res.Resources();}
- public View findViewById(int id){return title;}
+ public View findViewById(int id){return id==2?chevron:title;}
  public ViewGroup.LayoutParams getLayoutParams(){return params;}
  public void setLayoutParams(ViewGroup.LayoutParams p){params=p;}
+ public android.graphics.drawable.Drawable getBackground(){return background;}
+ public void setBackground(android.graphics.drawable.Drawable b){background=b;}
+ public void setPadding(int l,int t,int r,int b){padLeft=l;padTop=t;padRight=r;padBottom=b;}
+ public int getPaddingLeft(){return padLeft;} public int getPaddingTop(){return padTop;}
+ public int getPaddingRight(){return padRight;} public int getPaddingBottom(){return padBottom;}
+ public int getVisibility(){return visibility;} public void setVisibility(int v){visibility=v;}
 }
 ''',
 'android/view/ViewGroup.java': r'''package android.view; public class ViewGroup extends View {
- public static class LayoutParams {}
+ public static class LayoutParams { public static final int MATCH_PARENT=-1, WRAP_CONTENT=-2; public int width=MATCH_PARENT; }
  public static class MarginLayoutParams extends LayoutParams {
-  public int start=3,end=5,bottomMargin=7;
+  public int start=3,end=5,topMargin=2,bottomMargin=7;
   public int getMarginStart(){return start;} public int getMarginEnd(){return end;}
   public void setMarginStart(int v){start=v;} public void setMarginEnd(int v){end=v;}
  }
 }''',
 'android/widget/TextView.java': r'''package android.widget; public class TextView extends android.view.View {
  private android.graphics.drawable.Drawable[] icons=new android.graphics.drawable.Drawable[4];
- public int padding;
- public int getCurrentTextColor(){return 123;}
+ public int padding, textColor=123;
+ public android.graphics.Typeface typeface;
+ public int getCurrentTextColor(){return textColor;}
+ public void setTextColor(int c){textColor=c;}
+ public android.graphics.Typeface getTypeface(){return typeface;}
+ public void setTypeface(android.graphics.Typeface t){typeface=t;}
  public android.graphics.drawable.Drawable[] getCompoundDrawablesRelative(){return icons;}
  public void setCompoundDrawablesRelative(android.graphics.drawable.Drawable a,android.graphics.drawable.Drawable b,
  android.graphics.drawable.Drawable c,android.graphics.drawable.Drawable d){icons=new android.graphics.drawable.Drawable[]{a,b,c,d};}
@@ -58,14 +75,16 @@ class Settings {
  static void setString(String k,String v) {} static void debugLog(String s) {}
 }
 class Diagnostics { static void error(String s,Throwable t) { throw new AssertionError(s,t); } }
-class SettingsActivity { static android.content.Context opened; static void open(android.content.Context c) { opened=c; } }
+class SettingsActivity { static final int ACCENT_DARK=0xFF2DBCB1, ACCENT_LIGHT=0xFF00897B; static android.content.Context opened; static void open(android.content.Context c) { opened=c; } }
+class MaterialYou { static int settingsAccent(boolean dark, int fallback) { return 0xFF1A73E8; } }
 class ProtoScanner {
  static class Result { java.util.List<String> strings=java.util.Collections.emptyList(); }
  static Result scan(byte[] b) { return new Result(); }
 }
 class IconDrawable extends android.graphics.drawable.Drawable {
  static final String APPS="apps",PUZZLE="puzzle",GROUPS="groups",EVENTS="events",ARTICLE="article";
- IconDrawable(String p,int c) {} public void draw(android.graphics.Canvas c) {}
+ final int color;
+ IconDrawable(String p,int c) { color=c; } public void draw(android.graphics.Canvas c) {}
  public void setAlpha(int a) {} public void setColorFilter(android.graphics.ColorFilter c) {}
  public int getOpacity() { return 0; }
 }

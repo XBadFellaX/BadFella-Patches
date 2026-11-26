@@ -149,7 +149,7 @@ public final class SettingsActivity extends Activity {
             categories.add(ads);
         }
 
-        if (Settings.isFeedFiltersIncluded() || Settings.isDisableDoubleTapLikeIncluded()
+        if (Settings.isDisableDoubleTapLikeIncluded()
                 || Settings.isExpandPostsIncluded() || Settings.isSwipeTabsIncluded()
                 || Settings.isCopyTextIncluded() || Settings.isKeepFeedIncluded()
                 || Settings.isPostMenuIncluded() || Settings.isViewerTapToHideIncluded()
@@ -208,48 +208,51 @@ public final class SettingsActivity extends Activity {
                 feed.toggle(Settings.KEEP_FEED, false, "Keep feed on reopen",
                         "Stay where you were when you come back. Pull down or tap \"New posts\" for new posts.");
             }
-            if (Settings.isFeedFiltersIncluded()) {
-                feed.toggle(Settings.FOCUS_MODE, false, "Focus mode", "Hide like, comment, and repost counts.")
-                        .toggle(Settings.HIDE_CELEBRATIONS, false, "Hide celebration posts",
-                                "Work anniversaries, new positions, and the like.")
-                        .toggle(Settings.HIDE_FEED_JOBS, false, "Hide jobs in the feed",
-                                "Job cards in the home feed.")
-                        .toggle(Settings.HIDE_REPOSTS, false, "Hide reposts",
-                                "Posts that reshare someone else's post.")
-                        .toggle(Settings.HIDE_ACTIVITY_POSTS, false, "Hide posts from others' activity",
-                                "Posts shown because someone liked, commented on, or reacted to them.")
-                        .toggle(Settings.HIDE_RECOMMENDATIONS, false, "Hide \"Recommended for you\"",
-                                "Suggestions of people and pages to follow in the feed.")
-                        .toggle(Settings.HIDE_VIDEO_POSTS, false, "Hide video posts", "Posts that contain a video.")
-                        .toggle(Settings.HIDE_GAMES, false, "Hide games",
-                                "LinkedIn's puzzle games in the Me panel, search, and feed.")
-                        .toggle(Settings.HIDE_NEW_POSTS_PILL, false, "Hide the \"New posts\" button",
-                                "The pill that appears at the top of the feed.")
-                        .toggle(Settings.HIDE_TRANSLATION, false, "Hide \"See translation\"",
-                                "The translate button below posts in other languages.")
-                        .toggle(Settings.HIDE_AI, false, "Hide AI suggestions",
-                                "AI prompts, suggestions, and assistant cards. Experimental.")
-                        .value("Muted words", new ValueRow() {
-                            public String currentValue() {
-                                String words = Settings.mutedWords().trim();
-                                return words.isEmpty() ? I18n.tr("Posts with these words or phrases are hidden.")
-                                        : words.replace("\n", ", ");
-                            }
-
-                            public Runnable onClick() {
-                                return SettingsActivity.this::editMutedWords;
-                            }
-
-                            public boolean enabled() {
-                                return true;
-                            }
-                        });
-            }
             if (Settings.isScreenshotShareIncluded()) {
                 feed.toggle(Settings.NO_SCREENSHOT_SHARE, true, "Disable screenshot share sheet",
                         "Keep LinkedIn's share sheet closed when you take a screenshot of a post.");
             }
             categories.add(feed);
+        }
+
+        if (Settings.isFeedFiltersIncluded()) {
+            Category filters = new Category("Feed filters", IconDrawable.BLOCK)
+                    .toggle(Settings.FOCUS_MODE, false, "Focus mode", "Hide like, comment, and repost counts.")
+                    .toggle(Settings.HIDE_CELEBRATIONS, false, "Hide celebration posts",
+                            "Work anniversaries, new positions, and the like.")
+                    .toggle(Settings.HIDE_FEED_JOBS, false, "Hide jobs in the feed",
+                            "Job cards in the home feed.")
+                    .toggle(Settings.HIDE_REPOSTS, false, "Hide reposts",
+                            "Posts that reshare someone else's post.")
+                    .toggle(Settings.HIDE_ACTIVITY_POSTS, false, "Hide posts from others' activity",
+                            "Posts shown because someone liked, commented on, or reacted to them.")
+                    .toggle(Settings.HIDE_RECOMMENDATIONS, false, "Hide \"Recommended for you\"",
+                            "Suggestions of people and pages to follow in the feed.")
+                    .toggle(Settings.HIDE_VIDEO_POSTS, false, "Hide video posts", "Posts that contain a video.")
+                    .toggle(Settings.HIDE_GAMES, false, "Hide games",
+                            "LinkedIn's puzzle games in search and feed.")
+                    .toggle(Settings.HIDE_NEW_POSTS_PILL, false, "Hide the \"New posts\" button",
+                            "The pill that appears at the top of the feed.")
+                    .toggle(Settings.HIDE_TRANSLATION, false, "Hide \"See translation\"",
+                            "The translate button below posts in other languages.")
+                    .toggle(Settings.HIDE_AI, false, "Hide AI suggestions",
+                            "AI prompts, suggestions, and assistant cards. Experimental.")
+                    .value("Muted words", new ValueRow() {
+                        public String currentValue() {
+                            String words = Settings.mutedWords().trim();
+                            return words.isEmpty() ? I18n.tr("Posts with these words or phrases are hidden.")
+                                    : words.replace("\n", ", ");
+                        }
+
+                        public Runnable onClick() {
+                            return SettingsActivity.this::editMutedWords;
+                        }
+
+                        public boolean enabled() {
+                            return true;
+                        }
+                    });
+            categories.add(filters);
         }
 
         if (Settings.isNavigationBarIncluded() || Settings.isGlassNavigationBarIncluded()
@@ -966,27 +969,196 @@ public final class SettingsActivity extends Activity {
         };
     }
 
+    private static final class PatchStatusEntry {
+        final String name;
+        final boolean included;
+        final boolean active;
+        final String summary;
+
+        PatchStatusEntry(String name, boolean included, boolean active, String summary) {
+            this.name = name;
+            this.included = included;
+            this.active = included && active;
+            this.summary = summary;
+        }
+
+        int state() {
+            if (!included) return 2;
+            return active ? 0 : 1;
+        }
+    }
+
+    private PatchStatusEntry[] patchStatusEntries() {
+        return new PatchStatusEntry[]{
+                new PatchStatusEntry("Hide ads", Settings.isHideAdsIncluded(), Settings.hideAds(),
+                        "Removes promoted posts from the home feed."),
+                new PatchStatusEntry("Hide promoted jobs", Settings.isHidePromotedJobsIncluded(), Settings.hidePromotedJobs(),
+                        "Removes promoted job listings from Jobs and search."),
+                new PatchStatusEntry("Hide suggested posts", Settings.isHideSuggestedIncluded(), Settings.hideSuggested(),
+                        "Hides suggested posts from outside your network."),
+                new PatchStatusEntry("Hide Premium upsells", Settings.isHidePremiumIncluded(), Settings.hidePremium(),
+                        "Hides Premium and AI upgrade cards."),
+                new PatchStatusEntry("Feed filters", Settings.isFeedFiltersIncluded(),
+                        Settings.focusMode() || Settings.hideCelebrations() || Settings.hideFeedJobs()
+                                || Settings.hideReposts() || Settings.hideActivityPosts()
+                                || Settings.hideRecommendations() || Settings.hideVideoPosts()
+                                || Settings.hideGames() || Settings.hideNewPostsPill()
+                                || Settings.hideTranslation() || Settings.hideAi()
+                                || !Settings.mutedWords().trim().isEmpty(),
+                        "Optional filters for counts, reposts, games, AI, and muted words."),
+                new PatchStatusEntry("Expand posts", Settings.isExpandPostsIncluded(), Settings.expandPosts(),
+                        "Opens long posts already expanded."),
+                new PatchStatusEntry("Disable double-tap like", Settings.isDisableDoubleTapLikeIncluded(), Settings.disableDoubleTapLike(),
+                        "Stops double-tapping a post from liking it."),
+                new PatchStatusEntry("Copy text", Settings.isCopyTextIncluded(), Settings.copyText(),
+                        "Long press posts or comments to select and copy text."),
+                new PatchStatusEntry("Copy post text", Settings.isCopyPostTextIncluded(), Settings.copyPostText(),
+                        "Long press a post to copy its full text."),
+                new PatchStatusEntry("Icon-only post actions", Settings.isIconOnlyActionsIncluded(), Settings.iconOnlyActions(),
+                        "Shows post action icons without text labels."),
+                new PatchStatusEntry("Keep feed on reopen", Settings.isKeepFeedIncluded(), Settings.keepFeed(),
+                        "Keeps your feed position when returning to the app."),
+                new PatchStatusEntry("Disable screenshot share sheet", Settings.isScreenshotShareIncluded(), Settings.blockScreenshotShare(),
+                        "Keeps LinkedIn's share sheet closed on screenshots."),
+                new PatchStatusEntry("Hide top bar buttons", Settings.isTopBarButtonsIncluded(),
+                        Settings.get(Settings.HIDE_TOP_BAR_POST, false) || Settings.get(Settings.HIDE_TOP_BAR_MESSAGING, false),
+                        "Lets you hide Post and Messaging in the top bar."),
+                new PatchStatusEntry("Video tab", Settings.isVideoTabIncluded(),
+                        Settings.videoTabTime() || Settings.videoTabAutoScroll(),
+                        "Adds playback time and auto-advance options to Video."),
+                new PatchStatusEntry("Post menu items", Settings.isPostMenuIncluded(), Settings.postMenu(),
+                        "Adds Copy text and Download actions to post menus."),
+                new PatchStatusEntry("Tap to hide in viewers", Settings.isViewerTapToHideIncluded(), Settings.viewerTapToHide(),
+                        "Tap full-screen videos or documents to hide overlays."),
+                new PatchStatusEntry("Swipe between feeds", Settings.isSwipeFeedsIncluded(), Settings.swipeFeeds(),
+                        "Swipe sideways between For you and Network feeds."),
+                new PatchStatusEntry("Hide bottom tabs", Settings.isHideTabsIncluded(),
+                        Settings.hideTabNetwork() || Settings.hideTabJobs(),
+                        "Lets you hide My Network or Jobs from the bottom bar."),
+                new PatchStatusEntry("Navigation bar", Settings.isNavigationBarIncluded(), true,
+                        "Shows or hides bottom bar tabs, labels, and badges."),
+                new PatchStatusEntry("Customize navigation bar", Settings.isCustomizeNavigationIncluded(), true,
+                        "Reorders bottom bar tabs and adds Messaging."),
+                new PatchStatusEntry("Swipe between tabs", Settings.isSwipeTabsIncluded(), Settings.swipeTabs(),
+                        "Swipe sideways to switch bottom bar tabs."),
+                new PatchStatusEntry("Always show navigation bar", Settings.isAlwaysShowNavigationBarIncluded(), Settings.alwaysShowNavigationBar(),
+                        "Keeps the bottom bar visible while scrolling."),
+                new PatchStatusEntry("Glass navigation bar", Settings.isGlassNavigationBarIncluded(), Settings.glassNavigationBar(),
+                        "Renders the bottom bar as a floating glass capsule."),
+                new PatchStatusEntry("More tab", Settings.isMoreMenuIncluded(), Settings.moreMenu(),
+                        "Controls More tab rows and profile menu shortcuts."),
+                new PatchStatusEntry("Anonymous profile viewing", Settings.isAnonymousProfileViewingIncluded(), Settings.anonymousProfileViewing(),
+                        "Drops profile view analytics events."),
+                new PatchStatusEntry("Download media", Settings.isDownloadMediaIncluded(), Settings.downloadMedia(),
+                        "Adds a download button to photos, videos, and documents."),
+                new PatchStatusEntry("Messaging", Settings.isMessagingIncluded(),
+                        Settings.hideSponsoredMessages() || Settings.ghostMode(),
+                        "Hides sponsored messages and enables Ghost mode."),
+                new PatchStatusEntry("Open links directly", Settings.isOpenLinksDirectlyIncluded(), Settings.openLinksDirectly(),
+                        "Skips LinkedIn's external link redirect warning."),
+                new PatchStatusEntry("Sanitize share links", Settings.isSanitizeShareLinksIncluded(), Settings.sanitizeShareLinks(),
+                        "Strips tracking parameters from shared links."),
+                new PatchStatusEntry("Block tracking", Settings.isBlockTrackingIncluded(), Settings.blockTracking(),
+                        "Blocks outgoing analytics events."),
+                new PatchStatusEntry("Remove gaps and dividers", Settings.isRemoveGapsAndDividersIncluded(), Settings.removeGapsAndDividers(),
+                        "Removes feed gaps and list dividers."),
+                new PatchStatusEntry("Material You", Settings.isMaterialYouIncluded(), Settings.materialYou(),
+                        "Applies wallpaper or custom accent colors."),
+                new PatchStatusEntry("Pitch black", Settings.isAmoledBlackIncluded(), Settings.pitchBlack(),
+                        "Uses pure black backgrounds in dark mode."),
+                new PatchStatusEntry("GmsCore support", Settings.isGmsCoreSupportIncluded(), true,
+                        "Enables microG RE sign-in and push notifications."),
+        };
+    }
+
     private void showPatchStatus() {
-        LinearLayout box = cardBox("Patch status", "Patches applied when this LinkedIn was patched.");
+        PatchStatusEntry[] entries = patchStatusEntries();
+        int onCount = 0;
+        int offCount = 0;
+        int notAppliedCount = 0;
+        for (PatchStatusEntry entry : entries) {
+            if (entry.state() == 0) onCount++;
+            else if (entry.state() == 1) offCount++;
+            else notAppliedCount++;
+        }
+        String summary = I18n.f("%1$d on  •  %2$d off  •  %3$d not applied", onCount, offCount, notAppliedCount);
+        LinearLayout box = cardBox("Patch status", summary);
+
+        LinearLayout chips = new LinearLayout(this);
+        chips.setOrientation(LinearLayout.HORIZONTAL);
+        chips.setGravity(Gravity.CENTER_HORIZONTAL);
+        chips.setPadding(0, 0, 0, dp(12));
+
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         list.setBackground(outlined());
 
-        Object[][] patches = patches();
-        for (int i = 0; i < patches.length; i++) {
-            if (i > 0) list.addView(linkDivider());
-            boolean included = (Boolean) patches[i][1];
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(18), dp(14), dp(18), dp(14));
-            row.addView(text((String) patches[i][0], 16, textPrimary, false),
-                    new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-            TextView state = text(included ? "Applied" : "Not applied", 14,
-                    included ? accent : textSecondary, true);
-            row.addView(state);
-            list.addView(row);
+        final int[] selectedFilter = {-1}; // -1 = All, 0 = On, 1 = Off, 2 = Not applied
+        String[] labels = {"All", "On", "Off", "Not applied"};
+        int[] filterValues = {-1, 0, 1, 2};
+        TextView[] chipViews = new TextView[labels.length];
+
+        Runnable renderList = () -> {
+            for (int i = 0; i < chipViews.length; i++) {
+                boolean active = selectedFilter[0] == filterValues[i];
+                chipViews[i].setTextColor(active ? (dark ? 0xFF000000 : 0xFFFFFFFF) : textPrimary);
+                GradientDrawable bg = new GradientDrawable();
+                bg.setCornerRadius(dp(16));
+                bg.setColor(active ? accent : surface);
+                if (!active) bg.setStroke(dp(1), divider);
+                chipViews[i].setBackground(bg);
+            }
+            list.removeAllViews();
+            int shown = 0;
+            for (PatchStatusEntry entry : entries) {
+                if (selectedFilter[0] != -1 && entry.state() != selectedFilter[0]) continue;
+                if (shown > 0) list.addView(linkDivider());
+                shown++;
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.VERTICAL);
+                row.setPadding(dp(18), dp(12), dp(18), dp(12));
+
+                LinearLayout top = new LinearLayout(this);
+                top.setOrientation(LinearLayout.HORIZONTAL);
+                top.setGravity(Gravity.CENTER_VERTICAL);
+                top.addView(text(entry.name, 16, textPrimary, true),
+                        new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                String stateLabel = entry.state() == 0 ? "On" : entry.state() == 1 ? "Off" : "Not applied";
+                int stateColor = entry.state() == 0 ? accent : entry.state() == 1 ? textPrimary : textSecondary;
+                top.addView(text(stateLabel, 13, stateColor, true));
+                row.addView(top, matchWidth());
+
+                TextView desc = text(entry.summary, 13, textSecondary, false);
+                desc.setPadding(0, dp(4), 0, 0);
+                row.addView(desc, matchWidth());
+                list.addView(row);
+            }
+            if (shown == 0) {
+                TextView empty = text("No patches in this state.", 14, textSecondary, false);
+                empty.setGravity(Gravity.CENTER);
+                empty.setPadding(dp(18), dp(18), dp(18), dp(18));
+                list.addView(empty);
+            }
+        };
+
+        for (int i = 0; i < labels.length; i++) {
+            final int fv = filterValues[i];
+            TextView chip = text(labels[i], 13, textPrimary, true);
+            chip.setPadding(dp(12), dp(6), dp(12), dp(6));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            if (i > 0) lp.setMarginStart(dp(8));
+            chip.setLayoutParams(lp);
+            chip.setOnClickListener(v -> {
+                selectedFilter[0] = fv;
+                renderList.run();
+            });
+            chipViews[i] = chip;
+            chips.addView(chip);
         }
+
+        renderList.run();
+        box.addView(chips, matchWidth());
         box.addView(list, matchWidth());
         showCard(box);
     }

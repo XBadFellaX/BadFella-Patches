@@ -79,7 +79,7 @@ class LinkedInCatalogTests(unittest.TestCase):
     def test_reviewed_targets_and_version_agnosticism(self):
         for name, patch in self.patches.items():
             targets = patch["compatiblePackages"][0]["targets"]
-            self.assertEqual(len(targets), 6, f"{name} should have 6 targets")
+            self.assertEqual(len(targets), 7, f"{name} should have 7 targets")
             self.assertEqual(targets[0]["version"], "4.1.1267")
             self.assertEqual(targets[1]["version"], "4.1.1271")
             self.assertEqual(set(targets[1]["versionCodes"].values()), {217900})
@@ -93,9 +93,12 @@ class LinkedInCatalogTests(unittest.TestCase):
             self.assertEqual(targets[4]["version"], "4.1.1276")
             self.assertEqual(set(targets[4]["versionCodes"].values()), {218400})
             self.assertFalse(targets[4]["isExperimental"])
+            self.assertEqual(targets[5]["version"], "4.1.1278")
+            self.assertEqual(set(targets[5]["versionCodes"].values()), {218600})
+            self.assertFalse(targets[5]["isExperimental"])
             # The last target is the experimental wildcard for future version support.
-            self.assertIsNone(targets[5]["version"])
-            self.assertTrue(targets[5]["isExperimental"])
+            self.assertIsNone(targets[6]["version"])
+            self.assertTrue(targets[6]["isExperimental"])
 
     def test_default_patches(self):
         for name, patch in self.patches.items():
@@ -233,12 +236,10 @@ class LinkedInSourceTests(unittest.TestCase):
         """doTransform also runs per viewport sample while scrolling: no path may serialize unconditionally."""
         sdui_src = (EXT_DIR / "SduiComponentFilter.java").read_text(encoding="utf-8")
         # rewrite returns before touching the view name when no feature that edits components is on.
-        self.assertIn("if (!expandPosts && !viewer && !postMenu && !copyPostText) return component;", sdui_src)
+        self.assertIn("if (!viewer && !postMenu && !copyPostText) return component;", sdui_src)
         # Every editing branch is gated on the component's own view name.
-        self.assertIn('private static final String COMMENTARY = "feed-commentary";', sdui_src)
         self.assertIn('private static final String VIEWER_CONTAINER = "feed-update-screen-container";', sdui_src)
         self.assertIn('private static final String CONTROL_MENU = "feed-control-menu";', sdui_src)
-        self.assertIn("expandPosts && COMMENTARY.equals(viewName)", sdui_src)
         self.assertIn("viewer && VIEWER_CONTAINER.equals(viewName)", sdui_src)
         self.assertIn("postMenu && viewName.startsWith(CONTROL_MENU)", sdui_src)
         # One reflective view name and one serialization per component per thread, shared by rewrite and shouldHide.
