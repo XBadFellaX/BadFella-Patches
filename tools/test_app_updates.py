@@ -24,6 +24,13 @@ class UpdateTests(unittest.TestCase):
         previous = {'latest': {'app': item()}, 'errors': {}}
         self.assertEqual(monitor.advance(previous, {'app': item(9)}, {}), (previous, [], False))
 
+    def test_play_version_without_numeric_order_alerts_once_on_change(self):
+        previous = {'latest': {'app': item([1, 0], 'Google Play')}, 'errors': {}}
+        play = {**item(None, 'Google Play'), 'title': '8a14774d3a9cb8f25eaae58f4c4e4f3e'}
+        state, changed, notify = monitor.advance(previous, {'app': play}, {})
+        self.assertEqual((changed, notify), (['app'], True))
+        self.assertEqual(monitor.advance(state, {'app': play}, {}), (state, [], False))
+
     def test_failure_preserves_baseline_and_only_notifies_on_transition(self):
         previous = {'latest': {'app': item()}, 'errors': {}}
         state, changed, notify = monitor.advance(previous, {}, {'app': 'HTTPError'})
@@ -86,6 +93,7 @@ class UpdateTests(unittest.TestCase):
         result = monitor.play_latest(data.encode(), 'example.app')
         self.assertEqual(result['title'], '2.10.3')
         self.assertEqual(result['order'], [2, 10, 3])
+        self.assertIsNone(monitor.play_latest(data.replace('2.10.3', 'a1b2c3').encode(), 'example.app')['order'])
         with self.assertRaises(ValueError):
             monitor.play_latest(b'<html>Consent required</html>', 'example.app')
         with self.assertRaises(ValueError):
@@ -121,6 +129,32 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(set(found), {'public', 'selected-play'})
         self.assertEqual(errors, {})
         self.assertEqual(request.call_count, 1)
+
+    @patch.object(monitor, 'collect', return_value=({'app': item(), 'play-only': item([1, 0], 'Google Play')}, {}))
+    @patch.object(monitor, 'check_play')
+    def test_play_tracks_alongside_mirrors_without_resetting_baselines(self, check_play, collect):
+        apps = {p: {'name': p, 'catalog': 'Public', 'supported': '1.0'} for p in ('app', 'play-only', 'missing')}
+        old = {'latest': {'app': item(20), 'play-only': item([1, 0], 'Google Play')}, 'errors': {}}
+        play = {'order': [2, 0], 'title': '2.0', 'url': 'https://play.google.com/store/apps/details?id=app',
+                'source': 'Google Play'}
+        check_play.return_value = {'app': play}, {'missing': 'Listing unavailable'}
+        state, changed, notify = monitor.update_state(apps, old, ['play-only'])
+        check_play.assert_called_once_with({'app', 'missing'})
+        self.assertTrue(notify)
+        self.assertEqual(changed, {'app', 'missing'})
+        self.assertEqual(state['latest'], old['latest'])
+        self.assertEqual(state['errors'], {})
+        body = monitor.message(apps, old, state, changed)
+        self.assertIn('(APKMirror) | [2.0](https://play.google.com/store/apps/details?id=app)', body)
+        self.assertIn('| missing (1.0) | — | Version unavailable |', body)
+        self.assertEqual(monitor.update_state(apps, state, ['play-only']), (state, set(), False))
+
+        check_play.return_value = {}, {'app': 'HTTP 503', 'missing': 'Listing unavailable'}
+        failed, changed, notify = monitor.update_state(apps, state, ['play-only'])
+        self.assertEqual((changed, notify), ({'app'}, True))
+        self.assertEqual(failed['play']['latest'], {'app': play})
+        check_play.return_value = {'app': play}, {'missing': 'Listing unavailable'}
+        self.assertEqual(monitor.update_state(apps, failed, ['play-only']), (state, {'app'}, True))
 
     @patch.object(monitor, 'api')
     def test_state_comes_from_bot_comments_and_covers_all_pages(self, api):

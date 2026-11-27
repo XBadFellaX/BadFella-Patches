@@ -1,5 +1,6 @@
 """Daily upstream discovery; notification state lives in the issue's bot comments."""
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import json
@@ -86,10 +87,32 @@ def play_latest(data, package):
     # shortcut: public ds:5 layout from google-play-scraper; review its mapping if Play changes the page.
     details = json.JSONDecoder().raw_decode(html[match.end():])[0]
     version = details[1][2][140][0][0][0]
-    if not isinstance(version, str) or not re.fullmatch(r'\d+(?:\.\d+)+', version):
-        raise ValueError('Google Play did not expose a numeric app version')
-    return {'order': [int(part) for part in version.split('.')], 'title': version,
+    if not isinstance(version, str) or not version.strip() or version == 'Varies with device':
+        raise ValueError('Google Play did not expose an app version')
+    order = [int(part) for part in version.split('.')] if re.fullmatch(r'\d+(?:\.\d+)*', version) else None
+    return {'order': order, 'title': version,
             'url': 'https://play.google.com/store/apps/details?id=' + package, 'source': 'Google Play'}
+
+
+def check_play(packages):
+    def check(package):
+        try:
+            url = 'https://play.google.com/store/apps/details?id=' + package + '&hl=en_US&gl=US'
+            return play_latest(request(url), package), None
+        except urllib.error.HTTPError as error:
+            return None, 'Listing unavailable' if error.code == 404 else f'HTTP {error.code}'
+        except (urllib.error.URLError, ValueError, KeyError, TypeError, IndexError, TimeoutError) as error:
+            return None, type(error).__name__
+
+    found, errors = {}, {}
+    packages = sorted(packages)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for package, (item, error) in zip(packages, pool.map(check, packages)):
+            if error is None:
+                found[package] = item
+            else:
+                errors[package] = error
+    return found, errors
 
 
 def collect(apps, play_packages=()):
@@ -109,12 +132,9 @@ def collect(apps, play_packages=()):
             found[package] = mirror_latest(request('https://www.apkmirror.com/apk/' + FEEDS[package] + '/feed/'), FEEDS[package])
         except (urllib.error.URLError, ValueError, KeyError, TypeError, TimeoutError, ET.ParseError) as error:
             errors[package] = type(error).__name__
-    for package in apps.keys() & play_packages:
-        try:
-            url = 'https://play.google.com/store/apps/details?id=' + package + '&hl=en_US&gl=US'
-            found[package] = play_latest(request(url), package)
-        except (urllib.error.URLError, ValueError, KeyError, TypeError, IndexError, TimeoutError) as error:
-            errors[package] = type(error).__name__
+    play_found, play_errors = check_play(apps.keys() & play_packages)
+    found.update(play_found)
+    errors.update(play_errors)
     return found, errors
 
 
@@ -124,7 +144,11 @@ def advance(previous, found, errors):
     for package, item in found.items():
         old = latest.get(package)
         # Source order is comparable only within one provider; a provider switch establishes a new baseline.
-        if old is None or old['source'] != item['source'] or item['order'] > old['order']:
+        if old and old['source'] == item['source'] and old['order'] is not None and item['order'] is not None:
+            is_new = item['order'] > old['order']
+        else:
+            is_new = old is None or item['source'] != old['source'] or item['title'] != old['title']
+        if is_new:
             latest[package] = item
             changed.append(package)
     state = {'latest': latest, 'errors': errors}
@@ -132,25 +156,48 @@ def advance(previous, found, errors):
     return state, changed, notify
 
 
+def update_state(apps, previous, play_packages):
+    found, errors = collect(apps, play_packages)
+    state, changed, notify = advance(previous, found, errors)
+    play_found, play_errors = check_play(apps.keys() - set(play_packages))
+    old_play = previous.get('play', {})
+    state['play'], play_changed, play_notify = advance(old_play, play_found, play_errors)
+    availability_changed = {p for p in old_play.get('errors', {}).keys() | play_errors.keys()
+                            if old_play.get('errors', {}).get(p) != play_errors.get(p)}
+    changed = (set(changed) | set(play_changed) | availability_changed) & apps.keys()
+    return state, changed, notify or play_notify
+
+
 def text(value):
     return str(value).replace('\n', ' ').replace('|', '\\|').replace('`', '').replace('@', '@\u200b')
 
 
 def message(apps, previous, state, changed):
+    play = state.get('play', {})
+    play_errors = play.get('errors', {})
     lines = ['@XBadFellaX', '', 'App update watch: ' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'), '',
-             'Starting snapshot. Future alerts report new listings since this check.' if not previous else 'New listings or a change in source availability.', '',
-             '| Catalog | App (worked-on version) | Source listing |', '| --- | --- | --- |']
+             'Starting snapshot. Future alerts report listing changes since this check.' if not previous else 'Listing or source availability changes.', '',
+             '| Catalog | App (worked-on version) | Mirror listing | Google Play (US) |', '| --- | --- | --- | --- |']
     for package in sorted(changed):
-        item = state['latest'][package]
+        item = state['latest'].get(package)
+        play_item = play.get('latest', {}).get(package)
+        if item and item['source'] == 'Google Play':
+            item, play_item = None, item
+        mirror_link = f"[{text(item['title'])}]({item['url']}) ({item['source']})" if item else '—'
+        play_link = f"[{text(play_item['title'])}]({play_item['url']})" if play_item else '—'
+        if package in play_errors:
+            play_link = 'Version unavailable'
+            if play_errors[package] != 'Listing unavailable':
+                play_link = f'[{play_link}](https://play.google.com/store/apps/details?id={package})'
         lines.append(f"| {text(apps[package]['catalog'])} | {text(apps[package]['name'])} ({text(apps[package]['supported'])}) | "
-                     f"[{text(item['title'])}]({item['url']}) ({item['source']}) |")
+                     f'{mirror_link} | {play_link} |')
     if not changed:
-        lines.append('| | No new listings | |')
+        lines.append('| | No new listings | | |')
     if state['errors']:
         lines += ['', 'Could not check: ' + '; '.join(text(apps[p]['name']) + ' (' + e + ')' for p, e in sorted(state['errors'].items()))]
     elif previous.get('errors'):
-        lines += ['', 'All sources are responding again.']
-    lines += ['', 'Bracketed versions identify reviewed inputs or declared patch targets, not phone-test certification. Listings include beta releases. Availability does not establish patch compatibility; no APKs or patches are changed.',
+        lines += ['', 'Primary sources are responding again.']
+    lines += ['', 'Worked-on versions identify reviewed inputs or declared patch targets. Mirror listings can include betas. Google Play availability varies by region, device and rollout.',
               '', MARKER + json.dumps(state, separators=(',', ':')) + '\n-->']
     return '\n'.join(lines)
 
@@ -189,14 +236,14 @@ def main():
     if not args.dry_run and args.catalog_name == 'Private' and not api('')['private']:
         raise ValueError('Update notifications must stay in a private repository')
     previous = {} if args.dry_run else previous_state(issue)
-    found, errors = collect(apps, args.play_package)
-    state, changed, notify = advance(previous, found, errors)
+    state, changed, notify = update_state(apps, previous, args.play_package)
+    errors = state['errors']
     body = message(apps, previous, state, changed)
     if args.dry_run:
         print(body)
     elif notify:
         api(f'/issues/{issue}/comments', {'body': body})
-        print(f'Posted {len(changed)} listing(s), {len(errors)} source error(s)')
+        print(f"Posted {len(changed)} app(s), {len(errors)} primary source error(s), {len(state['play']['errors'])} additional Play version(s) unavailable")
     else:
         print('No new listings or changes in source availability; no notification sent')
     if errors:
