@@ -109,12 +109,14 @@ def source_contracts(root=ROOT):
             raise ValueError("Unsupported fingerprint declaration in " + path.name)
         for match in found:
             body, _ = balanced(text, match.end() - 1)
-            attrs = named(body, {"definingClass", "name", "returnType", "parameters", "filters", "accessFlags"})
+            attrs = named(body, {"definingClass", "name", "returnType", "parameters", "filters", "accessFlags", "strings"})
             spec = {"id": match[1], "source": path.relative_to(root).as_posix(), "calls": [], "fields": []}
             for key, target in [("definingClass", "owner"), ("name", "name"), ("returnType", "return")]:
                 if key in attrs: spec[target] = literal(attrs[key])
             if "parameters" not in attrs: raise ValueError("Fingerprint parameters must be explicit")
             spec["params"] = string_list(attrs["parameters"])
+            if "strings" in attrs:
+                spec["string_hashes"] = [digest(value.encode("utf-8")) for value in string_list(attrs["strings"])]
             spec["flags"] = 0
             if "accessFlags" in attrs:
                 flags_body, _ = balanced(attrs["accessFlags"], attrs["accessFlags"].index("("))
@@ -286,6 +288,7 @@ def ref_matches(reference, spec, field=False):
 def fingerprint_matches(method, spec):
     return (all(method[k] == spec[k] for k in ("owner", "name", "return", "params") if k in spec)
             and method["flags"] & spec["flags"] == spec["flags"]
+            and all(value in method.get("string_hashes", ()) for value in spec.get("string_hashes", ()))
             and all(any(ref_matches(c, rule) for c in method["calls"]) for rule in spec["calls"])
             and all(any(ref_matches(c, rule, True) for c in method["fields"]) for rule in spec["fields"]))
 

@@ -20,6 +20,12 @@ result = json.loads(args.result.read_text())
 assert result['success'] and not result['failedPatches'], result
 expected_patches = 4
 assert len(result['appliedPatches']) == expected_patches, result
+latest = result['packageVersion'] == '8.3.1.1'
+reminder_guards = {('Leo;', 'i')} if latest else {('Ljd/d;', 'h'), ('Lbo;', 'i')}
+analytics_provider = 'Lz24;' if latest else 'Lc24;'
+privacy_gate = {'8.3.0.2': 'Lov8;', '8.3.1.1': 'Loy8;'}.get(result['packageVersion'])
+firebase_client = 'Lcom/google/firebase/installations/remote/FirebaseInstallationServiceClient;'
+checked_classes = {owner for owner, _ in reminder_guards} | {analytics_provider, privacy_gate, firebase_client}
 
 manifest = subprocess.check_output(
     [str(SDK / 'aapt2.exe'), 'dump', 'xmltree', '--file', 'AndroidManifest.xml', str(APK)],
@@ -49,6 +55,7 @@ for name, value in [('firebase_analytics_collection_enabled', 'false'),
 
 classes = Counter()
 reminder_guard_checked = False
+privacy_gate_checked = False
 legacy_analytics_checked = False
 firebase_certificate_checked = False
 with zipfile.ZipFile(APK) as archive:
@@ -73,12 +80,9 @@ with zipfile.ZipFile(APK) as archive:
             string_index = struct.unpack_from('<I', data, type_offset + 4 * type_index)[0]
             descriptor = string(string_index)
             classes[descriptor] += 1
-            if descriptor not in ['Ljd/d;', 'Lbo;', 'Lc24;',
-                                  'Lcom/google/firebase/installations/remote/FirebaseInstallationServiceClient;']:
+            if descriptor not in checked_classes:
                 continue
 
-            # The runtime regression is in this scheduler's h()Z guard in build 8240, its
-            # i()Z equivalent in 8.3.0.1 and the same Lbo.i()Z guard in 8.3.0.2.
             offset = struct.unpack_from('<I', data, class_offset + index * 32 + 24)[0]
 
             def read_uleb(position):
@@ -107,11 +111,14 @@ with zipfile.ZipFile(APK) as archive:
                     _, offset = read_uleb(offset)
                     code_offset, offset = read_uleb(offset)
                     name_index = struct.unpack_from('<I', data, method_offset + method_index * 8 + 4)[0]
-                    if ((descriptor == 'Ljd/d;' and string(name_index) == 'h')
-                            or (descriptor == 'Lbo;' and string(name_index) == 'i')):
+                    method_name = string(name_index)
+                    if (descriptor, method_name) in reminder_guards:
                         assert code_offset and data[code_offset + 16:code_offset + 20] == bytes([0x12, 0, 0x0f, 0]), 'Reminder guard must return false'
                         reminder_guard_checked = True
-                    if descriptor == 'Lc24;' and string(name_index) == '<init>':
+                    if descriptor == privacy_gate and method_name == 'd':
+                        assert code_offset and data[code_offset + 16:code_offset + 20] == bytes([0x12, 0x10, 0x0f, 0]), 'Reminder privacy gate must return true'
+                        privacy_gate_checked = True
+                    if descriptor == analytics_provider and method_name == '<init>':
                         assert code_offset, 'Legacy analytics constructor has no code'
                         registers, incoming = struct.unpack_from('<HH', data, code_offset)
                         opcode, callee, arguments, end = struct.unpack_from('<HHHH', data, code_offset + 16)
@@ -120,7 +127,7 @@ with zipfile.ZipFile(APK) as archive:
                         callee_type_name = struct.unpack_from('<I', data, type_offset + callee_class * 4)[0]
                         assert string(callee_type_name) == 'Ljava/lang/Object;' and string(callee_name) == '<init>', 'Wrong legacy analytics superclass constructor'
                         legacy_analytics_checked = True
-                    if descriptor.endswith('/FirebaseInstallationServiceClient;') and string(name_index) == 'getFingerprintHashForPackage':
+                    if descriptor == firebase_client and method_name == 'getFingerprintHashForPackage':
                         assert code_offset, 'Firebase certificate lookup has no code'
                         opcode, certificate_string, end = struct.unpack_from('<HHH', data, code_offset + 16)
                         assert opcode == 0x001a and end == 0x0011, 'Firebase certificate lookup must return the scoped certificate header'
@@ -129,6 +136,7 @@ with zipfile.ZipFile(APK) as archive:
 
 assert classes and all(count == 1 for count in classes.values()), 'Duplicate DEX classes'
 assert reminder_guard_checked, 'Reminder guard was not checked'
+assert privacy_gate is None or privacy_gate_checked, 'Reminder privacy gate was not checked'
 assert legacy_analytics_checked, 'Legacy analytics initialization was not checked'
 assert firebase_certificate_checked, 'Firebase certificate header was not checked'
 assert 'Lapp/badfella/extension/ticktick/PushSignatureSpoof;' in classes

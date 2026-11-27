@@ -1,3 +1,7 @@
+## 1.8.0-dev.9 (2026-11-26)
+
+- **TickTick:** Add support for 8.3.1.1 (build 8311) across all four patches. Keep support for 8.3.0.2.
+
 ## 1.8.0-dev.8 (2026-11-26)
 
 - **BoldVoice:** Fix a startup error on 5.1.3 (build 470) when Disable upgrade nudges is enabled.

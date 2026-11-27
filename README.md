@@ -23,7 +23,7 @@ Startup integrity checks, Pro screen labels and physical USB operations are unve
 1. Install [Morphe Manager](https://github.com/MorpheApp/morphe-manager/releases/latest) **2.2.0 or later**.
 2. On your phone, tap **Add to Morphe** above and add the source.
 3. Open the app in Manager. Refresh Sources if it is missing; enable **Settings → Expert settings → Expert Mode** if needed for custom app selection. Enable pre-releases in the source settings to use development previews.
-4. Select the unmodified **TickTick 8.3.0.1 APK**, **Emby for Android 3.5.79 APK (ARM64 or ARMv7)**, **Remote for Android TV 6.1.0 APKM**, **Pep Talk 2.31.0 XAPK**, **Wanderlog 2.227/2.228 APKM** or **Torrent Search Revolution V2 2.3.5 APKS**, choose the patches below, then patch and install.
+4. Select the unmodified **TickTick 8.3.1.1 or 8.3.0.2 APK bundle**, **Emby for Android 3.5.79 APK (ARM64 or ARMv7)**, **Remote for Android TV 6.1.0 APKM**, **Pep Talk 2.31.0 XAPK**, **Wanderlog 2.227/2.228 APKM** or **Torrent Search Revolution V2 2.3.5 APKS**, choose the patches below, then patch and install.
 5. For updates, refresh this source and patch again using the **same Manager signing key** to preserve app data.
 
 Manual import: download the `.mpp` from [Releases](https://github.com/XBadFellaX/BadFella-Patches/releases/latest) and add it in Manager's **Sources** screen.
@@ -159,9 +159,9 @@ app data. Upstream attribution is in `NOTICE`.
 
 **🎯 Supported versions:**
 
-| 8.3.0.2 |
-| :---: |
-| Version 8.3.0.2, build 8302. | Any version (experimental). Every patch verifies its own anchors. |
+| 8.3.0.2 | 8.3.1.1 | Any version (experimental) |
+| :---: | :---: | :---: |
+| Version 8.3.0.2, build 8302. | Version 8.3.1.1, build 8311. | Every patch verifies its own anchors. |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|

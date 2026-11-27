@@ -74,6 +74,14 @@ class UpdateCheckTests(unittest.TestCase):
         current["methods"] = {changed["id"]: changed}
         self.assertIn("MISSING", self.statuses(current))
 
+    def test_string_anchor_requires_the_exact_constant(self):
+        actual = check.source_contracts()
+        spec = next(entry for entry in actual["fingerprints"] if entry["id"] == "CheckPrivacyPolicyConfirmedFingerprint")
+        matching = check.digest(b"agree_service_and_privacy_policy")
+        other = check.digest(b"show_service_and_privacy_policy")
+        self.assertTrue(check.fingerprint_matches(method(string_hashes=[matching]), spec))
+        self.assertFalse(check.fingerprint_matches(method(string_hashes=[other]), spec))
+
     def test_signer_version_resources_and_capabilities(self):
         current = copy.deepcopy(self.inventory)
         current["artifact"].update(version="9.0.0", certificate_sha1=["B" * 40])

@@ -11,10 +11,8 @@ object Constants {
         apkFileType = ApkFileType.APKM,
         appIconColor = 0x4870F8,
         targets = listOf(
-            // 8.3.0.2 renamed the reminder privacy gate's class (Ltv8 -> Lov8). The previous
-            // 8.3.0.1 build is served by the older bundle; declaring it here would offer a
-            // version whose reminder gate no longer resolves.
             AppTarget(version = "8.3.0.2", versionCode = 8302, description = "Version 8.3.0.2, build 8302."),
+            AppTarget(version = "8.3.1.1", versionCode = 8311, description = "Version 8.3.1.1, build 8311."),
             // Every patch resolves its own class, method and instruction anchors rather than
             // offsets, so later TickTick builds can be patched without a version pin. Morphe
             // flags this target as experimental and each patch fails closed on a changed anchor.

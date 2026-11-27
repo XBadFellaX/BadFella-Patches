@@ -8,15 +8,12 @@ import app.morphe.patcher.util.returnEarly
 import app.badfella.patches.ticktick.shared.Constants.COMPATIBILITY_TICKTICK
 import com.android.tools.smali.dexlib2.AccessFlags
 
-// SettingsPreferencesHelper.checkPrivacyPolicyConfirmed moved into the obfuscated
-// preferences class in 8.3.0.1 (Ltv8) and R8 renamed that class to Lov8 in 8.3.0.2.
-// Its callers are unchanged: process start, the broadcast receivers, push and both
-// alert receivers still gate on this method.
+// R8 renames the preferences class between builds. The confirmation key and
+// boolean signature still identify the gate used by process startup and alerts.
 object CheckPrivacyPolicyConfirmedFingerprint : Fingerprint(
-    definingClass = "Lov8;",
-    name = "d",
     returnType = "Z",
     parameters = emptyList(),
+    strings = listOf("agree_service_and_privacy_policy"),
 )
 
 // Reminder scheduler anti-mod consistency guard. It builds a blank User and

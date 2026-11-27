@@ -50,7 +50,8 @@ class DexInventory {
         out.put("flags", m.getAccessFlags()); out.put("calls", calls(m));
         out.put("callers", callers.stream().limit(8).toList());
         out.put("caller_count", callers.size()); out.put("callers_hash", hash(String.join("\n", callers)));
-        Set<String> fields = new TreeSet<>(); Map<String,Integer> ops = new TreeMap<>();
+        Set<String> fields = new TreeSet<>(), stringHashes = new TreeSet<>();
+        Map<String,Integer> ops = new TreeMap<>();
         StringBuilder body = new StringBuilder();
         if (m.getImplementation() != null) {
             body.append("registers:").append(m.getImplementation().getRegisterCount());
@@ -64,7 +65,13 @@ class DexInventory {
                 if (i instanceof ReferenceInstruction r) {
                     var ref = r.getReference();
                     // Hash constants in place: a changed key/URL changes the body hash without exposing it.
-                    body.append(":ref:").append(ref instanceof StringReference s ? hash(s.getString()) : ref.toString());
+                    if (ref instanceof StringReference s) {
+                        String hashed = hash(s.getString());
+                        stringHashes.add(hashed);
+                        body.append(":ref:").append(hashed);
+                    } else {
+                        body.append(":ref:").append(ref);
+                    }
                     if (ref instanceof FieldReference f) fields.add(f.getDefiningClass()+"->"+f.getName()+":"+f.getType());
                 }
                 if (i instanceof DualReferenceInstruction r) body.append(":ref2:").append(r.getReference2());
@@ -79,6 +86,7 @@ class DexInventory {
                 for (var h:t.getExceptionHandlers()) body.append(':').append(h.getExceptionType()).append(':').append(h.getHandlerCodeAddress());
             }
         }
+        if (!stringHashes.isEmpty()) out.put("string_hashes", stringHashes);
         out.put("fields", fields); out.put("ops", ops);
         out.put("body", m.getImplementation() == null ? null : hash(body.toString()));
         return out;
