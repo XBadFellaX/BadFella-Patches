@@ -1,3 +1,7 @@
+## 1.8.0-dev.7 (2026-11-26)
+
+- **Emby:** Verify both existing patches with Emby for Android 3.5.79 (build 300005793) on ARM64 and ARMv7.
+
 ## 1.8.0-dev.6 (2026-11-26)
 
 - **BoldVoice:** Restrict support to 5.1.3 build 470 (ARM64 APKS) and drop the 5.3.6 build 499 target from both patches. 5.3.6 keeps the PairIP native VM running for its hoisted strings, so the license and Play Store screen cannot be neutralized from Java alone; it now reports as incompatible instead of producing a build that crashes on launch. Add a new `Disable upgrade nudges` patch (enabled by default) that bypasses the `RootContainer` force-update gate so 5.1.3 installs keep working without the forced-update lockout screen.
