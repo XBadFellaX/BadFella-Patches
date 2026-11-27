@@ -1,9 +1,11 @@
 """Compare app versions and keep the monitoring issue's dashboard current."""
 import argparse
+from base64 import b64decode
 from concurrent.futures import ThreadPoolExecutor
 from email.message import EmailMessage
 from email.utils import parsedate_to_datetime
 from functools import partial
+from html import unescape
 import json
 import os
 from pathlib import Path
@@ -13,7 +15,7 @@ import ssl
 from threading import Lock
 from time import monotonic, sleep
 import urllib.error
-from urllib.parse import quote
+from urllib.parse import quote, urlencode, urlsplit
 import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
@@ -21,9 +23,14 @@ import xml.etree.ElementTree as ET
 MARKER = '<!-- badfella-app-update-dashboard -->'
 EMAIL_PENDING = '<!-- badfella-app-update-email-pending -->'
 USER_AGENT = 'BadFella-App-Updates/1.0'
-SOURCES = ('APKMirror', 'APKPure', 'Google Play')
+PRIMARY_SOURCES = ('APKMirror', 'APKPure', 'Google Play')
+SOURCES = (*PRIMARY_SOURCES, 'APKCube', 'Uptodown', 'APKCombo', 'Aptoide',
+           'F-Droid', 'IzzyOnDroid', 'GitHub', 'GitLab')
 SOURCE_ERRORS = (OSError, ValueError, KeyError, TypeError, IndexError, ET.ParseError)
-PRERELEASE = re.compile(r'(?<![a-z])(?:alpha|beta|rc|release[ -]candidate|preview|canary|nightly)(?![a-z])', re.I)
+PRERELEASE = re.compile(
+    r'(?<![a-z])(?:alpha|beta|rc|release[ -]candidate|preview|canary|nightly|dev|snapshot|pre[ -]?release)(?![a-z])',
+    re.I,
+)
 MIRROR_SEARCH_LOCK = Lock()
 next_mirror_search = 0.0
 FEEDS = {
@@ -38,12 +45,12 @@ FEEDS = {
 }
 
 
-def request(url, data=None, headers=None, method=None):
+def request(url, data=None, headers=None, method=None, timeout=15):
     headers = {'User-Agent': USER_AGENT, **(headers or {})}
     if data is not None:
         headers['Content-Type'] = 'application/json'
         data = json.dumps(data).encode()
-    with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=30) as response:
+    with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=timeout) as response:
         return response.read()
 
 
@@ -56,13 +63,45 @@ def catalog_apps(catalog, catalog_name='Public', reviewed_versions=None):
     apps = {}
     for patch in catalog['patches']:
         for app in patch.get('compatiblePackages') or []:
+            package = app['packageName']
             targets = [t['version'] for t in app['targets'] if t.get('version')]
-            apps[app['packageName']] = {'name': app['name'], 'catalog': catalog_name,
-                                       'supported': reviewed_versions.get(app['packageName']) or
-                                       (targets[-1] if targets else 'version not recorded')}
+            row = apps.setdefault(package, {'name': app['name'], 'catalog': catalog_name, 'target': None})
+            declared = max(reversed(targets), key=version_key, default=None)
+            if declared and (not row['target'] or version_key(declared) >= version_key(row['target'])):
+                row['target'] = declared
+    for package, row in apps.items():
+        row['supported'] = row['target'] or reviewed_versions.get(package) or 'version not recorded'
     if not apps:
         raise ValueError('Catalog has no apps')
     return apps
+
+
+def published_dev_catalog(stable_version):
+    """Use the tagged catalog for the preview currently offered by the Manager source."""
+    def read_manifest(path):
+        return json.loads(b64decode(api(path)['content'], validate=False))
+
+    try:
+        manifest = read_manifest('/contents/patches-bundle.json?ref=dev')
+        version = manifest['version']
+        if not re.fullmatch(r'\d+\.\d+\.\d+-dev\.\d+', version):
+            return None
+        if version_key(version.split('-')[0]) <= version_key(stable_version):
+            return None
+        tag = 'v' + version
+        release = api(f'/releases/tags/{tag}')
+        asset_url = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/{tag}/patches-{version}.mpp"
+        if (release['tag_name'] != tag or release['draft'] or not release['prerelease']
+                or manifest['download_url'] != asset_url
+                or not any(asset['state'] == 'uploaded' and asset['browser_download_url'] == asset_url
+                           for asset in release['assets'])):
+            return None
+        catalog = read_manifest(f'/contents/patches-list.json?ref={tag}')
+        return catalog if catalog['version'] == version else None
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return None
+        raise
 
 
 def mirror_latest(data, path):
@@ -156,7 +195,87 @@ def mirror_listing(package, feed):
     return mirror_latest(request(f'{origin}/apk/{feed}/feed/'), feed)
 
 
-def collect(apps, feeds):
+def cube_listing(package):
+    card = ET.fromstring(request(f'https://apkcube.com/embed/card/{package}'))
+    for node in card.findall('.//{*}text'):
+        match = re.search(r'·\s+v(.+)$', node.text or '')
+        if match:
+            return stable_listing(match[1].strip(), f'https://apkcube.com/apk-downloader?url={package}')
+    return {'status': 'Version unavailable'}
+
+
+def aptoide_listing(package):
+    url = f'https://ws75.aptoide.com/api/7/app/get/not_apk_tags=alpha,beta/package_name={package}'
+    app = json.loads(request(url))['nodes']['meta']['data']
+    if app['package'] != package:
+        raise ValueError('Aptoide returned a different package')
+    file = app['file']
+    if file.get('malware', {}).get('rank') != 'TRUSTED':
+        return {'status': 'Unverified upload'}
+    page = app['urls']['w']
+    parts = urlsplit(page)
+    if parts.scheme != 'https' or not (parts.hostname or '').endswith('.aptoide.com'):
+        raise ValueError('Aptoide returned an unexpected listing')
+    return stable_listing(file['vername'], page)
+
+
+def fdroid_listing(package, api_base, listing_base):
+    index = json.loads(request(f'{api_base}/api/v1/packages/{package}'))
+    if index['packageName'] != package:
+        raise ValueError('Repository returned a different package')
+    suggested = index.get('suggestedVersionCode')
+    candidate = next((item for item in index['packages'] if str(item['versionCode']) == str(suggested)), None)
+    return stable_listing(candidate['versionName'] if candidate else None, f'{listing_base}/{package}/')
+
+
+def uptodown_listing(package):
+    # shortcut: use the public website and verify each result's package field.
+    search = request('https://en.uptodown.com/android/search?' + urlencode({'query': package})).decode()
+    found = re.findall(r"(https://[a-z0-9-]+\.en\.uptodown\.com/android)';addEventAnalytics\('search'", search)
+    for url in list(dict.fromkeys(found))[:3]:
+        html = request(url).decode()
+        if not re.search(r'<td>\s*' + re.escape(package) + r'\s*</td>', html):
+            continue
+        version = re.search(r'"softwareVersion"\s*:\s*"([^"]+)"', html)
+        return stable_listing(unescape(version[1]) if version else None, url)
+    return {'status': 'No listing found'}
+
+
+def combo_listing(package):
+    # shortcut: accept candidates from APKCombo only when their URL carries the exact package.
+    origin = 'https://apkcombo.com'
+    html = request(f'{origin}/search/{package}').decode()
+    match = re.search(r'href="(' + re.escape(origin) + r'/[\w-]+/' + re.escape(package) + r'/)"', html)
+    if not match:
+        return {'status': 'No listing found'}
+    url = match[1]
+    html = request(url).decode()
+    version = re.search(r'<dt>Version</dt>\s*<dd[^>]*>\s*<bdi[^>]*>([^<]+)', html)
+    return stable_listing(unescape(version[1]) if version else None, url)
+
+
+def repository_listing(source, project):
+    if not project:
+        return {'status': 'No official repository mapped'}
+    asset_pattern = re.compile(r'\.(apk|apks|xapk|apkm)$', re.I)
+    if source == 'GitHub':
+        releases = json.loads(request(f'https://api.github.com/repos/{project}/releases?per_page=10'))
+        candidates = [(release['tag_name'], release['html_url']) for release in releases
+                      if not release['draft'] and not release['prerelease']
+                      and any(asset['state'] == 'uploaded' and asset_pattern.search(asset['name'])
+                              for asset in release['assets'])]
+    else:
+        releases = json.loads(request(f'https://gitlab.com/api/v4/projects/{quote(project, safe="")}/releases?per_page=10'))
+        candidates = [(release['tag_name'], f'https://gitlab.com/{project}/-/releases/{quote(release["tag_name"], safe="")}')
+                      for release in releases if not release.get('upcoming_release')
+                      and any(asset_pattern.search(urlsplit(asset['url']).path) or asset_pattern.search(asset['name'])
+                              for asset in release['assets']['links'])]
+    listings = [stable_listing(tag.removeprefix('v'), url) for tag, url in candidates]
+    return max((item for item in listings if item.get('version')), key=lambda item: version_key(item['version']),
+               default={'status': 'No stable APK release found'})
+
+
+def collect(apps, feeds, github_repos=None, gitlab_repos=None):
     packages = sorted(apps)
     try:
         pure = pure_latest(packages)
@@ -164,26 +283,41 @@ def collect(apps, feeds):
         print(f'APKPure check failed ({type(error).__name__})')
         pure = dict.fromkeys(packages, {'status': 'Check failed'})
 
-    def check(package):
-        sources = {'APKPure': pure.get(package, {'status': 'No listing found'})}
-        for source, probe in (('APKMirror', partial(mirror_listing, package, feeds.get(package))),
-                              ('Google Play', partial(play_listing, package))):
-            try:
-                sources[source] = probe()
-            except urllib.error.HTTPError as error:
-                print(f'{source} check failed for {package} (HTTP {error.code})')
-                sources[source] = {'status': 'Rate limited' if error.code == 429 else 'Check failed'}
-            except SOURCE_ERRORS as error:
-                print(f'{source} check failed for {package} ({type(error).__name__})')
-                sources[source] = {'status': 'Check failed'}
-        return package, sources
+    probes = {
+        'Google Play': play_listing,
+        'APKCube': cube_listing,
+        'Uptodown': uptodown_listing,
+        'APKCombo': combo_listing,
+        'Aptoide': aptoide_listing,
+        'F-Droid': partial(fdroid_listing, api_base='https://f-droid.org', listing_base='https://f-droid.org/packages'),
+        'IzzyOnDroid': partial(fdroid_listing, api_base='https://apt.izzysoft.de/fdroid', listing_base='https://apt.izzysoft.de/packages'),
+        'GitHub': lambda package: repository_listing('GitHub', (github_repos or {}).get(package)),
+        'GitLab': lambda package: repository_listing('GitLab', (gitlab_repos or {}).get(package)),
+        'APKMirror': lambda package: mirror_listing(package, feeds.get(package)),
+    }
 
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        return dict(pool.map(check, packages))
+    def check(source, package):
+        try:
+            return probes[source](package)
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                return {'status': 'No listing found'}
+            print(f'{source} check failed for {package} (HTTP {error.code})')
+            return {'status': 'Rate limited' if error.code == 429 else 'Check failed'}
+        except SOURCE_ERRORS as error:
+            print(f'{source} check failed for {package} ({type(error).__name__})')
+            return {'status': 'Check failed'}
+
+    listings = {package: {'APKPure': pure.get(package, {'status': 'No listing found'})} for package in packages}
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        checked = {(package, source): pool.submit(check, source, package) for package in packages for source in probes}
+        for (package, source), future in checked.items():
+            listings[package][source] = future.result()
+    return listings
 
 
 def version_key(version):
-    match = re.fullmatch(r'(\d+(?:\.\d+)*)(?:\s*(alpha|beta|rc)\s*(\d*))?', version, re.I)
+    match = re.fullmatch(r'v?(\d+(?:\.\d+)*)(?:\s*(alpha|beta|rc)\s*(\d*))?', version, re.I)
     if not match:
         return ()
     numbers = tuple(map(int, match[1].split('.')))
@@ -194,7 +328,7 @@ def version_key(version):
 
 
 def compare(package, listings, worked_on):
-    available = [(source, listings[source]) for source in SOURCES if listings[source].get('version')]
+    available = [(source, listings[source]) for source in SOURCES if listings.get(source, {}).get('version')]
     if not available:
         return None, [], 'No version available', 2
     versions = {listing['version'] for _, listing in available}
@@ -224,37 +358,61 @@ def text(value):
             .replace('\n', ' ').replace('\r', ' ').replace('`', '').replace('@', '@\u200b'))
 
 
-def dashboard(apps, listings_by_package, catalog_name):
+def dashboard(apps, listings_by_package, catalog_name, dev_catalog=None):
     sections = ('Newer builds to review', 'Needs review', 'Other source comparisons')
     rows = [[], [], []]
+    dev_apps = catalog_apps(dev_catalog, catalog_name) if dev_catalog else {}
+    coverage = []
     for package, app in sorted(apps.items(), key=lambda pair: pair[1]['name'].casefold()):
         listings = listings_by_package[package]
         selected, winners, status, section = compare(package, listings, app['supported'])
-        cells = [f"**{text(app['name'])}**", text(app['supported'])]
+        stable_target = app.get('target')
+        dev_target = dev_apps.get(package, {}).get('target')
+        stable_label = stable_target or ('Unpinned · reviewed ' + app['supported']
+                                         if app['supported'] != 'version not recorded' else 'Unpinned')
+        dev_label = '—'
+        if dev_apps and package not in dev_apps:
+            dev_label = 'Not listed'
+        elif package in dev_apps and dev_target != stable_target:
+            dev_label = dev_target or 'Unpinned'
+        cells = [f"**{text(app['name'])}**", text(stable_label), text(dev_label)]
+        shown_sources = []
+        unavailable = []
         for source in SOURCES:
-            item = listings[source]
-            version = text(item.get('version') or item.get('status') or 'Version unavailable')
-            cells.append(f'**{version}**' if source in winners else version)
+            item = listings.get(source, {})
+            if item.get('version'):
+                result = f"{source} {text(item['version'])}"
+                shown_sources.append(f'**{result}**' if source in winners else result)
+            elif item.get('status') and item['status'] != 'No official repository mapped':
+                unavailable.append(f"{source} · {text(item['status'])}")
         if selected:
             item = listings[selected]
             label = f"{selected} · {text(item['version'])}"
-            tie = ' · all three tied' if len(winners) == 3 else ' · tied' if len(winners) == 2 else ''
+            tie = f' · {len(winners)} tied' if len(winners) > 1 else ''
             partial_check = ' · partial check' if any(item.get('status') in {'Check failed', 'Rate limited'}
                                                       for item in listings.values()) else ''
             cells.append(f"**[{label}]({item['url']})**{tie}{partial_check}")
         else:
             cells.append(status.removeprefix('Needs review · '))
+        cells.append('<br>'.join(shown_sources) or '—')
         rows[section].append('| ' + ' | '.join(cells) + ' |')
+        if unavailable:
+            coverage.append(f"| {text(app['name'])} | " + '<br>'.join(unavailable) + ' |')
 
     lines = [MARKER, f'## App update watch · {catalog_name}', '',
-             'Latest available listings for the patch catalog. Worked-on versions are reviewed inputs or declared targets.', '']
+             'Upstream comparisons use stable app listings. A dev target is shown when the published preview differs from stable.', '']
     for heading, group in zip(sections, rows):
         if group:
             lines.extend((f'### {heading}', '',
-                          '| App | Worked on | APKMirror | APKPure | Google Play (US) | Latest source |',
-                          '| --- | --- | --- | --- | --- | --- |', *group, ''))
-    lines.extend(('The link goes to the newest comparable listing. Ties prefer APKMirror, then APKPure, then Google Play.',
-                  'Labeled prereleases are excluded. Availability varies by device, region and rollout.', ''))
+                          '| App | Stable target | Dev target | Latest stable source | Source versions |',
+                          '| --- | --- | --- | --- | --- |', *group, ''))
+    lines.extend(('Dev targets belong to published previews and may still be under testing.',
+                  'Labeled prereleases are excluded. Availability varies by device, region and rollout. Google Play uses its US listing.',
+                  'Ties prefer APKMirror, APKPure and Google Play, followed by the other sources in the order listed below.', '',
+                  'Sources · ' + ', '.join(SOURCES) + '. GitHub and GitLab require a verified publisher repository.', ''))
+    if coverage:
+        lines.extend(('<details>', '<summary>Unavailable results and source coverage</summary>', '',
+                      '| App | Other source results |', '| --- | --- |', *coverage, '', '</details>', ''))
     return '\n'.join(lines)
 
 
@@ -311,12 +469,24 @@ def main():
     parser.add_argument('--catalog-name', choices=['Public', 'Private'], default='Public')
     parser.add_argument('--reviewed-versions', type=Path)
     parser.add_argument('--mirror-feed', action='append', default=[], metavar='PACKAGE=DEVELOPER/APP')
+    parser.add_argument('--github-repo', action='append', default=[], metavar='PACKAGE=OWNER/REPO')
+    parser.add_argument('--gitlab-repo', action='append', default=[], metavar='PACKAGE=NAMESPACE/REPO')
+    parser.add_argument('--dev-catalog', type=Path, help='Tagged preview catalog for local dry runs')
     args = parser.parse_args()
     reviewed = json.loads(args.reviewed_versions.read_text(encoding='utf-8')) if args.reviewed_versions else {}
-    apps = catalog_apps(json.loads(args.catalog.read_text(encoding='utf-8')), args.catalog_name, reviewed)
+    catalog = json.loads(args.catalog.read_text(encoding='utf-8'))
+    apps = catalog_apps(catalog, args.catalog_name, reviewed)
     feeds = FEEDS | dict(entry.split('=', 1) for entry in args.mirror_feed)
     if any(not re.fullmatch(r'[\w-]+/[\w-]+', feed) for feed in feeds.values()):
         raise ValueError('Invalid APKMirror feed path')
+    github = dict(entry.split('=', 1) for entry in args.github_repo)
+    gitlab = dict(entry.split('=', 1) for entry in args.gitlab_repo)
+    namespace = r'[\w-][\w.-]*'
+    if (any(not re.fullmatch(f'{namespace}/{namespace}', project) for project in github.values())
+            or any(not re.fullmatch(f'{namespace}(?:/{namespace})+', project) for project in gitlab.values())):
+        raise ValueError('Invalid release repository path')
+    if args.dev_catalog and not args.dry_run:
+        raise ValueError('--dev-catalog is only available with --dry-run')
     issue = os.environ.get('APP_UPDATE_ISSUE', '')
     if not args.dry_run and not issue.isdecimal():
         raise ValueError('APP_UPDATE_ISSUE must identify the monitoring issue')
@@ -326,8 +496,12 @@ def main():
     previous = {} if args.dry_run else api(path)
     if previous and ('pull_request' in previous or previous['title'] != 'Daily upstream app version alerts'):
         raise ValueError('APP_UPDATE_ISSUE points to a different issue')
-    listings = collect(apps, feeds)
-    body = dashboard(apps, listings, args.catalog_name)
+    if args.dry_run:
+        dev_catalog = json.loads(args.dev_catalog.read_text(encoding='utf-8')) if args.dev_catalog else None
+    else:
+        dev_catalog = published_dev_catalog(catalog['version'])
+    listings = collect(apps, feeds, github, gitlab)
+    body = dashboard(apps, listings, args.catalog_name, dev_catalog)
     if args.dry_run:
         print(body)
     else:
