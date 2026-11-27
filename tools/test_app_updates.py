@@ -146,10 +146,12 @@ class UpdateTests(unittest.TestCase):
         ]).encode()
         self.assertEqual(monitor.repository_listing('GitHub', 'owner/app'), listing('2.0', release['html_url']))
 
-    def test_dashboard_shows_dev_difference_and_only_links_stable_winner(self):
+    def test_dashboard_shows_dev_difference_and_links_every_version(self):
         apps = {'app': {'name': 'App', 'target': '1.0', 'supported': '1.0'},
                 'app2': {'name': 'Equal', 'target': '1.1', 'supported': '1.1'}}
-        sources = {'APKMirror': listing('2.1'), 'APKPure': listing('2.0'), 'Google Play': {'status': 'Version unavailable'}}
+        sources = {'APKMirror': listing('2.1', 'https://example.com/mirror'),
+                   'APKPure': listing('2.0', 'https://example.com/pure'),
+                   'Google Play': {'status': 'Version unavailable'}}
         equal = dict.fromkeys(monitor.SOURCES, listing('1.1'))
         dev = {'patches': [{'compatiblePackages': [
             {'packageName': 'app', 'name': 'App', 'targets': [{'version': '3.0'}]},
@@ -160,7 +162,8 @@ class UpdateTests(unittest.TestCase):
         self.assertIn('| **Equal** | 1.1 | — |', body)
         self.assertIn('Google Play · Version unavailable', body)
         self.assertLess(body.index('Newer builds to review'), body.index('Other source comparisons'))
-        self.assertEqual(body.count('https://example.com/app'), 2)
+        self.assertIn('**[APKMirror 2.1](https://example.com/mirror)**', body)
+        self.assertIn('[APKPure 2.0](https://example.com/pure)', body)
 
     @patch.object(monitor, 'api')
     @patch.object(monitor, 'send_email')

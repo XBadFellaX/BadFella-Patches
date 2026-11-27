@@ -381,7 +381,7 @@ def dashboard(apps, listings_by_package, catalog_name, dev_catalog=None):
         for source in SOURCES:
             item = listings.get(source, {})
             if item.get('version'):
-                result = f"{source} {text(item['version'])}"
+                result = f"[{source} {text(item['version'])}]({item['url']})"
                 shown_sources.append(f'**{result}**' if source in winners else result)
             elif item.get('status') and item['status'] != 'No official repository mapped':
                 unavailable.append(f"{source} · {text(item['status'])}")
