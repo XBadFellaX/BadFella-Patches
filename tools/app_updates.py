@@ -1,35 +1,48 @@
-"""Daily upstream discovery; notification state lives in the issue's bot comments."""
+"""Compare app versions and keep the monitoring issue's dashboard current."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from email.message import EmailMessage
 from email.utils import parsedate_to_datetime
+from functools import partial
 import json
 import os
 from pathlib import Path
 import re
+import smtplib
+import ssl
+from threading import Lock
+from time import monotonic, sleep
 import urllib.error
+from urllib.parse import quote
 import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
 
-MARKER = '<!-- badfella-app-update-state\n'
+MARKER = '<!-- badfella-app-update-dashboard -->'
+EMAIL_PENDING = '<!-- badfella-app-update-email-pending -->'
 USER_AGENT = 'BadFella-App-Updates/1.0'
+SOURCES = ('APKMirror', 'APKPure', 'Google Play')
+SOURCE_ERRORS = (OSError, ValueError, KeyError, TypeError, IndexError, ET.ParseError)
+MIRROR_SEARCH_LOCK = Lock()
+next_mirror_search = 0.0
 FEEDS = {
     'com.linkedin.android': 'linkedin/linkedin-linkedin',
     'com.openai.chatgpt': 'openai/chatgpt',
     'com.mb.android': 'emby-media/emby-for-android',
+    'com.ticktick.task': 'ticktick-limited/ticktick-to-do-list-with-reminder-day-planner',
+    'com.mixapplications.ultimateusb': 'mixapplications/ultimate-usb-all-in-one-tool',
     'com.wellocution.androidapp': 'boldvoice/boldvoice-accent-training',
     'com.wanderlog.android': 'wanderlog/wanderlog-trip-planner-app',
     'tech.simha.androidtvremote': 'simha-software/remote-for-android-tv',
 }
 
 
-def request(url, data=None, headers=None):
+def request(url, data=None, headers=None, method=None):
     headers = {'User-Agent': USER_AGENT, **(headers or {})}
     if data is not None:
         headers['Content-Type'] = 'application/json'
         data = json.dumps(data).encode()
-    with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers), timeout=30) as response:
+    with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=30) as response:
         return response.read()
 
 
@@ -52,15 +65,19 @@ def catalog_apps(catalog, catalog_name='Public', reviewed_versions=None):
 
 
 def mirror_latest(data, path):
-    items = ET.fromstring(data).findall('./channel/item')
-    if not items:
-        raise ValueError('APKMirror feed has no releases')
-    item = max(items, key=lambda i: parsedate_to_datetime(i.findtext('pubDate')))
-    url = item.findtext('link', '')
-    if not url.startswith('https://www.apkmirror.com/apk/' + path + '/'):
-        raise ValueError('APKMirror returned an unexpected app link')
-    return {'order': parsedate_to_datetime(item.findtext('pubDate')).timestamp(),
-            'title': item.findtext('title'), 'url': url, 'source': 'APKMirror'}
+    releases = []
+    for item in ET.fromstring(data).findall('./channel/item'):
+        url = item.findtext('link', '')
+        if not re.fullmatch(r'https://www\.apkmirror\.com/apk/' + re.escape(path) + r'/[\w-]+/', url):
+            continue
+        title = item.findtext('title', '')
+        version = re.search(r'\s([0-9]+(?:\.[0-9]+)*(?:\s*(?:alpha|beta|rc)\s*\d*)?)\s+by\s+', title, re.I)
+        released = parsedate_to_datetime(item.findtext('pubDate'))
+        releases.append((version_key(version[1]) if version else (), released,
+                         {'version': version[1] if version else None, 'url': url}))
+    if not releases:
+        raise ValueError('APKMirror feed has no matching releases')
+    return max(releases, key=lambda release: (bool(release[0]), release[0], release[1]))[2]
 
 
 def pure_latest(packages):
@@ -74,8 +91,7 @@ def pure_latest(packages):
                              {'ual-access-businessid': 'projecta', 'ual-access-projecta': json.dumps(header)}))
     if data.get('retcode') != 0:
         raise ValueError('APKPure refused the update request')
-    return {app['package_name']: {'order': int(app['version_code']), 'title': app['version_name'],
-                                 'url': 'https://apkpure.com/p/' + app['package_name'], 'source': 'APKPure'}
+    return {app['package_name']: {'version': app['version_name'], 'url': 'https://apkpure.com/p/' + app['package_name']}
             for app in data['app_update_response'] if app['package_name'] in packages}
 
 
@@ -86,168 +102,223 @@ def play_latest(data, package):
         raise ValueError('Google Play app metadata missing')
     # shortcut: public ds:5 layout from google-play-scraper; review its mapping if Play changes the page.
     details = json.JSONDecoder().raw_decode(html[match.end():])[0]
-    version = details[1][2][140][0][0][0]
+    try:
+        version = details[1][2][140][0][0][0]
+    except (IndexError, TypeError):
+        version = None
     if not isinstance(version, str) or not version.strip() or version == 'Varies with device':
-        raise ValueError('Google Play did not expose an app version')
-    order = [int(part) for part in version.split('.')] if re.fullmatch(r'\d+(?:\.\d+)*', version) else None
-    return {'order': order, 'title': version,
-            'url': 'https://play.google.com/store/apps/details?id=' + package, 'source': 'Google Play'}
+        return {'status': 'Version unavailable'}
+    return {'version': version, 'url': 'https://play.google.com/store/apps/details?id=' + package}
 
 
-def check_play(packages):
+def play_listing(package):
+    try:
+        return play_latest(request(f'https://play.google.com/store/apps/details?id={package}&hl=en_US&gl=US'), package)
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return {'status': 'No listing'}
+        raise
+
+
+def mirror_listing(package, feed):
+    global next_mirror_search
+    origin = 'https://www.apkmirror.com'
+    if not feed:
+        # shortcut: public APKMirror package search markup; update the matcher if the site changes.
+        with MIRROR_SEARCH_LOCK:
+            delay = next_mirror_search - monotonic()
+            if delay > 0:
+                sleep(delay)
+            next_mirror_search = monotonic() + 2
+            search = request(f'{origin}/?post_type=app_release&searchtype=app&s={quote(package)}').decode()
+        paths = dict.fromkeys(re.findall(r'href="/apk/([\w-]+/[\w-]+)/"', search))
+        matches = []
+        for path in paths:
+            page = request(f'{origin}/apk/{path}/').decode()
+            if f'https://play.google.com/store/apps/details?id={package}"' in page:
+                matches.append(path)
+        if len(matches) != 1:
+            return {'status': 'Ambiguous listing' if matches else 'No listing found'}
+        feed = matches[0]
+    return mirror_latest(request(f'{origin}/apk/{feed}/feed/'), feed)
+
+
+def collect(apps, feeds):
+    packages = sorted(apps)
+    try:
+        pure = pure_latest(packages)
+    except SOURCE_ERRORS as error:
+        print(f'APKPure check failed ({type(error).__name__})')
+        pure = dict.fromkeys(packages, {'status': 'Check failed'})
+
     def check(package):
-        try:
-            url = 'https://play.google.com/store/apps/details?id=' + package + '&hl=en_US&gl=US'
-            return play_latest(request(url), package), None
-        except urllib.error.HTTPError as error:
-            return None, 'Listing unavailable' if error.code == 404 else f'HTTP {error.code}'
-        except (urllib.error.URLError, ValueError, KeyError, TypeError, IndexError, TimeoutError) as error:
-            return None, type(error).__name__
+        sources = {'APKPure': pure.get(package, {'status': 'No listing found'})}
+        for source, probe in (('APKMirror', partial(mirror_listing, package, feeds.get(package))),
+                              ('Google Play', partial(play_listing, package))):
+            try:
+                sources[source] = probe()
+            except urllib.error.HTTPError as error:
+                print(f'{source} check failed for {package} (HTTP {error.code})')
+                sources[source] = {'status': 'Rate limited' if error.code == 429 else 'Check failed'}
+            except SOURCE_ERRORS as error:
+                print(f'{source} check failed for {package} ({type(error).__name__})')
+                sources[source] = {'status': 'Check failed'}
+        return package, sources
 
-    found, errors = {}, {}
-    packages = sorted(packages)
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        for package, (item, error) in zip(packages, pool.map(check, packages)):
-            if error is None:
-                found[package] = item
-            else:
-                errors[package] = error
-    return found, errors
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        return dict(pool.map(check, packages))
 
 
-def collect(apps, play_packages=()):
-    play_packages = set(play_packages)
-    found, errors = {}, {}
-    pure = [p for p in apps if p not in FEEDS and p not in play_packages]
-    if pure:
-        try:
-            found.update(pure_latest(pure))
-            for package in pure:
-                if package not in found:
-                    errors[package] = 'APKPure did not return this app'
-        except (urllib.error.URLError, ValueError, KeyError, TypeError, TimeoutError) as error:
-            errors.update({p: type(error).__name__ for p in pure})
-    for package in apps.keys() & FEEDS.keys():
-        try:
-            found[package] = mirror_latest(request('https://www.apkmirror.com/apk/' + FEEDS[package] + '/feed/'), FEEDS[package])
-        except (urllib.error.URLError, ValueError, KeyError, TypeError, TimeoutError, ET.ParseError) as error:
-            errors[package] = type(error).__name__
-    play_found, play_errors = check_play(apps.keys() & play_packages)
-    found.update(play_found)
-    errors.update(play_errors)
-    return found, errors
+def version_key(version):
+    match = re.fullmatch(r'(\d+(?:\.\d+)*)(?:\s*(alpha|beta|rc)\s*(\d*))?', version, re.I)
+    if not match:
+        return ()
+    numbers = tuple(map(int, match[1].split('.')))
+    while len(numbers) > 1 and numbers[-1] == 0:
+        numbers = numbers[:-1]
+    stage = match[2].lower() if match[2] else None
+    return numbers, ('alpha', 'beta', 'rc', None).index(stage), int(match[3] or 0)
 
 
-def advance(previous, found, errors):
-    latest = dict(previous.get('latest', {}))
-    changed = []
-    for package, item in found.items():
-        old = latest.get(package)
-        # Source order is comparable only within one provider; a provider switch establishes a new baseline.
-        if old and old['source'] == item['source'] and old['order'] is not None and item['order'] is not None:
-            is_new = item['order'] > old['order']
-        else:
-            is_new = old is None or item['source'] != old['source'] or item['title'] != old['title']
-        if is_new:
-            latest[package] = item
-            changed.append(package)
-    state = {'latest': latest, 'errors': errors}
-    notify = bool(changed) or errors != previous.get('errors', {}) or not previous
-    return state, changed, notify
-
-
-def update_state(apps, previous, play_packages):
-    found, errors = collect(apps, play_packages)
-    state, changed, notify = advance(previous, found, errors)
-    play_found, play_errors = check_play(apps.keys() - set(play_packages))
-    old_play = previous.get('play', {})
-    state['play'], play_changed, play_notify = advance(old_play, play_found, play_errors)
-    availability_changed = {p for p in old_play.get('errors', {}).keys() | play_errors.keys()
-                            if old_play.get('errors', {}).get(p) != play_errors.get(p)}
-    changed = (set(changed) | set(play_changed) | availability_changed) & apps.keys()
-    return state, changed, notify or play_notify
+def compare(package, listings, worked_on):
+    available = [(source, listings[source]) for source in SOURCES if listings[source].get('version')]
+    if not available:
+        return None, [], 'No version available', 2
+    versions = {listing['version'] for _, listing in available}
+    ranked = [(source, version_key(listing['version'])) for source, listing in available]
+    by_source = dict(ranked)
+    pure = by_source.get('APKPure')
+    reference = by_source.get('APKMirror') or by_source.get('Google Play') or version_key(worked_on)
+    if package == 'com.linkedin.android' and pure and reference and pure[0][0] != reference[0][0]:
+        return None, [], 'Needs review · APKPure version line differs', 1
+    if len(versions) > 1 and any(not key for _, key in ranked):
+        return None, [], 'Needs review · version formats differ', 1
+    highest = max(key for _, key in ranked)
+    winners = [source for source, key in ranked if key == highest]
+    baseline = version_key(worked_on)
+    if highest and baseline and highest > baseline:
+        return winners[0], winners, 'Newer than worked on', 0
+    if versions == {worked_on} or highest and highest == baseline:
+        return winners[0], winners, 'Matches worked on', 2
+    if highest and baseline:
+        return winners[0], winners, 'Older than worked on', 2
+    return winners[0], winners, 'Compare with worked-on version', 1
 
 
 def text(value):
-    return str(value).replace('\n', ' ').replace('|', '\\|').replace('`', '').replace('@', '@\u200b')
+    return (str(value).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            .replace('|', '\\|').replace('[', '\\[').replace(']', '\\]')
+            .replace('\n', ' ').replace('\r', ' ').replace('`', '').replace('@', '@\u200b'))
 
 
-def message(apps, previous, state, changed):
-    play = state.get('play', {})
-    play_errors = play.get('errors', {})
-    lines = ['@XBadFellaX', '', 'App update watch: ' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'), '',
-             'Starting snapshot. Future alerts report listing changes since this check.' if not previous else 'Listing or source availability changes.', '',
-             '| Catalog | App (worked-on version) | Mirror listing | Google Play (US) |', '| --- | --- | --- | --- |']
-    for package in sorted(changed):
-        item = state['latest'].get(package)
-        play_item = play.get('latest', {}).get(package)
-        if item and item['source'] == 'Google Play':
-            item, play_item = None, item
-        mirror_link = f"[{text(item['title'])}]({item['url']}) ({item['source']})" if item else '—'
-        play_link = f"[{text(play_item['title'])}]({play_item['url']})" if play_item else '—'
-        if package in play_errors:
-            play_link = 'Version unavailable'
-            if play_errors[package] != 'Listing unavailable':
-                play_link = f'[{play_link}](https://play.google.com/store/apps/details?id={package})'
-        lines.append(f"| {text(apps[package]['catalog'])} | {text(apps[package]['name'])} ({text(apps[package]['supported'])}) | "
-                     f'{mirror_link} | {play_link} |')
-    if not changed:
-        lines.append('| | No new listings | | |')
-    if state['errors']:
-        lines += ['', 'Could not check: ' + '; '.join(text(apps[p]['name']) + ' (' + e + ')' for p, e in sorted(state['errors'].items()))]
-    elif previous.get('errors'):
-        lines += ['', 'Primary sources are responding again.']
-    lines += ['', 'Worked-on versions identify reviewed inputs or declared patch targets. Mirror listings can include betas. Google Play availability varies by region, device and rollout.',
-              '', MARKER + json.dumps(state, separators=(',', ':')) + '\n-->']
+def dashboard(apps, listings_by_package, catalog_name):
+    sections = ('Newer builds to review', 'Needs review', 'Other source comparisons')
+    rows = [[], [], []]
+    for package, app in sorted(apps.items(), key=lambda pair: pair[1]['name'].casefold()):
+        listings = listings_by_package[package]
+        selected, winners, status, section = compare(package, listings, app['supported'])
+        cells = [f"**{text(app['name'])}**", text(app['supported'])]
+        for source in SOURCES:
+            item = listings[source]
+            version = text(item.get('version') or item.get('status') or 'Version unavailable')
+            cells.append(f'**{version}**' if source in winners else version)
+        if selected:
+            item = listings[selected]
+            label = f"{selected} · {text(item['version'])}"
+            tie = ' · all three tied' if len(winners) == 3 else ' · tied' if len(winners) == 2 else ''
+            partial_check = ' · partial check' if any(item.get('status') in {'Check failed', 'Rate limited'}
+                                                      for item in listings.values()) else ''
+            cells.append(f"**[{label}]({item['url']})**{tie}{partial_check}")
+        else:
+            cells.append(status.removeprefix('Needs review · '))
+        rows[section].append('| ' + ' | '.join(cells) + ' |')
+
+    lines = [MARKER, f'## App update watch · {catalog_name}', '',
+             'Latest available listings for the patch catalog. Worked-on versions are reviewed inputs or declared targets.', '']
+    for heading, group in zip(sections, rows):
+        if group:
+            lines.extend((f'### {heading}', '',
+                          '| App | Worked on | APKMirror | APKPure | Google Play (US) | Latest source |',
+                          '| --- | --- | --- | --- | --- | --- |', *group, ''))
+    lines.extend(('The link goes to the newest comparable listing. Ties prefer APKMirror, then APKPure, then Google Play.',
+                  'Availability varies by device, region and rollout. Beta builds are labeled when the source exposes that information.', ''))
     return '\n'.join(lines)
 
 
-def api(path, data=None):
+def api(path, data=None, method=None):
     return json.loads(request('https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] + path, data,
-                              {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'}))
+                              {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                               'Accept': 'application/vnd.github+json'}, method))
 
 
-def previous_state(issue):
-    page, state = 1, {}
-    while True:
-        comments = api(f'/issues/{issue}/comments?per_page=100&page={page}')
-        for comment in comments:
-            if comment['user']['login'] != 'github-actions[bot]' or MARKER not in comment['body']:
-                continue
-            state = json.loads(comment['body'].split(MARKER, 1)[1].split('\n-->', 1)[0])
-        if len(comments) < 100:
-            return state
-        page += 1
+def send_email(config, issue_url, catalog_name):
+    message = EmailMessage()
+    message['Subject'] = f'BadFella {catalog_name.lower()} app update watch changed'
+    message['From'] = config.get('from') or config['username']
+    message['To'] = config['to']
+    message.set_content(f'The app update dashboard has changed.\n\n{issue_url}\n')
+    context = ssl.create_default_context()
+    port = int(config.get('port', 587))
+    if port == 465:
+        connection = smtplib.SMTP_SSL(config['host'], port, timeout=30, context=context)
+    else:
+        connection = smtplib.SMTP(config['host'], port, timeout=30)
+    with connection as smtp:
+        if port != 465:
+            smtp.starttls(context=context)
+        smtp.login(config['username'], config['password'])
+        smtp.send_message(message)
+
+
+def update_issue(path, previous, body, catalog_name, email_config):
+    previous_body = previous['body'].rstrip()
+    pending = previous_body.endswith(EMAIL_PENDING)
+    if body.rstrip() != previous_body.removesuffix(EMAIL_PENDING).rstrip():
+        api(path, {'body': body + '\n' + EMAIL_PENDING}, 'PATCH')
+        pending = True
+        print('Updated the dashboard in the issue description')
+    if not pending:
+        print('No dashboard changes')
+        return
+    if not email_config:
+        print('Email pending: APP_UPDATE_SMTP_CONFIG is not configured')
+        return
+    try:
+        send_email(json.loads(email_config), previous['html_url'], catalog_name)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise SystemExit(f'Email delivery failed ({type(error).__name__}); will retry') from None
+    api(path, {'body': body}, 'PATCH')
+    print('Email accepted by the SMTP relay')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--dry-run', action='store_true', help='Read upstreams and print a snapshot; never access GitHub issues')
-    parser.add_argument('--catalog', type=Path, default=Path('patches-list.json'), help='catalog from the repository being monitored')
+    parser.add_argument('--dry-run', action='store_true', help='Print the dashboard without editing the issue')
+    parser.add_argument('--catalog', type=Path, default=Path('patches-list.json'))
     parser.add_argument('--catalog-name', choices=['Public', 'Private'], default='Public')
-    parser.add_argument('--reviewed-versions', type=Path, help='recorded app versions used for patch work; display only')
-    parser.add_argument('--play-package', action='append', default=[], help='package to check through public Play metadata instead of APKPure')
+    parser.add_argument('--reviewed-versions', type=Path)
+    parser.add_argument('--mirror-feed', action='append', default=[], metavar='PACKAGE=DEVELOPER/APP')
     args = parser.parse_args()
     reviewed = json.loads(args.reviewed_versions.read_text(encoding='utf-8')) if args.reviewed_versions else {}
     apps = catalog_apps(json.loads(args.catalog.read_text(encoding='utf-8')), args.catalog_name, reviewed)
-    issue = os.environ.get('APP_UPDATE_ISSUE')
-    if not args.dry_run and (not issue or not issue.isdecimal()):
+    feeds = FEEDS | dict(entry.split('=', 1) for entry in args.mirror_feed)
+    if any(not re.fullmatch(r'[\w-]+/[\w-]+', feed) for feed in feeds.values()):
+        raise ValueError('Invalid APKMirror feed path')
+    issue = os.environ.get('APP_UPDATE_ISSUE', '')
+    if not args.dry_run and not issue.isdecimal():
         raise ValueError('APP_UPDATE_ISSUE must identify the monitoring issue')
-    if not args.dry_run and args.catalog_name == 'Private' and not api('')['private']:
-        raise ValueError('Update notifications must stay in a private repository')
-    previous = {} if args.dry_run else previous_state(issue)
-    state, changed, notify = update_state(apps, previous, args.play_package)
-    errors = state['errors']
-    body = message(apps, previous, state, changed)
+    if not args.dry_run and api('')['private'] != (args.catalog_name == 'Private'):
+        raise ValueError('The catalog and monitoring repository visibility must match')
+    path = f'/issues/{issue}'
+    previous = {} if args.dry_run else api(path)
+    if previous and ('pull_request' in previous or previous['title'] != 'Daily upstream app version alerts'):
+        raise ValueError('APP_UPDATE_ISSUE points to a different issue')
+    listings = collect(apps, feeds)
+    body = dashboard(apps, listings, args.catalog_name)
     if args.dry_run:
         print(body)
-    elif notify:
-        api(f'/issues/{issue}/comments', {'body': body})
-        print(f"Posted {len(changed)} app(s), {len(errors)} primary source error(s), {len(state['play']['errors'])} additional Play version(s) unavailable")
     else:
-        print('No new listings or changes in source availability; no notification sent')
-    if errors:
-        raise SystemExit(1)
+        update_issue(path, previous, body, args.catalog_name, os.environ.get('APP_UPDATE_SMTP_CONFIG'))
 
 
 if __name__ == '__main__':

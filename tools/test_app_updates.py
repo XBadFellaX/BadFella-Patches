@@ -1,169 +1,137 @@
+import json
 import unittest
 from unittest.mock import patch
 
 import app_updates as monitor
 
 
-def item(order=10, source='APKMirror'):
-    return {'order': order, 'title': 'App 2.0 beta', 'url': 'https://www.apkmirror.com/apk/example/app/2/', 'source': source}
+def listing(version, url='https://example.com/app'):
+    return {'version': version, 'url': url}
 
 
 class UpdateTests(unittest.TestCase):
-    def test_snapshot_then_unchanged_run_is_silent(self):
-        state, changed, notify = monitor.advance({}, {'app': item()}, {})
-        self.assertEqual(changed, ['app'])
-        self.assertTrue(notify)
-        self.assertEqual(monitor.advance(state, {'app': item()}, {}), (state, [], False))
-
-    def test_new_release_and_provider_baselines(self):
-        previous = {'latest': {'app': item()}, 'errors': {}}
-        self.assertEqual(monitor.advance(previous, {'app': item(11)}, {})[1:], (['app'], True))
-        self.assertEqual(monitor.advance(previous, {'app': item(1, 'APKPure')}, {})[1:], (['app'], True))
-
-    def test_older_listing_does_not_replace_newer_state(self):
-        previous = {'latest': {'app': item()}, 'errors': {}}
-        self.assertEqual(monitor.advance(previous, {'app': item(9)}, {}), (previous, [], False))
-
-    def test_play_version_without_numeric_order_alerts_once_on_change(self):
-        previous = {'latest': {'app': item([1, 0], 'Google Play')}, 'errors': {}}
-        play = {**item(None, 'Google Play'), 'title': '8a14774d3a9cb8f25eaae58f4c4e4f3e'}
-        state, changed, notify = monitor.advance(previous, {'app': play}, {})
-        self.assertEqual((changed, notify), (['app'], True))
-        self.assertEqual(monitor.advance(state, {'app': play}, {}), (state, [], False))
-
-    def test_failure_preserves_baseline_and_only_notifies_on_transition(self):
-        previous = {'latest': {'app': item()}, 'errors': {}}
-        state, changed, notify = monitor.advance(previous, {}, {'app': 'HTTPError'})
-        self.assertTrue(notify)
-        self.assertEqual(state['latest'], previous['latest'])
-        self.assertEqual(changed, [])
-        self.assertFalse(monitor.advance(state, {}, {'app': 'HTTPError'})[2])
-        self.assertTrue(monitor.advance(state, {'app': item()}, {})[2])
-
-    def test_feed_uses_publication_date_and_validates_app_link(self):
-        feed = b'''<rss><channel><item><title>App 2 beta</title>
-<pubDate>Thu, 19 Nov 2026 18:11:38 +0000</pubDate>
-<link>https://www.apkmirror.com/apk/example/app/2/</link></item>
-<item><title>App 1</title><pubDate>Wed, 18 Nov 2026 18:11:38 +0000</pubDate>
-<link>https://www.apkmirror.com/apk/example/app/1/</link></item></channel></rss>'''
-        self.assertEqual(monitor.mirror_latest(feed, 'example/app')['title'], 'App 2 beta')
-        with self.assertRaises(ValueError):
-            monitor.mirror_latest(feed, 'different/app')
-        with self.assertRaises(ValueError):
-            monitor.mirror_latest(b'<rss><channel/></rss>', 'example/app')
-
-    def test_catalog_deduplicates_and_keeps_wildcard_out_of_target(self):
+    def test_catalog_deduplicates_and_prefers_reviewed_version(self):
         app = {'packageName': 'app', 'name': 'App', 'targets': [{'version': '1.0'}, {'version': None}]}
-        apps = monitor.catalog_apps({'patches': [{'compatiblePackages': [app]}, {'compatiblePackages': [app]}]})
-        self.assertEqual(apps, {'app': {'name': 'App', 'catalog': 'Public', 'supported': '1.0'}})
+        apps = monitor.catalog_apps({'patches': [{'compatiblePackages': [app, app]}]}, 'Private', {'app': '1.1'})
+        self.assertEqual(apps, {'app': {'name': 'App', 'catalog': 'Private', 'supported': '1.1'}})
 
-    def test_private_catalog_and_existing_state_extend_without_reset(self):
-        app = {'packageName': 'private', 'name': 'Private app', 'targets': [{'version': '1.0'}]}
-        apps = monitor.catalog_apps({'patches': [{'compatiblePackages': [app]}]}, 'Private')
-        self.assertEqual(apps['private']['catalog'], 'Private')
-        previous = {'latest': {'public': item()}, 'errors': {}}
-        state, changed, notify = monitor.advance(previous, {'public': item(), 'private': item()}, {})
-        self.assertEqual(changed, ['private'])
-        self.assertTrue(notify)
-        self.assertEqual(state['latest']['public'], previous['latest']['public'])
-        body = monitor.message(apps, previous, state, changed)
-        self.assertIn('| Private | Private app (1.0) |', body)
-        self.assertFalse(monitor.advance(state, {'public': item(), 'private': item()}, {})[2])
-
-    def test_reviewed_version_is_display_only_and_does_not_pin_catalog(self):
-        app = {'packageName': 'app', 'name': 'App', 'targets': [{'version': None}]}
-        catalog = {'patches': [{'compatiblePackages': [app]}]}
-        apps = monitor.catalog_apps(catalog, 'Private', {'app': '2.10.3'})
-        state, changed, _ = monitor.advance({}, {'app': item()}, {})
-        body = monitor.message(apps, {}, state, changed)
-        self.assertIn('| Private | App (2.10.3) |', body)
-        self.assertNotIn('not version-pinned', body)
-        self.assertIsNone(app['targets'][0]['version'])
-        self.assertFalse(monitor.advance(state, {'app': item()}, {})[2])
+    def test_apkmirror_selects_highest_version_before_publication_time(self):
+        feed = b"""<rss><channel><item><title>App 2.0 beta by Author</title>
+<pubDate>Thu, 19 Nov 2026 18:11:38 +0000</pubDate>
+<link>https://www.apkmirror.com/apk/example/app/beta/</link></item>
+<item><title>App 2.0 by Author</title><pubDate>Wed, 18 Nov 2026 18:11:38 +0000</pubDate>
+<link>https://www.apkmirror.com/apk/example/app/stable/</link></item></channel></rss>"""
+        self.assertEqual(monitor.mirror_latest(feed, 'example/app')['version'], '2.0')
         with self.assertRaises(ValueError):
-            monitor.catalog_apps(catalog, reviewed_versions={'app': 123})
-        with self.assertRaises(ValueError):
-            monitor.catalog_apps(catalog, reviewed_versions=[])
-
-    def test_public_play_metadata_is_parsed_as_json_without_execution(self):
-        import json
-        row = [None] * 141
-        row[140] = [[['2.10.3']]]
-        data = 'AF_initDataCallback({key: \'ds:5\', data:' + json.dumps([None, [None, None, row]]) + ', sideChannel:{}});'
-        result = monitor.play_latest(data.encode(), 'example.app')
-        self.assertEqual(result['title'], '2.10.3')
-        self.assertEqual(result['order'], [2, 10, 3])
-        self.assertIsNone(monitor.play_latest(data.replace('2.10.3', 'a1b2c3').encode(), 'example.app')['order'])
-        with self.assertRaises(ValueError):
-            monitor.play_latest(b'<html>Consent required</html>', 'example.app')
-        with self.assertRaises(ValueError):
-            monitor.play_latest(data.replace('2.10.3', 'Varies with device').encode(), 'example.app')
+            monitor.mirror_latest(feed, 'other/app')
+        self.assertGreater(monitor.version_key('2.1 beta2'), monitor.version_key('2.1 beta1'))
 
     @patch.object(monitor, 'request')
-    def test_apkpure_maps_only_requested_apps(self, request):
-        request.return_value = b'{"retcode":0,"app_update_response":[{"package_name":"app","version_name":"2.0","version_code":"123"}]}'
-        self.assertEqual(monitor.pure_latest(['app'])['app']['order'], 123)
-        self.assertEqual(monitor.pure_latest(['app'])['app']['url'], 'https://apkpure.com/p/app')
-        self.assertEqual(monitor.pure_latest(['different']), {})
-        request.return_value = b'{"retcode":1}'
+    def test_apkmirror_search_verifies_package_and_rejects_ambiguity(self, request):
+        request.side_effect = [b'<a href="/apk/team/app/"><a href="/apk/team/watch/">',
+                               b'<a href="https://play.google.com/store/apps/details?id=example.app">',
+                               b'<a href="https://play.google.com/store/apps/details?id=example.app">']
+        self.assertEqual(monitor.mirror_listing('example.app', None), {'status': 'Ambiguous listing'})
+
+    @patch.object(monitor, 'request')
+    def test_apkpure_maps_only_requested_packages(self, request):
+        request.return_value = b'{"retcode":0,"app_update_response":[{"package_name":"app","version_name":"2.0"}]}'
+        self.assertEqual(monitor.pure_latest(['app']), {'app': listing('2.0', 'https://apkpure.com/p/app')})
+        self.assertEqual(monitor.pure_latest(['other']), {})
+
+    def test_google_play_handles_numeric_opaque_and_missing_versions(self):
+        for version in ['2.10.3', 'a1b2c3', 'Varies with device']:
+            row = [None] * 141
+            row[140] = [[[version]]]
+            raw = "AF_initDataCallback({key: 'ds:5', data:" + json.dumps([None, [None, None, row]]) + '});'
+            expected = ({'status': 'Version unavailable'} if version == 'Varies with device'
+                        else listing(version, 'https://play.google.com/store/apps/details?id=example.app'))
+            self.assertEqual(monitor.play_latest(raw.encode(), 'example.app'), expected)
         with self.assertRaises(ValueError):
-            monitor.pure_latest(['app'])
+            monitor.play_latest(b'<html>Consent required</html>', 'example.app')
+
+    @patch.object(monitor, 'play_listing', return_value=listing('2.1'))
+    @patch.object(monitor, 'mirror_listing', side_effect=OSError)
+    @patch.object(monitor, 'pure_latest', return_value={'app': listing('2.0')})
+    def test_every_source_is_checked_even_if_one_fails(self, pure, mirror, play):
+        self.assertEqual(monitor.collect({'app': {}}, {'app': 'example/app'}),
+                         {'app': {'APKMirror': {'status': 'Check failed'}, 'APKPure': listing('2.0'),
+                                  'Google Play': listing('2.1')}})
+        pure.assert_called_once_with(['app'])
+        mirror.assert_called_once_with('app', 'example/app')
+        play.assert_called_once_with('app')
+
+    def test_comparison_selects_single_link_and_marks_ties(self):
+        sources = dict.fromkeys(monitor.SOURCES, listing('2.0'))
+        result = monitor.compare('app', sources, '1.0')
+        self.assertEqual(result, ('APKMirror', list(monitor.SOURCES), 'Newer than worked on', 0))
+        sources['Google Play'] = listing('2.1')
+        self.assertEqual(monitor.compare('app', sources, '1.0')[0], 'Google Play')
+
+    def test_comparison_flags_linkedin_and_opaque_disagreement(self):
+        sources = {'APKMirror': listing('4.1.1279 beta'), 'APKPure': listing('6.1.1'), 'Google Play': listing('4.1.1276')}
+        self.assertIn('version line differs', monitor.compare('com.linkedin.android', sources, '4.1.1276')[2])
+        sources['APKPure'] = listing('abc123')
+        self.assertIn('version formats differ', monitor.compare('app', sources, '1.0')[2])
+
+    def test_dashboard_uses_worked_on_version_and_only_links_winner(self):
+        apps = {'app': {'name': 'App', 'supported': '1.0'}, 'app2': {'name': 'Equal', 'supported': '1.1'}}
+        sources = {'APKMirror': listing('2.1'), 'APKPure': listing('2.0'), 'Google Play': {'status': 'Version unavailable'}}
+        equal = dict.fromkeys(monitor.SOURCES, listing('1.1'))
+        body = monitor.dashboard(apps, {'app': sources, 'app2': equal}, 'Public')
+        self.assertIn('| **App** | 1.0 | **2.1** | 2.0 | Version unavailable | **[APKMirror · 2.1]', body)
+        self.assertLess(body.index('Newer builds to review'), body.index('Other source comparisons'))
+        self.assertEqual(body.count('https://example.com/app'), 2)
+
+    @patch.object(monitor, 'api')
+    @patch.object(monitor, 'send_email')
+    def test_issue_edit_queues_email_and_unchanged_run_is_silent_after_delivery(self, send, api):
+        path = '/issues/12'
+        previous = {'body': 'old', 'html_url': 'https://github.example/issues/12'}
+        monitor.update_issue(path, previous, 'new', 'Public', '')
+        queued = api.call_args.args[1]['body']
+        self.assertTrue(queued.endswith(monitor.EMAIL_PENDING))
+        self.assertEqual(api.call_args.args[::2], (path, 'PATCH'))
+        send.assert_not_called()
+        api.reset_mock()
+        monitor.update_issue(path, {**previous, 'body': queued}, 'new', 'Public', '{}')
+        send.assert_called_once_with({}, previous['html_url'], 'Public')
+        api.assert_called_once_with(path, {'body': 'new'}, 'PATCH')
+        api.reset_mock()
+        send.reset_mock()
+        monitor.update_issue(path, {**previous, 'body': 'new'}, 'new', 'Public', '{}')
+        api.assert_not_called()
+        send.assert_not_called()
+
+    @patch.object(monitor, 'api')
+    @patch.object(monitor, 'send_email', side_effect=OSError)
+    def test_failed_email_keeps_pending_marker(self, send, api):
+        previous = {'body': 'old', 'html_url': 'https://github.example/issues/12'}
+        with self.assertRaisesRegex(SystemExit, 'will retry'):
+            monitor.update_issue('/issues/12', previous, 'new', 'Public', '{}')
+        api.assert_called_once_with('/issues/12', {'body': 'new\n' + monitor.EMAIL_PENDING}, 'PATCH')
+
+    @patch.object(monitor.smtplib, 'SMTP')
+    def test_email_uses_tls_and_sends_only_dashboard_link(self, smtp):
+        config = {'host': 'mail.example.com', 'username': 'sender@example.com',
+                  'password': 'fake', 'to': 'owner@example.com'}
+        monitor.send_email(config, 'https://github.example/issues/12', 'Private')
+        session = smtp.return_value.__enter__.return_value
+        session.starttls.assert_called_once()
+        session.login.assert_called_once_with(config['username'], 'fake')
+        message = session.send_message.call_args.args[0]
+        self.assertEqual(message['To'], config['to'])
+        self.assertIn('https://github.example/issues/12', message.get_content())
 
     @patch.dict(monitor.os.environ, {'APP_UPDATE_ISSUE': '1'})
     @patch('sys.argv', ['app_updates.py', '--catalog-name', 'Private'])
     @patch.object(monitor.Path, 'read_text', return_value='{"patches":[{"compatiblePackages":[{"packageName":"app","name":"App","targets":[]}]}]}')
     @patch.object(monitor, 'api', return_value={'private': False})
     @patch.object(monitor, 'collect')
-    def test_private_catalog_cannot_post_in_public_repository(self, collect, api, read_text):
-        with self.assertRaisesRegex(ValueError, 'private repository'):
+    def test_private_catalog_cannot_publish_in_public_repository(self, collect, api, read_text):
+        with self.assertRaisesRegex(ValueError, 'visibility must match'):
             monitor.main()
         collect.assert_not_called()
-
-    @patch.dict(monitor.FEEDS, {}, clear=True)
-    @patch.object(monitor, 'play_latest', return_value=item(11, 'Google Play'))
-    @patch.object(monitor, 'request', return_value=b'page')
-    @patch.object(monitor, 'pure_latest', return_value={'public': item(10, 'APKPure')})
-    def test_provider_selection_only_checks_supplied_catalog(self, pure, request, play):
-        found, errors = monitor.collect({'public': {}, 'selected-play': {}}, ['selected-play'])
-        pure.assert_called_once_with(['public'])
-        self.assertEqual(set(found), {'public', 'selected-play'})
-        self.assertEqual(errors, {})
-        self.assertEqual(request.call_count, 1)
-
-    @patch.object(monitor, 'collect', return_value=({'app': item(), 'play-only': item([1, 0], 'Google Play')}, {}))
-    @patch.object(monitor, 'check_play')
-    def test_play_tracks_alongside_mirrors_without_resetting_baselines(self, check_play, collect):
-        apps = {p: {'name': p, 'catalog': 'Public', 'supported': '1.0'} for p in ('app', 'play-only', 'missing')}
-        old = {'latest': {'app': item(20), 'play-only': item([1, 0], 'Google Play')}, 'errors': {}}
-        play = {'order': [2, 0], 'title': '2.0', 'url': 'https://play.google.com/store/apps/details?id=app',
-                'source': 'Google Play'}
-        check_play.return_value = {'app': play}, {'missing': 'Listing unavailable'}
-        state, changed, notify = monitor.update_state(apps, old, ['play-only'])
-        check_play.assert_called_once_with({'app', 'missing'})
-        self.assertTrue(notify)
-        self.assertEqual(changed, {'app', 'missing'})
-        self.assertEqual(state['latest'], old['latest'])
-        self.assertEqual(state['errors'], {})
-        body = monitor.message(apps, old, state, changed)
-        self.assertIn('(APKMirror) | [2.0](https://play.google.com/store/apps/details?id=app)', body)
-        self.assertIn('| missing (1.0) | — | Version unavailable |', body)
-        self.assertEqual(monitor.update_state(apps, state, ['play-only']), (state, set(), False))
-
-        check_play.return_value = {}, {'app': 'HTTP 503', 'missing': 'Listing unavailable'}
-        failed, changed, notify = monitor.update_state(apps, state, ['play-only'])
-        self.assertEqual((changed, notify), ({'app'}, True))
-        self.assertEqual(failed['play']['latest'], {'app': play})
-        check_play.return_value = {'app': play}, {'missing': 'Listing unavailable'}
-        self.assertEqual(monitor.update_state(apps, failed, ['play-only']), (state, {'app'}, True))
-
-    @patch.object(monitor, 'api')
-    def test_state_comes_from_bot_comments_and_covers_all_pages(self, api):
-        state = {'latest': {}, 'errors': {'app': 'HTTPError'}}
-        body = monitor.MARKER + '{"latest":{},"errors":{"app":"HTTPError"}}\n-->'
-        api.side_effect = [[{'user': {'login': 'someone'}, 'body': body}] * 100,
-                           [{'user': {'login': 'github-actions[bot]'}, 'body': body}]]
-        self.assertEqual(monitor.previous_state('1'), state)
-        self.assertEqual(api.call_count, 2)
 
 
 if __name__ == '__main__':

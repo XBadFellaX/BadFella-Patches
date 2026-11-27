@@ -330,9 +330,8 @@ and disappear when it ends. Capturing adds some overhead; it does not fix lag.
 
 ## App update alerts
 
-A daily check compares APKMirror or APKPure listings with public Google Play
-versions and posts changes to the
-[app update thread](https://github.com/XBadFellaX/BadFella-Patches/issues/12).
-Subscribe to that thread for GitHub email alerts. Mirrors can show betas before
-Google Play. Some Play listings hide the version, and availability varies by
-device, region and rollout. A new listing still needs patch compatibility testing.
+A daily check compares APKMirror, APKPure and Google Play and updates the
+[app update dashboard](https://github.com/XBadFellaX/BadFella-Patches/issues/12)
+when results change. Each row shows all three results and links to the newest
+comparable listing. Mirrors can show betas before Google Play. Availability
+varies by device, region and rollout.
