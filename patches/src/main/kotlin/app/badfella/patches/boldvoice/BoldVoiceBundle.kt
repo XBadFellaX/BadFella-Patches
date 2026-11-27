@@ -40,7 +40,7 @@ private val FORCE_UPDATE_470 = BundleProfile(
             0x147a32c, 96,
             hexBytes("5e080b416e080c00084508081fdc4ab309084508170c0b47b315083b1805176c18180045181820e7f519081803b32f083b1805206c18180044221803854520222144884418170edb3b1705176c17170045171720e7f56f082022181737061a08"),
             // Set the update flag to false and jump from 0x563 to its original store at 0x5bd.
-            hexBytes("96084b5a"),
+            hexBytes("9608af5a"),
         ),
     ),
 )

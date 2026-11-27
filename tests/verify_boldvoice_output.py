@@ -19,12 +19,12 @@ PROFILE_470 = (
     (0x1A6B1AD, 72, bytes.fromhex("8902014503020080b3130003130000b10f0045030201c3cb130103130001b128004505020253619401160105019302b1110144040503e690032c746e020405031301021300017600"), GATE_TRUE_RET_LONG),
     (0x1B07808, 16, bytes.fromhex("89000144000000f94500000180b37600"), GATE_TRUE_RET),
     (0x1B1C281, 16, bytes.fromhex("89000144000000f9450000011be67600"), GATE_TRUE_RET),
-    (0x147A32C, 96, bytes.fromhex("5e080b416e080c00084508081fdc4ab309084508170c0b47b315083b1805176c18180045181820e7f519081803b32f083b1805206c18180044221803854520222144884418170edb3b1705176c17170045171720e7f56f082022181737061a08"), bytes.fromhex("96084b5a")),
+    (0x147A32C, 96, bytes.fromhex("5e080b416e080c00084508081fdc4ab309084508170c0b47b315083b1805176c18180045181820e7f519081803b32f083b1805206c18180044221803854520222144884418170edb3b1705176c17170045171720e7f56f082022181737061a08"), bytes.fromhex("9608af5a")),
 )
 
 def verify_update_continuation(bundle):
     offset = PROFILE_470[-1][0]
-    assert bundle[offset : offset + 3] == bytes.fromhex("96084b"), "Expected LoadConstFalse r8 and Jmp"
+    assert bundle[offset : offset + 3] == bytes.fromhex("9608af"), "Expected HBC99 LoadConstFalse r8 and Jmp"
     jump = offset + 2
     target = jump + int.from_bytes(bundle[jump + 1 : jump + 2], "little", signed=True)
     assert target == 0x147A388, "Update bypass must continue at the original store"
