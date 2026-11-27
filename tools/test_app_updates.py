@@ -15,16 +15,21 @@ class UpdateTests(unittest.TestCase):
         apps = monitor.catalog_apps({'patches': [{'compatiblePackages': [app, app]}]}, 'Private', {'app': '1.1'})
         self.assertEqual(apps, {'app': {'name': 'App', 'catalog': 'Private', 'supported': '1.1'}})
 
-    def test_apkmirror_selects_highest_version_before_publication_time(self):
-        feed = b"""<rss><channel><item><title>App 2.0 beta by Author</title>
+    def test_apkmirror_selects_highest_stable_version_before_publication_time(self):
+        beta = b"""<item><title>App 2.1 beta by Author</title>
 <pubDate>Thu, 19 Nov 2026 18:11:38 +0000</pubDate>
-<link>https://www.apkmirror.com/apk/example/app/beta/</link></item>
-<item><title>App 2.0 by Author</title><pubDate>Wed, 18 Nov 2026 18:11:38 +0000</pubDate>
-<link>https://www.apkmirror.com/apk/example/app/stable/</link></item></channel></rss>"""
+<link>https://www.apkmirror.com/apk/example/app/beta/</link></item>"""
+        older = b"""<item><title>App 1.9 by Author</title>
+<pubDate>Fri, 20 Nov 2026 18:11:38 +0000</pubDate>
+<link>https://www.apkmirror.com/apk/example/app/older/</link></item>"""
+        stable = b"""<item><title>App 2.0 by Author</title><pubDate>Wed, 18 Nov 2026 18:11:38 +0000</pubDate>
+<link>https://www.apkmirror.com/apk/example/app/stable/</link></item>"""
+        feed = b'<rss><channel>' + beta + older + stable + b'</channel></rss>'
         self.assertEqual(monitor.mirror_latest(feed, 'example/app')['version'], '2.0')
         with self.assertRaises(ValueError):
             monitor.mirror_latest(feed, 'other/app')
-        self.assertGreater(monitor.version_key('2.1 beta2'), monitor.version_key('2.1 beta1'))
+        beta_only = b'<rss><channel>' + beta + b'</channel></rss>'
+        self.assertEqual(monitor.mirror_latest(beta_only, 'example/app'), {'status': 'No stable version in feed'})
 
     @patch.object(monitor, 'request')
     def test_apkmirror_search_verifies_package_and_rejects_ambiguity(self, request):
@@ -38,6 +43,8 @@ class UpdateTests(unittest.TestCase):
         request.return_value = b'{"retcode":0,"app_update_response":[{"package_name":"app","version_name":"2.0"}]}'
         self.assertEqual(monitor.pure_latest(['app']), {'app': listing('2.0', 'https://apkpure.com/p/app')})
         self.assertEqual(monitor.pure_latest(['other']), {})
+        request.return_value = request.return_value.replace(b'2.0', b'2.0-beta2')
+        self.assertEqual(monitor.pure_latest(['app']), {'app': {'status': 'Prerelease excluded'}})
 
     def test_google_play_handles_numeric_opaque_and_missing_versions(self):
         for version in ['2.10.3', 'a1b2c3', 'Varies with device']:
@@ -49,6 +56,8 @@ class UpdateTests(unittest.TestCase):
             self.assertEqual(monitor.play_latest(raw.encode(), 'example.app'), expected)
         with self.assertRaises(ValueError):
             monitor.play_latest(b'<html>Consent required</html>', 'example.app')
+        self.assertEqual(monitor.play_latest(raw.replace('Varies with device', '2.1 Beta').encode(), 'example.app'),
+                         {'status': 'Prerelease excluded'})
 
     @patch.object(monitor, 'play_listing', return_value=listing('2.1'))
     @patch.object(monitor, 'mirror_listing', side_effect=OSError)

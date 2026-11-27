@@ -23,6 +23,7 @@ EMAIL_PENDING = '<!-- badfella-app-update-email-pending -->'
 USER_AGENT = 'BadFella-App-Updates/1.0'
 SOURCES = ('APKMirror', 'APKPure', 'Google Play')
 SOURCE_ERRORS = (OSError, ValueError, KeyError, TypeError, IndexError, ET.ParseError)
+PRERELEASE = re.compile(r'(?<![a-z])(?:alpha|beta|rc|release[ -]candidate|preview|canary|nightly)(?![a-z])', re.I)
 MIRROR_SEARCH_LOCK = Lock()
 next_mirror_search = 0.0
 FEEDS = {
@@ -66,18 +67,32 @@ def catalog_apps(catalog, catalog_name='Public', reviewed_versions=None):
 
 def mirror_latest(data, path):
     releases = []
+    excluded = False
     for item in ET.fromstring(data).findall('./channel/item'):
         url = item.findtext('link', '')
         if not re.fullmatch(r'https://www\.apkmirror\.com/apk/' + re.escape(path) + r'/[\w-]+/', url):
             continue
         title = item.findtext('title', '')
-        version = re.search(r'\s([0-9]+(?:\.[0-9]+)*(?:\s*(?:alpha|beta|rc)\s*\d*)?)\s+by\s+', title, re.I)
+        if PRERELEASE.search(title.rsplit(' by ', 1)[0]):
+            excluded = True
+            continue
+        version = re.search(r'\s([0-9]+(?:\.[0-9]+)*)\s+by\s+', title, re.I)
         released = parsedate_to_datetime(item.findtext('pubDate'))
         releases.append((version_key(version[1]) if version else (), released,
                          {'version': version[1] if version else None, 'url': url}))
     if not releases:
+        if excluded:
+            return {'status': 'No stable version in feed'}
         raise ValueError('APKMirror feed has no matching releases')
     return max(releases, key=lambda release: (bool(release[0]), release[0], release[1]))[2]
+
+
+def stable_listing(version, url):
+    if not isinstance(version, str) or not version.strip() or version == 'Varies with device':
+        return {'status': 'Version unavailable'}
+    if PRERELEASE.search(version):
+        return {'status': 'Prerelease excluded'}
+    return {'version': version, 'url': url}
 
 
 def pure_latest(packages):
@@ -91,7 +106,7 @@ def pure_latest(packages):
                              {'ual-access-businessid': 'projecta', 'ual-access-projecta': json.dumps(header)}))
     if data.get('retcode') != 0:
         raise ValueError('APKPure refused the update request')
-    return {app['package_name']: {'version': app['version_name'], 'url': 'https://apkpure.com/p/' + app['package_name']}
+    return {app['package_name']: stable_listing(app['version_name'], 'https://apkpure.com/p/' + app['package_name'])
             for app in data['app_update_response'] if app['package_name'] in packages}
 
 
@@ -106,9 +121,7 @@ def play_latest(data, package):
         version = details[1][2][140][0][0][0]
     except (IndexError, TypeError):
         version = None
-    if not isinstance(version, str) or not version.strip() or version == 'Varies with device':
-        return {'status': 'Version unavailable'}
-    return {'version': version, 'url': 'https://play.google.com/store/apps/details?id=' + package}
+    return stable_listing(version, 'https://play.google.com/store/apps/details?id=' + package)
 
 
 def play_listing(package):
@@ -241,7 +254,7 @@ def dashboard(apps, listings_by_package, catalog_name):
                           '| App | Worked on | APKMirror | APKPure | Google Play (US) | Latest source |',
                           '| --- | --- | --- | --- | --- | --- |', *group, ''))
     lines.extend(('The link goes to the newest comparable listing. Ties prefer APKMirror, then APKPure, then Google Play.',
-                  'Availability varies by device, region and rollout. Beta builds are labeled when the source exposes that information.', ''))
+                  'Labeled prereleases are excluded. Availability varies by device, region and rollout.', ''))
     return '\n'.join(lines)
 
 

@@ -333,5 +333,5 @@ and disappear when it ends. Capturing adds some overhead; it does not fix lag.
 A daily check compares APKMirror, APKPure and Google Play and updates the
 [app update dashboard](https://github.com/XBadFellaX/BadFella-Patches/issues/12)
 when results change. Each row shows all three results and links to the newest
-comparable listing. Mirrors can show betas before Google Play. Availability
-varies by device, region and rollout.
+comparable listing. The check excludes labeled prereleases. Availability varies
+by device, region and rollout.
