@@ -1,3 +1,7 @@
+## 1.8.0-dev.8 (2026-11-26)
+
+- **BoldVoice:** Fix an early return during startup on 5.1.3 (build 470) when Disable upgrade nudges is enabled.
+
 ## 1.8.0-dev.7 (2026-11-26)
 
 - **Emby:** Verify both existing patches with Emby for Android 3.5.79 (build 300005793) on ARM64 and ARMv7.
